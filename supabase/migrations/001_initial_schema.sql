@@ -101,7 +101,6 @@ create table public.annual_expenses (
   annual_amount numeric(14,2) not null check (annual_amount >= 0),
   due_date date,
   monthly_reserve numeric(14,2) generated always as (round(annual_amount / 12, 2)) stored,
-  reserved_this_cycle boolean not null default false,
   active boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

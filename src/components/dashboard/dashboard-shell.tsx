@@ -1,12 +1,14 @@
 import type { ComponentType } from "react";
+import Link from "next/link";
 import { ArrowDownLeft, ArrowUpRight, Banknote, CalendarDays, CircleDollarSign, CreditCard, Landmark, PiggyBank, Plus, ShieldCheck, TrendingUp, WalletCards } from "lucide-react";
 import type { FinancialCycle } from "@/lib/finance/cycle";
-import type { DashboardSnapshot } from "@/lib/finance/types";
+import type { DashboardInput, DashboardSnapshot } from "@/lib/finance/types";
 import { dictionaries } from "@/lib/i18n/dictionaries";
 
 type DashboardShellProps = {
   cycle: FinancialCycle;
   salaryPaymentDate: Date;
+  input: DashboardInput;
   snapshot: DashboardSnapshot;
   source: "supabase" | "demo";
   status: "ready" | "empty" | "error";
@@ -48,25 +50,33 @@ function StatCard({ label, value, tone = "neutral", icon: Icon }: { label: strin
   );
 }
 
-function ProgressRow({ label, used, total, color = "bg-primary" }: { label: string; used: number; total: number; color?: string }) {
-  const percent = total <= 0 ? 0 : Math.min(100, Math.round((used / total) * 100));
+function ProgressRow({ label, used, total, detail, color = "bg-primary" }: { label: string; used: number; total: number; detail?: string; color?: string }) {
+  const rawPercent = total <= 0 ? 0 : Math.round((used / total) * 100);
+  const percent = Math.max(0, Math.min(100, rawPercent));
+  const overspent = used > total;
+  const barColor = overspent ? "bg-rose-500" : rawPercent >= 85 ? "bg-amber-500" : color;
 
   return (
     <div className="grid gap-2">
       <div className="flex items-center justify-between gap-4 text-sm font-bold text-ink">
         <span>{label}</span>
-        <span>{percent}%</span>
+        <span className={overspent ? "text-rose-700" : undefined}>{rawPercent}%</span>
       </div>
       <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
-        <div className={"h-full rounded-full " + color} style={{ width: percent + "%" }} />
+        <div className={"h-full rounded-full " + barColor} style={{ width: percent + "%" }} />
       </div>
+      {detail ? <p className={"text-xs font-bold " + (overspent ? "text-rose-700" : "text-muted")}>{detail}</p> : null}
     </div>
   );
 }
 
-export function DashboardShell({ cycle, salaryPaymentDate, snapshot, source, status, notices, errorMessage }: DashboardShellProps) {
+export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, source, status, notices, errorMessage }: DashboardShellProps) {
   const dailyAvailable = cycle.daysRemaining > 0 ? snapshot.realAvailableMoney / cycle.daysRemaining : snapshot.realAvailableMoney;
   const sourceLabel = source === "supabase" ? "Live Supabase data" : "Demo data";
+  const sinkingFunds = input.sinkingFundReserves.map((fund) => ({
+    ...fund,
+    used: fund.reservedThisCycle ? fund.monthlyReserve : 0
+  }));
 
   return (
     <div className="grid gap-5">
@@ -161,16 +171,45 @@ export function DashboardShell({ cycle, salaryPaymentDate, snapshot, source, sta
       <section id="budgets" className="grid gap-4 rounded-panel border border-slate-200 bg-white p-4 shadow-card md:p-5">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-black uppercase tracking-normal text-muted">Budget pacing</p>
-            <h2 className="mt-1 text-xl font-black text-ink">Mobile-first budget view</h2>
+            <p className="text-xs font-black uppercase tracking-normal text-muted">Budget and reserve pacing</p>
+            <h2 className="mt-1 text-xl font-black text-ink">งบและ sinking funds</h2>
           </div>
-          <button className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-white shadow-card" aria-label="Add expense"><Plus size={20} aria-hidden="true" /></button>
+          <Link href="/planning" className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-white shadow-card" aria-label="Manage budgets"><Plus size={20} aria-hidden="true" /></Link>
         </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <ProgressRow label="Daily living" used={9300} total={24000} />
-          <ProgressRow label="Misc shopping" used={4100} total={7000} color="bg-amber-500" />
-          <ProgressRow label="Luxury" used={1700} total={5000} color="bg-emerald-600" />
-        </div>
+        {input.reservedBudgets.length === 0 && sinkingFunds.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-bold text-muted">ยังไม่มีงบหรือ sinking fund สำหรับรอบนี้ กดปุ่ม + เพื่อเพิ่มในหน้าแผนเงิน</p>
+        ) : null}
+        {input.reservedBudgets.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {input.reservedBudgets.map((budget) => {
+              const remaining = budget.budgetAmount - budget.usedAmount;
+              const daily = Math.max(0, remaining) / Math.max(1, cycle.daysRemaining);
+              return (
+                <ProgressRow
+                  key={budget.id}
+                  label={budget.label}
+                  used={budget.usedAmount}
+                  total={budget.budgetAmount}
+                  detail={"เหลือ " + formatMoney(remaining) + " · เฉลี่ย/วัน " + formatMoney(daily)}
+                />
+              );
+            })}
+          </div>
+        ) : null}
+        {sinkingFunds.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {sinkingFunds.map((fund) => (
+              <ProgressRow
+                key={fund.id}
+                label={fund.label}
+                used={fund.used}
+                total={fund.monthlyReserve}
+                detail={(fund.reservedThisCycle ? "กันเงินแล้ว " : "ยังต้องกัน ") + formatMoney(fund.monthlyReserve)}
+                color="bg-emerald-600"
+              />
+            ))}
+          </div>
+        ) : null}
       </section>
 
       <section id="transactions" className="rounded-panel border border-dashed border-slate-300 bg-white/72 p-5 text-sm font-semibold text-muted">

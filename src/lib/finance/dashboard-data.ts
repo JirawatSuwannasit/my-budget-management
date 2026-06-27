@@ -50,7 +50,6 @@ type AnnualExpenseRow = {
   name: string;
   annual_amount: number | string | null;
   monthly_reserve: number | string | null;
-  reserved_this_cycle: boolean | null;
   active: boolean | null;
 };
 
@@ -187,7 +186,7 @@ export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, c
       id: expense.id,
       label: expense.name,
       monthlyReserve: toNumber(expense.monthly_reserve) || toNumber(expense.annual_amount) / 12,
-      reservedThisCycle: expense.reserved_this_cycle === true || isPaidInCycle(cycleTransactions, expense.id, cycleStartDate)
+      reservedThisCycle: isPaidInCycle(cycleTransactions, expense.id, cycleStartDate)
     }));
 
   const plannedDebtPayments = rows.debts

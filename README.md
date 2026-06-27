@@ -1,8 +1,8 @@
-# Private Personal Finance Control Dashboard
+﻿# Private Personal Finance Control Dashboard
 
 A private, mobile-first personal finance web app for tracking real available money after unpaid obligations, reserved budgets, credit card payable, planned debt payments, and monthly sinking fund reserves.
 
-This repository is in **Phase 4: GitHub + Vercel Deployment Preparation**. Phase 3 was locally verified and approved after `npm test`, `npm run typecheck`, `npm run lint`, and `npm run build` passed in Windows PowerShell. Phase 4 prepares the project for safe GitHub upload and Vercel deployment. Do not add new finance features in this phase.
+This repository has completed deployment preparation and is now in **Phase 6: Budgets, Subscriptions, and Sinking Funds**. Earlier local verification passed. This phase adds private planning screens so budgets, subscriptions, and annual sinking funds can be managed from the app and reflected in the dashboard.
 
 ## 1. What Phase 3 Includes
 
@@ -591,3 +591,546 @@ Not included in Phase 4:
 - Full Thai/English language switcher UI
 
 These are intentionally left for later phases after Phase 4 is complete.
+## 27. Accounts + Transactions CRUD Phase
+
+This phase adds the first real data-entry screens after deployment:
+
+- Account list
+- Add account
+- Edit account
+- Activate/deactivate account
+- Transaction list
+- Add transaction
+- Edit transaction
+- Safe delete for transactions created by the app
+- Balance effects for normal cash/bank transactions, transfers, investment transfers, card payments, and debt payments
+- Side records for credit card expenses, credit card payments, and debt payments
+
+No new deployment was performed by Codex in this phase.
+
+## 28. New Database Migrations for This Phase
+
+New migrations were added:
+
+```text
+supabase/migrations/002_link_side_records_to_transactions.sql
+supabase/migrations/003_add_transactions_destination_account_id.sql
+supabase/migrations/004_add_planning_category_links.sql
+```
+
+Run these migrations in Supabase before browser testing the Accounts + Transactions CRUD and Phase 6 planning screens.
+
+Run them in this order:
+
+1. `supabase/migrations/002_link_side_records_to_transactions.sql`
+2. `supabase/migrations/003_add_transactions_destination_account_id.sql`
+3. `supabase/migrations/004_add_planning_category_links.sql`
+
+The `003` migration fixes this browser error:
+
+```text
+column transactions.destination_account_id does not exist
+Could not find the 'destination_account_id' column of 'transactions' in the schema cache.
+```
+
+The `004` migration fixes these browser errors:
+
+```text
+column subscriptions.category_id does not exist
+Could not find category_id column of subscriptions in schema cache
+Could not find category_id column of annual_expenses in schema cache
+```
+
+Beginner-friendly SQL Editor method:
+
+1. Open your Supabase project.
+2. Click **SQL Editor** in the left sidebar.
+3. Click **New query**.
+4. Open the first migration file in VS Code:
+
+```text
+D:\AI project\My_budget_project\supabase\migrations\002_link_side_records_to_transactions.sql
+```
+
+5. Copy all SQL from the file.
+6. Paste it into Supabase SQL Editor.
+7. Click **Run**.
+8. Wait for Supabase to finish.
+9. Click **New query** again.
+10. Open the second migration file in VS Code:
+
+```text
+D:\AI project\My_budget_project\supabase\migrations\003_add_transactions_destination_account_id.sql
+```
+
+11. Copy all SQL from the file.
+12. Paste it into Supabase SQL Editor.
+13. Confirm the SQL includes this final line:
+
+```sql
+notify pgrst, 'reload schema';
+```
+
+14. Click **Run**.
+15. Wait for Supabase to finish, then refresh the app.
+16. Click **New query** again.
+17. Open the third migration file in VS Code:
+
+```text
+D:\AI project\My_budget_project\supabase\migrations\004_add_planning_category_links.sql
+```
+
+18. Copy all SQL from the file.
+19. Paste it into Supabase SQL Editor.
+20. Confirm the SQL includes this final line:
+
+```sql
+notify pgrst, 'reload schema';
+```
+
+21. Click **Run**.
+22. Wait for Supabase to finish, then refresh the app.
+
+The `002` migration adds `transaction_id` links to `card_transactions`, `card_payments`, and `debt_payments`. Those links let the app safely reverse side effects when you edit or delete a transaction.
+
+The `003` migration adds nullable `transactions.destination_account_id`, adds a foreign key to `public.accounts(id)` with `on delete set null`, adds an index, and reloads the Supabase/PostgREST schema cache.
+
+The `004` migration adds nullable `category_id` columns to `subscriptions` and `annual_expenses`, adds foreign keys to `public.categories(id)` with `on delete set null`, adds indexes, and reloads the Supabase/PostgREST schema cache. Existing subscription and annual expense rows are preserved.
+
+Phase 6 does **not** require an `annual_expenses.reserved_this_cycle` column. Sinking fund reserve status is derived from current-cycle `sinking_fund_reserve` transactions linked to the annual expense.
+
+## 29. How to Add Accounts
+
+Start the local app, log in, then open **Accounts** from the bottom navigation or left sidebar.
+
+Add these account types as needed:
+
+- `main_bank`: your main salary/current account. Counts toward real available money.
+- `other_bank`: another bank account. Counts toward real available money.
+- `cash`: physical cash. Counts toward real available money.
+- `wallet`: app wallet or stored balance. Counts toward real available money.
+- `investment`: investment account. Does not count toward real available money.
+
+To add an account:
+
+1. Open **Accounts**.
+2. Enter the account name, for example `KBank Salary`.
+3. Choose the account type.
+4. Enter the current balance.
+5. Keep **active** checked.
+6. Click **Add account**.
+
+To edit an account:
+
+1. Open **Accounts**.
+2. Find the account card.
+3. Click **Edit account**.
+4. Change the name, type, balance, or active status.
+5. Click **Save account**.
+
+Use activate/deactivate when an account should stay in history but should no longer be used for current calculations.
+
+## 30. How to Add Each Transaction Type
+
+Open **Transactions** after you have at least one account.
+
+### Income
+
+Use for salary or other money received.
+
+Effect:
+
+- Increases the selected account balance.
+- Counts as current-cycle income.
+- Uses the 25th-to-24th financial cycle.
+
+### Expense
+
+Use for normal spending paid from cash, bank, or wallet.
+
+Effect:
+
+- Decreases the selected cash-like account balance immediately.
+- Counts as normal spending for budgets.
+- Does not get subtracted again from real available money because the account balance already went down.
+
+### Transfer
+
+Use for moving money between your own accounts.
+
+Effect:
+
+- Decreases the source account.
+- Increases the destination account.
+- Does not count as an expense.
+
+### Credit Card Expense
+
+Use when you spend on a credit card.
+
+Effect:
+
+- Creates a card transaction.
+- Increases credit card liability/tracking.
+- Does not decrease cash immediately.
+
+You need at least one credit card record in Supabase before this appears as a useful option. Full credit card management screens are planned for a later phase.
+
+### Credit Card Payment
+
+Use when you pay a card statement from a bank/cash-like account.
+
+Effect:
+
+- Decreases the selected cash-like account.
+- Creates a card payment record.
+- Increases the statement paid amount.
+- Reduces remaining card payable.
+
+You need an unpaid or partially paid `credit_card_statements` row in Supabase before this can be tested fully.
+
+### Debt Payment
+
+Use when paying a loan or personal debt.
+
+Effect:
+
+- Decreases the selected cash-like account.
+- Creates a debt payment record.
+- Reduces the debt remaining balance.
+
+You need a debt record in Supabase before this can be tested fully.
+
+### Investment Transfer
+
+Use when moving money from a cash-like account to an investment account.
+
+Effect:
+
+- Decreases the source cash-like account.
+- Increases the investment account.
+- Tracks investment movement separately.
+- Does not mix investment transfer with normal expenses.
+
+### Sinking Fund Reserve
+
+Use when marking money as reserved for annual or irregular costs.
+
+Effect in v1:
+
+- Creates a transaction marker.
+- Does not change account balances because sinking fund reserve is virtual first.
+- Helps avoid double counting in real available money logic.
+
+## 31. Finance Rules Preserved in CRUD
+
+The account and transaction screens follow the approved finance logic:
+
+- Cash-like accounts count toward real available money.
+- Investment accounts do not count toward real available money.
+- Transfers between accounts are not expenses.
+- Investment transfers are separate from daily spending.
+- Credit card expenses increase card liability first and reduce cash only when paid.
+- Cash/bank expenses reduce cash immediately.
+- Paid expenses are not subtracted again from real available money.
+- The financial cycle remains 25th-to-24th.
+- Salary paid early before a weekend still belongs to the cycle starting on the 25th.
+
+## 32. Local Verification Workflow for This Phase
+
+Codex did not run these commands because you asked Codex not to run npm test/typecheck/lint/build in this sandbox.
+
+Please run these in Windows PowerShell from the project folder:
+
+```powershell
+cd "D:\AI project\My_budget_project"
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
+
+All four should pass before approving this phase or pushing/deploying later.
+
+## 33. Browser Checks for Accounts + Transactions
+
+Before browser testing, make sure both phase migrations have been run in Supabase:
+
+```text
+supabase/migrations/002_link_side_records_to_transactions.sql
+supabase/migrations/003_add_transactions_destination_account_id.sql
+supabase/migrations/004_add_planning_category_links.sql
+```
+
+The `003` migration is required before opening **Transactions**, because the transaction list reads `transactions.destination_account_id` for transfer and investment transfer rows.
+The `004` migration is required before opening **Plan / แผนเงิน**, because Phase 6 reads `subscriptions.category_id` and `annual_expenses.category_id`.
+
+Start the app locally:
+
+```powershell
+cd "D:\AI project\My_budget_project"
+npm run dev
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+Manual browser checks:
+
+1. Log in with your Supabase user.
+2. Confirm logged-out users cannot see `/accounts` or `/transactions`.
+3. Open **Accounts**.
+4. Add a main bank account.
+5. Add a cash or wallet account.
+6. Add an investment account.
+7. Confirm the cash-like total excludes the investment account.
+8. Edit an account balance and confirm it saves.
+9. Deactivate an account and confirm it appears inactive.
+10. Open **Transactions**.
+11. Add income into the main bank account and confirm the account balance increases.
+12. Add a normal expense and confirm the cash-like account balance decreases.
+13. Add a transfer between cash-like accounts and confirm total cash-like money does not change.
+14. Add an investment transfer and confirm the investment account increases while normal spending stays separate.
+15. Go back to the dashboard and confirm real available money updates without double-counting paid expenses.
+
+Optional browser checks if you already have Supabase rows for debts and credit cards:
+
+1. Add a credit card expense and confirm cash does not decrease immediately.
+2. Add a credit card payment and confirm cash decreases and remaining payable changes.
+3. Add a debt payment and confirm cash decreases and remaining debt changes.
+4. Edit a transaction created by the app and confirm balances reverse/reapply correctly.
+5. Delete a transaction created by the app and confirm balances reverse safely.
+
+## 34. Accounts + Transactions CRUD Files Created or Modified
+
+Important files in this phase:
+
+- Account route: `src/app/(private)/accounts/page.tsx`
+- Account server actions: `src/app/(private)/accounts/actions.ts`
+- Account form: `src/components/accounts/account-form.tsx`
+- Transaction route: `src/app/(private)/transactions/page.tsx`
+- Transaction server actions: `src/app/(private)/transactions/actions.ts`
+- Transaction form: `src/components/transactions/transaction-form.tsx`
+- Account balance effect helper: `src/lib/finance/transaction-effects.ts`
+- Finance logic tests: `src/lib/finance/dashboard.test.ts`
+- App navigation: `src/components/layout/app-shell.tsx`
+- Supabase migration: `supabase/migrations/002_link_side_records_to_transactions.sql`
+- Supabase schema repair migration: `supabase/migrations/003_add_transactions_destination_account_id.sql`
+- Supabase Phase 6 schema repair migration: `supabase/migrations/004_add_planning_category_links.sql`
+- Documentation: `README.md`
+
+## 35. Not Included Yet
+
+Still planned for later phases:
+
+- Full category CRUD UI
+- Budget CRUD UI
+- Subscription CRUD UI
+- Debt CRUD UI
+- Credit card CRUD UI
+- Credit card statement closing workflow
+- Annual expense and sinking fund management UI
+- Full Thai/English language switcher UI
+- GitHub/Vercel redeploy automation
+
+## 36. Phase 6: Budgets, Subscriptions, and Sinking Funds
+
+Phase 6 adds a new private page:
+
+```text
+http://localhost:3000/planning
+```
+
+Use the **Plan / แผนเงิน** navigation item to open it.
+
+Before using this page, run this migration in Supabase SQL Editor if you have not already:
+
+```text
+supabase/migrations/004_add_planning_category_links.sql
+```
+
+This page includes:
+
+- Monthly budget management for the 25th-to-24th cycle
+- Subscription management for monthly and yearly subscriptions
+- Annual expense / sinking fund management
+- Progress bars for budgets and sinking fund reserves
+- Empty, loading, and error states
+- Thai-first labels with English finance terms where useful
+
+No deployment was performed by Codex in this phase.
+
+## 37. How to Create Budgets
+
+Open **Plan / แผนเงิน**, then use **เพิ่มงบรายเดือน**.
+
+Recommended budget examples:
+
+- `Daily living expenses`
+- `Transportation`
+- `Miscellaneous shopping`
+- `Luxury / non-essential spending`
+
+Budget fields:
+
+- **Budget name**: the name shown in the app.
+- **Amount per cycle**: the money reserved for the current 25th-to-24th cycle.
+- **Expense category**: used to match expense transactions to this budget.
+- **Active**: keep checked if this budget should count in dashboard calculations.
+
+How budget progress works:
+
+- Only active budgets for the current financial cycle are used.
+- Expenses count toward a budget when the transaction category matches the budget category.
+- Remaining budget = budget amount minus used amount.
+- Dashboard real available money subtracts only the unspent reserved budget.
+- Paid expenses are not subtracted again because they already reduced cash/bank balance.
+- Overspending is shown with warning color.
+
+## 38. How to Create Subscriptions
+
+Open **Plan / แผนเงิน**, then use **เพิ่ม subscription**.
+
+Subscription categories:
+
+- `AI`
+- `Sports / football`
+- `Entertainment`
+- `Productivity`
+- `Other`
+
+Monthly subscriptions:
+
+- Choose `รายเดือน - fixed obligation`.
+- Example: monthly AI subscription.
+- These count as monthly fixed obligations.
+- They reduce real available money until paid in the current cycle.
+- When you pay one, add an `expense` transaction and select the subscription in **Link to subscription / annual cost** so the dashboard does not count it twice.
+
+Yearly subscriptions:
+
+- Choose `รายปี - sinking fund`.
+- Example: Premier League football streaming app.
+- The app divides the yearly price by 12.
+- That monthly reserve reduces real available money.
+- Use a `sinking_fund_reserve` transaction when you set aside that month’s reserve.
+
+## 39. How to Create Annual Expenses / Sinking Funds
+
+Open **Plan / แผนเงิน**, then use **เพิ่ม sinking fund**.
+
+Recommended examples:
+
+- `Condo common fee`
+- `Condo insurance`
+- `Annual football app subscription`
+
+Annual expense fields:
+
+- **Name**: the annual cost name.
+- **Category**: housing, insurance, sports/football, or other.
+- **Annual amount**: the full yearly amount.
+- **Due date**: when the bill is due.
+- **Active**: keep checked if this sinking fund should count.
+
+Sinking fund logic:
+
+- Monthly reserve = annual amount divided by 12.
+- Monthly reserve reduces real available money.
+- If you create a `sinking_fund_reserve` transaction linked to the annual expense, the dashboard treats this cycle’s reserve as already done.
+- The app derives this from transactions; it does not require `annual_expenses.reserved_this_cycle`.
+- The actual payment should still be tracked separately when paid, usually as a normal expense or the later dedicated payment workflow.
+
+## 40. Phase 6 Dashboard Integration
+
+The dashboard now receives live budget and sinking fund details, not static placeholder progress bars.
+
+Dashboard behavior:
+
+- Active current-cycle budgets reduce real available money only by the remaining unspent amount.
+- Monthly subscriptions reduce real available money as unpaid obligations.
+- Yearly subscriptions reduce real available money as monthly sinking fund reserves.
+- Annual expenses reduce real available money as monthly sinking fund reserves.
+- Current-cycle transactions linked to subscriptions or annual expenses prevent double counting.
+- Annual expense reserve status is derived from current-cycle `sinking_fund_reserve` transactions.
+- The 25th-to-24th financial cycle logic stays unchanged.
+
+## 41. Local Verification Commands for Phase 6
+
+Codex did not run these commands because you asked Codex not to run npm test/typecheck/lint/build.
+
+Please run these in Windows PowerShell:
+
+```powershell
+cd "D:\AI project\My_budget_project"
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
+
+All four should pass before approving Phase 6.
+
+## 42. Browser Checks for Phase 6
+
+Start the app locally:
+
+```powershell
+cd "D:\AI project\My_budget_project"
+npm run dev
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+Manual browser checks:
+
+1. Log in.
+2. Open **Plan / แผนเงิน**.
+3. Add a monthly budget, for example `Daily living expenses`.
+4. Add a monthly AI subscription.
+5. Add a yearly football app subscription.
+6. Add `Condo common fee` as an annual expense.
+7. Confirm budget progress displays used, remaining, percent used, and average daily available.
+8. Confirm overspending uses warning color if used amount is over budget.
+9. Open **Transactions** and add an `expense` linked to the monthly AI subscription.
+10. Open **Dashboard**.
+11. Confirm real available money changes after adding active budgets, monthly subscriptions, and sinking funds.
+12. Confirm the paid monthly AI subscription is no longer double counted after the linked expense.
+13. Confirm yearly costs show monthly reserve.
+14. Add a matching `sinking_fund_reserve` transaction from **Transactions**.
+15. Confirm the related sinking fund no longer reduces real available money for the current cycle.
+
+## 43. Phase 6 Files Created or Modified
+
+Important Phase 6 files:
+
+- Planning route: `src/app/(private)/planning/page.tsx`
+- Planning loading state: `src/app/(private)/planning/loading.tsx`
+- Planning server actions: `src/app/(private)/planning/actions.ts`
+- Budget form: `src/components/planning/budget-form.tsx`
+- Subscription form: `src/components/planning/subscription-form.tsx`
+- Annual expense form: `src/components/planning/annual-expense-form.tsx`
+- Dashboard route: `src/app/(private)/dashboard/page.tsx`
+- Dashboard UI: `src/components/dashboard/dashboard-shell.tsx`
+- App navigation: `src/components/layout/app-shell.tsx`
+- Finance tests: `src/lib/finance/dashboard.test.ts`
+- Documentation: `README.md`
+
+## 44. Still Not Included After Phase 6
+
+Still planned for later phases:
+
+- Full category management UI
+- Dedicated subscription payment workflow
+- Dedicated annual bill payment workflow
+- Debt CRUD UI
+- Credit card CRUD UI
+- Credit card statement closing workflow
+- Full Thai/English language switcher UI

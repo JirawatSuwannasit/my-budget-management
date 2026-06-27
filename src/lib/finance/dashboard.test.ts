@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getCycleStartForSalaryPayment, getFinancialCycle } from "./cycle";
 import { calculateDashboardSnapshot } from "./dashboard";
+import { getAccountBalanceDeltas } from "./transaction-effects";
 import { hasRealDashboardRows, mapDashboardRowsToInput, type DashboardRows } from "./dashboard-data";
 import { sampleDashboardInput } from "./sample-data";
 import type { DashboardInput } from "./types";
@@ -238,6 +239,41 @@ describe("Supabase dashboard row mapping", () => {
     expect(input.sinkingFundReserves).toEqual([{ id: "football", label: "Football app", monthlyReserve: 350, reservedThisCycle: false }]);
   });
 
+  it("treats current-cycle sinking fund reserve transactions as already reserved", () => {
+    const input = mapDashboardRowsToInput(
+      rows({
+        annualExpenses: [
+          { id: "condo-fee", name: "Condo common fee", annual_amount: "12000", monthly_reserve: "1000", active: true }
+        ],
+        transactions: [
+          { id: "reserve", account_id: null, category_id: null, type: "sinking_fund_reserve", amount: "1000", transaction_date: "2026-07-26", cycle_start_date: "2026-07-25", related_entity_id: "condo-fee" }
+        ]
+      }),
+      cycleStart,
+      cycleEnd
+    );
+    const snapshot = calculateDashboardSnapshot(input);
+
+    expect(input.sinkingFundReserves).toEqual([{ id: "condo-fee", label: "Condo common fee", monthlyReserve: 1000, reservedThisCycle: true }]);
+    expect(snapshot.monthlySinkingFundReserves).toBe(0);
+  });
+
+  it("keeps annual expenses reserved until a matching sinking fund transaction exists", () => {
+    const input = mapDashboardRowsToInput(
+      rows({
+        annualExpenses: [
+          { id: "condo-insurance", name: "Condo insurance", annual_amount: "6000", monthly_reserve: "500", active: true }
+        ]
+      }),
+      cycleStart,
+      cycleEnd
+    );
+    const snapshot = calculateDashboardSnapshot(input);
+
+    expect(input.sinkingFundReserves).toEqual([{ id: "condo-insurance", label: "Condo insurance", monthlyReserve: 500, reservedThisCycle: false }]);
+    expect(snapshot.monthlySinkingFundReserves).toBe(500);
+  });
+
   it("aggregates card statements, paid amounts, and current card spending by card", () => {
     const input = mapDashboardRowsToInput(
       rows({
@@ -277,5 +313,34 @@ describe("Supabase dashboard row mapping", () => {
   it("detects whether Supabase returned real dashboard rows", () => {
     expect(hasRealDashboardRows(rows())).toBe(false);
     expect(hasRealDashboardRows(rows({ accounts: [{ id: "main", name: "Main", type: "main_bank", balance: 1, active: true }] }))).toBe(true);
+  });
+});
+
+
+describe("transaction account balance effects", () => {
+  it("reduces cash for cash/bank expenses", () => {
+    expect(getAccountBalanceDeltas({ type: "expense", amount: 150, accountId: "cash" })).toEqual([{ accountId: "cash", delta: -150 }]);
+  });
+
+  it("does not reduce cash for credit card expenses", () => {
+    expect(getAccountBalanceDeltas({ type: "credit_card_expense", amount: 150, accountId: "cash" })).toEqual([]);
+  });
+
+  it("moves money without creating expense for transfers", () => {
+    expect(getAccountBalanceDeltas({ type: "transfer", amount: 500, accountId: "main", destinationAccountId: "wallet" })).toEqual([
+      { accountId: "main", delta: -500 },
+      { accountId: "wallet", delta: 500 }
+    ]);
+  });
+
+  it("moves investment transfers separately from normal spending", () => {
+    expect(getAccountBalanceDeltas({ type: "investment_transfer", amount: 1000, accountId: "main", destinationAccountId: "invest" })).toEqual([
+      { accountId: "main", delta: -1000 },
+      { accountId: "invest", delta: 1000 }
+    ]);
+  });
+
+  it("keeps virtual sinking fund reserves out of account balances", () => {
+    expect(getAccountBalanceDeltas({ type: "sinking_fund_reserve", amount: 1000, accountId: "main" })).toEqual([]);
   });
 });

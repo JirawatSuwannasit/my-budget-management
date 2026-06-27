@@ -41,6 +41,7 @@ export default async function DashboardPage() {
     <DashboardShell
       cycle={cycle}
       salaryPaymentDate={salaryPayment}
+      input={dashboardInput}
       snapshot={snapshot}
       source={source}
       status={status}

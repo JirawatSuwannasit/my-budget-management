@@ -1,19 +1,21 @@
-"use client";
+﻿"use client";
 
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CreditCard, Landmark, LayoutDashboard, ListChecks, Settings } from "lucide-react";
+import { BarChart3, CreditCard, Landmark, LayoutDashboard, ListChecks, Settings, WalletCards } from "lucide-react";
 import { createClient } from "@/lib/supabase/browser";
 
 const navItems = [
   { href: "/dashboard", label: "หน้าหลัก", short: "Home", icon: LayoutDashboard },
-  { href: "/dashboard#transactions", label: "รายการ", short: "Txns", icon: ListChecks },
-  { href: "/dashboard#budgets", label: "งบ", short: "Budget", icon: BarChart3 },
+  { href: "/accounts", label: "บัญชี", short: "Accounts", icon: WalletCards },
+  { href: "/transactions", label: "รายการ", short: "Txns", icon: ListChecks },
+  { href: "/planning", label: "แผนเงิน", short: "Plan", icon: BarChart3 },
   { href: "/dashboard#cards", label: "บัตร", short: "Cards", icon: CreditCard },
   { href: "/dashboard#settings", label: "ตั้งค่า", short: "More", icon: Settings }
 ];
 
-export function AppShell({ children, userEmail }: Readonly<{ children: React.ReactNode; userEmail: string }>) {
+export function AppShell({ children, userEmail }: Readonly<{ children: ReactNode; userEmail: string }>) {
   const pathname = usePathname();
 
   async function signOut() {
@@ -33,7 +35,7 @@ export function AppShell({ children, userEmail }: Readonly<{ children: React.Rea
               <span className="block text-xs font-semibold text-muted">{userEmail}</span>
             </span>
           </Link>
-          <button onClick={signOut} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary">Logout</button>
+          <button onClick={signOut} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary">ออกจากระบบ</button>
         </div>
       </header>
 
@@ -42,12 +44,9 @@ export function AppShell({ children, userEmail }: Readonly<{ children: React.Rea
           <nav className="sticky top-24 grid gap-2 rounded-panel border border-slate-200 bg-white/82 p-3 shadow-card backdrop-blur">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const active = pathname === item.href;
+              const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
               return (
-                <Link key={item.href} href={item.href} className={
-                  "flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold transition " +
-                  (active ? "bg-primary text-white" : "text-muted hover:bg-primary/10 hover:text-primary")
-                }>
+                <Link key={item.href} href={item.href} className={"flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold transition " + (active ? "bg-primary text-white" : "text-muted hover:bg-primary/10 hover:text-primary")}>
                   <Icon size={18} aria-hidden="true" />
                   {item.label}
                 </Link>
@@ -59,16 +58,13 @@ export function AppShell({ children, userEmail }: Readonly<{ children: React.Rea
       </div>
 
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/94 px-3 pt-2 shadow-[0_-12px_30px_rgba(23,32,28,0.08)] backdrop-blur-xl lg:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+        <div className="mx-auto grid max-w-md grid-cols-6 gap-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const active = pathname === item.href;
+            const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
             return (
-              <Link key={item.href} href={item.href} className={
-                "grid min-h-14 place-items-center rounded-2xl px-1 text-[0.68rem] font-black transition " +
-                (active ? "bg-primary/10 text-primary" : "text-muted")
-              }>
-                <Icon size={19} aria-hidden="true" />
+              <Link key={item.href} href={item.href} className={"grid min-h-14 place-items-center rounded-2xl px-1 text-[0.62rem] font-black transition " + (active ? "bg-primary/10 text-primary" : "text-muted")}>
+                <Icon size={18} aria-hidden="true" />
                 <span>{item.short}</span>
               </Link>
             );
