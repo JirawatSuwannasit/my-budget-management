@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CreditCard, Landmark, LayoutDashboard, ListChecks, Settings, WalletCards } from "lucide-react";
+import { BarChart3, CreditCard, Landmark, LayoutDashboard, ListChecks, Settings, Tag, WalletCards } from "lucide-react";
 import { createClient } from "@/lib/supabase/browser";
 
 const navItems = [
@@ -11,6 +11,7 @@ const navItems = [
   { href: "/accounts", label: "บัญชี", short: "Accounts", icon: WalletCards },
   { href: "/transactions", label: "รายการ", short: "Txns", icon: ListChecks },
   { href: "/planning", label: "แผนเงิน", short: "Plan", icon: BarChart3 },
+  { href: "/categories", label: "หมวด", short: "Cat", icon: Tag },
   { href: "/debts-cards", label: "หนี้/บัตร", short: "Debt", icon: CreditCard },
   { href: "/dashboard#settings", label: "ตั้งค่า", short: "More", icon: Settings }
 ];
@@ -58,7 +59,7 @@ export function AppShell({ children, userEmail }: Readonly<{ children: ReactNode
       </div>
 
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/94 px-3 pt-2 shadow-[0_-12px_30px_rgba(23,32,28,0.08)] backdrop-blur-xl lg:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-6 gap-1">
+        <div className="mx-auto grid max-w-lg grid-cols-7 gap-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));

@@ -27,6 +27,11 @@ type TransactionRow = {
   related_entity_id: string | null;
 };
 
+type CategoryRow = {
+  id: string;
+  active: boolean | null;
+};
+
 type BudgetRow = {
   id: string;
   category_id: string | null;
@@ -38,6 +43,7 @@ type BudgetRow = {
 
 type SubscriptionRow = {
   id: string;
+  category_id?: string | null;
   name: string;
   frequency: "monthly" | "yearly";
   price: number | string | null;
@@ -47,6 +53,7 @@ type SubscriptionRow = {
 
 type AnnualExpenseRow = {
   id: string;
+  category_id?: string | null;
   name: string;
   annual_amount: number | string | null;
   monthly_reserve: number | string | null;
@@ -95,6 +102,7 @@ type CreditCardRow = {
 
 export type DashboardRows = {
   accounts: AccountRow[];
+  categories: CategoryRow[];
   transactions: TransactionRow[];
   budgets: BudgetRow[];
   subscriptions: SubscriptionRow[];
@@ -127,7 +135,10 @@ function isPaidInCycle(transactions: TransactionRow[], relatedEntityId: string, 
 export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, cycleEnd?: Date): DashboardInput {
   const cycleStartDate = cycleDate(cycleStart);
   const cycleEndDate = cycleDate(cycleEnd ?? new Date(cycleStart.getFullYear(), cycleStart.getMonth() + 1, 24, 12));
-  const cycleTransactions = rows.transactions.filter((transaction) => transaction.cycle_start_date === cycleStartDate);
+  const hasCategoryRows = rows.categories.length > 0;
+  const activeCategoryIds = new Set(rows.categories.filter(active).map((category) => category.id));
+  const categoryActiveOrMissing = (categoryId: string | null) => !categoryId || !hasCategoryRows || activeCategoryIds.has(categoryId);
+  const cycleTransactions = rows.transactions.filter((transaction) => transaction.cycle_start_date === cycleStartDate).filter((transaction) => categoryActiveOrMissing(transaction.category_id));
   const cashExpenseTransactions = cycleTransactions.filter((transaction) => transaction.type === "expense");
   const debtPaymentsThisCycle = rows.debtPayments.filter((payment) => {
     const paidDate = cycleDate(new Date(payment.paid_date));
@@ -145,6 +156,7 @@ export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, c
 
   const monthlySubscriptionObligations = rows.subscriptions
     .filter(active)
+    .filter((subscription) => categoryActiveOrMissing(subscription.category_id ?? null))
     .filter((subscription) => subscription.frequency === "monthly")
     .map((subscription) => ({
       id: subscription.id,
@@ -156,6 +168,7 @@ export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, c
 
   const reservedBudgets = rows.budgets
     .filter(active)
+    .filter((budget) => categoryActiveOrMissing(budget.category_id))
     .filter((budget) => budget.cycle_start_date === cycleStartDate)
     .map((budget) => {
       const usedAmount = cashExpenseTransactions
@@ -172,6 +185,7 @@ export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, c
 
   const yearlySubscriptionReserves = rows.subscriptions
     .filter(active)
+    .filter((subscription) => categoryActiveOrMissing(subscription.category_id ?? null))
     .filter((subscription) => subscription.frequency === "yearly")
     .map((subscription) => ({
       id: subscription.id,
@@ -182,6 +196,7 @@ export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, c
 
   const annualExpenseReserves = rows.annualExpenses
     .filter(active)
+    .filter((expense) => categoryActiveOrMissing(expense.category_id ?? null))
     .map((expense) => ({
       id: expense.id,
       label: expense.name,
@@ -252,8 +267,9 @@ async function selectTable<T>(supabase: SupabaseClient, table: string, columns =
 }
 
 export async function loadDashboardRows(supabase: SupabaseClient): Promise<DashboardRows> {
-  const [accounts, transactions, budgets, subscriptions, annualExpenses, debts, debtPayments, creditCards, creditCardStatements, cardTransactions] = await Promise.all([
+  const [accounts, categories, transactions, budgets, subscriptions, annualExpenses, debts, debtPayments, creditCards, creditCardStatements, cardTransactions] = await Promise.all([
     selectTable<AccountRow>(supabase, "accounts"),
+    selectTable<CategoryRow>(supabase, "categories", "id,active"),
     selectTable<TransactionRow>(supabase, "transactions"),
     selectTable<BudgetRow>(supabase, "budgets"),
     selectTable<SubscriptionRow>(supabase, "subscriptions"),
@@ -265,5 +281,5 @@ export async function loadDashboardRows(supabase: SupabaseClient): Promise<Dashb
     selectTable<CardTransactionRow>(supabase, "card_transactions")
   ]);
 
-  return { accounts, transactions, budgets, subscriptions, annualExpenses, debts, debtPayments, creditCards, creditCardStatements, cardTransactions };
+  return { accounts, categories, transactions, budgets, subscriptions, annualExpenses, debts, debtPayments, creditCards, creditCardStatements, cardTransactions };
 }

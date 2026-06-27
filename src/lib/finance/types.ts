@@ -1,4 +1,5 @@
 export type AccountType = "main_bank" | "other_bank" | "cash" | "wallet" | "investment";
+export type CategoryKind = "income" | "expense" | "transfer" | "debt" | "subscription" | "sinking_fund" | "investment" | "other";
 
 export type TransactionType =
   | "income"

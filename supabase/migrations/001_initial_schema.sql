@@ -36,7 +36,7 @@ create table public.categories (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   name text not null,
-  kind text not null check (kind in ('income', 'expense')),
+  kind text not null check (kind in ('income', 'expense', 'transfer', 'debt', 'subscription', 'sinking_fund', 'investment', 'other')),
   color text,
   icon_key text,
   active boolean not null default true,
@@ -263,6 +263,7 @@ end $$;
 
 create index accounts_user_id_idx on public.accounts(user_id);
 create index categories_user_kind_idx on public.categories(user_id, kind);
+create index categories_user_active_idx on public.categories(user_id, active);
 create index transactions_user_cycle_idx on public.transactions(user_id, cycle_start_date);
 create index transactions_user_date_idx on public.transactions(user_id, transaction_date);
 create index transactions_account_id_idx on public.transactions(account_id);

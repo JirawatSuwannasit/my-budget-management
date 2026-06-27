@@ -182,6 +182,7 @@ describe("Supabase dashboard row mapping", () => {
   function rows(overrides: Partial<DashboardRows> = {}): DashboardRows {
     return {
       accounts: [],
+      categories: [],
       transactions: [],
       budgets: [],
       subscriptions: [],
@@ -220,6 +221,37 @@ describe("Supabase dashboard row mapping", () => {
     expect(snapshot.investmentTransfersThisCycle).toBe(10000);
     expect(snapshot.unspentReservedBudgets).toBe(8000);
     expect(snapshot.realAvailableMoney).toBe(42000);
+  });
+
+  it("ignores dashboard records linked to inactive categories", () => {
+    const input = mapDashboardRowsToInput(
+      rows({
+        categories: [
+          { id: "active-daily", active: true },
+          { id: "inactive-shopping", active: false }
+        ],
+        transactions: [
+          { id: "active-expense", account_id: "main", category_id: "active-daily", type: "expense", amount: "1000", transaction_date: "2026-07-26", cycle_start_date: "2026-07-25", related_entity_id: null },
+          { id: "inactive-expense", account_id: "main", category_id: "inactive-shopping", type: "expense", amount: "9000", transaction_date: "2026-07-26", cycle_start_date: "2026-07-25", related_entity_id: null }
+        ],
+        budgets: [
+          { id: "active-budget", category_id: "active-daily", label: "Daily", amount: "5000", cycle_start_date: "2026-07-25", active: true },
+          { id: "inactive-budget", category_id: "inactive-shopping", label: "Shopping", amount: "50000", cycle_start_date: "2026-07-25", active: true }
+        ],
+        subscriptions: [
+          { id: "inactive-sub", name: "Old sub", frequency: "monthly", price: "9999", billing_day: 1, active: true, category_id: "inactive-shopping" }
+        ],
+        annualExpenses: [
+          { id: "inactive-annual", name: "Old annual", annual_amount: "12000", monthly_reserve: "1000", active: true, category_id: "inactive-shopping" }
+        ]
+      }),
+      cycleStart,
+      cycleEnd
+    );
+
+    expect(input.reservedBudgets).toEqual([{ id: "active-budget", label: "Daily", budgetAmount: 5000, usedAmount: 1000 }]);
+    expect(input.obligations).toEqual([]);
+    expect(input.sinkingFundReserves).toEqual([]);
   });
 
   it("derives unpaid monthly subscriptions and yearly subscription reserves", () => {

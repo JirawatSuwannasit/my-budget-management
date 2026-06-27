@@ -57,6 +57,8 @@ function revalidateFinanceViews() {
   revalidatePath("/dashboard");
   revalidatePath("/accounts");
   revalidatePath("/debts-cards");
+  revalidatePath("/planning");
+  revalidatePath("/categories");
 }
 async function updateStatementPaidAmount(supabase: SupabaseServer, userId: string, statementId: string, delta: number) {
   const { data, error } = await supabase.from("credit_card_statements").select("statement_amount_due,paid_amount").eq("id", statementId).eq("user_id", userId).single();

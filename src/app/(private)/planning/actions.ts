@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getFinancialCycle } from "@/lib/finance/cycle";
+import type { CategoryKind } from "@/lib/finance/types";
 import { createClient } from "@/lib/supabase/server";
 
 export type PlanningActionState = { status: "idle" | "success" | "error"; message: string };
@@ -56,7 +57,7 @@ function toDateInput(date: Date) {
   return year + "-" + month + "-" + day;
 }
 
-async function getOrCreateExpenseCategory(supabase: SupabaseServer, userId: string, name: string | null) {
+async function getOrCreateCategory(supabase: SupabaseServer, userId: string, name: string | null, kind: CategoryKind) {
   if (!name) return null;
   const cleanName = name.trim();
   if (!cleanName) return null;
@@ -65,7 +66,7 @@ async function getOrCreateExpenseCategory(supabase: SupabaseServer, userId: stri
     .from("categories")
     .select("id")
     .eq("user_id", userId)
-    .eq("kind", "expense")
+    .eq("kind", kind)
     .eq("name", cleanName)
     .maybeSingle();
   if (findError) throw new Error(findError.message);
@@ -73,7 +74,7 @@ async function getOrCreateExpenseCategory(supabase: SupabaseServer, userId: stri
 
   const { data: inserted, error: insertError } = await supabase
     .from("categories")
-    .insert({ user_id: userId, name: cleanName, kind: "expense", active: true })
+    .insert({ user_id: userId, name: cleanName, kind, active: true })
     .select("id")
     .single();
   if (insertError) throw new Error(insertError.message);
@@ -93,7 +94,7 @@ export async function saveBudget(_previousState: PlanningActionState, formData: 
     const label = textValue(formData, "label");
     const amount = parseAmount(formData.get("amount"), "Budget amount");
     const categoryName = textValue(formData, "category_name") ?? label;
-    const categoryId = await getOrCreateExpenseCategory(supabase, userId, categoryName);
+    const categoryId = await getOrCreateCategory(supabase, userId, categoryName, "expense");
     const active = formData.get("active") === "on";
     const cycleStartDate = textValue(formData, "cycle_start_date") ?? toDateInput(getFinancialCycle(todayAtNoon()).start);
 
@@ -132,7 +133,7 @@ export async function saveSubscription(_previousState: PlanningActionState, form
     const id = textValue(formData, "id");
     const name = textValue(formData, "name");
     const categoryName = textValue(formData, "category_name");
-    const categoryId = await getOrCreateExpenseCategory(supabase, userId, categoryName);
+    const categoryId = await getOrCreateCategory(supabase, userId, categoryName, "subscription");
     const frequency = parseFrequency(formData.get("frequency"));
     const price = parseAmount(formData.get("price"), "Subscription price");
     const billingDay = parseBillingDay(formData.get("billing_day"));
@@ -174,7 +175,7 @@ export async function saveAnnualExpense(_previousState: PlanningActionState, for
     const id = textValue(formData, "id");
     const name = textValue(formData, "name");
     const categoryName = textValue(formData, "category_name");
-    const categoryId = await getOrCreateExpenseCategory(supabase, userId, categoryName);
+    const categoryId = await getOrCreateCategory(supabase, userId, categoryName, "sinking_fund");
     const annualAmount = parseAmount(formData.get("annual_amount"), "Annual amount");
     const dueDate = textValue(formData, "due_date");
     const active = formData.get("active") === "on";

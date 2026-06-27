@@ -1346,3 +1346,191 @@ Important Phase 7 files:
 - Initial schema draft: `supabase/migrations/001_initial_schema.sql`
 - Phase 7 upgrade migration: `supabase/migrations/005_add_debt_bonus_payment_amount.sql`
 - Documentation: `README.md`
+
+## 56. Phase 8: Category Management and Payment Workflow Polish
+
+Phase 8 adds safer day-to-day management for categories, subscriptions, and annual expenses:
+
+- Category management page
+- Add/edit/deactivate categories
+- Expanded category types
+- Dedicated subscription payment action
+- Dedicated annual subscription reserve action
+- Dedicated annual expense reserve action
+- Dedicated annual bill payment action
+- Dashboard safeguards for inactive categories
+
+No deployment was performed by Codex in this phase.
+
+## 57. Phase 8 Database Migration
+
+A new migration was added:
+
+```text
+supabase/migrations/006_expand_category_kinds.sql
+```
+
+Run this migration in Supabase before testing Phase 8 in the browser. It expands category types to:
+
+- `income`
+- `expense`
+- `transfer`
+- `debt`
+- `subscription`
+- `sinking_fund`
+- `investment`
+- `other`
+
+Beginner-friendly SQL Editor method:
+
+1. Open your Supabase project.
+2. Click **SQL Editor** in the left sidebar.
+3. Click **New query**.
+4. Open this local file:
+
+```text
+D:\AI project\My_budget_project\supabase\migrations\006_expand_category_kinds.sql
+```
+
+5. Copy all SQL from the file.
+6. Paste it into Supabase SQL Editor.
+7. Click **Run**.
+8. Wait for Supabase to finish.
+
+If Supabase still reports an old schema error, run:
+
+```sql
+notify pgrst, 'reload schema';
+```
+
+## 58. How to Create and Manage Categories
+
+Open **Cat** from the bottom navigation or desktop sidebar.
+
+To add a category:
+
+1. Enter a category name, for example `Daily food`.
+2. Choose the type, for example `Expense`.
+3. Choose a color.
+4. Choose an icon.
+5. Keep **Active category** checked.
+6. Click **Add category**.
+
+To edit a category:
+
+1. Open **Cat**.
+2. Find the category.
+3. Click **Edit category**.
+4. Change the name, type, color, icon, or active status.
+5. Click **Save category**.
+
+The app does not hard-delete categories from this screen. If a category already has transactions, budgets, subscriptions, or annual expenses linked to it, deactivate it instead so old history remains understandable.
+
+## 59. Subscription Payment vs Annual Subscription Reserve
+
+Open **Plan / แผนเงิน**.
+
+For a monthly subscription:
+
+- Use **Pay subscription**.
+- This creates an `expense` transaction linked to the subscription.
+- The cash-like account balance decreases.
+- The dashboard treats the subscription as paid for the current 25th-to-24th cycle, so it is not double counted as an unpaid obligation.
+
+For a yearly subscription:
+
+- Use **Reserve monthly amount** if you are only setting aside this month’s reserve.
+- This creates a `sinking_fund_reserve` transaction linked to the yearly subscription.
+- It does not reduce a bank/cash balance in v1 because the reserve is virtual.
+- Use **Pay annual subscription** when you actually pay the full yearly bill.
+- The full yearly payment creates an `expense` transaction linked to the subscription and reduces the selected cash-like account.
+
+## 60. Sinking Fund Reserve vs Actual Annual Bill Payment
+
+For annual expenses such as condo common fee or insurance:
+
+- Use **Reserve this month** when you only want to mark this month’s reserve as done.
+- This creates a `sinking_fund_reserve` transaction linked to the annual expense.
+- The dashboard no longer subtracts that month’s reserve again.
+
+Use **Pay annual bill** when you actually pay the real annual bill:
+
+- This creates an `expense` transaction linked to the annual expense.
+- The selected cash-like account balance decreases.
+- The dashboard treats the current-cycle reserve as completed because the bill is already paid.
+
+## 61. Phase 8 Dashboard Safeguards
+
+The dashboard now protects these rules:
+
+- Linked monthly subscription payments prevent unpaid-obligation double counting.
+- Linked yearly subscription reserves prevent sinking-fund double counting.
+- Linked annual expense reserves prevent sinking-fund double counting.
+- Linked actual annual bill payments also prevent reserve double counting for the current cycle.
+- Inactive subscriptions and annual expenses do not affect the dashboard.
+- Inactive categories are ignored by dashboard mapping when category rows are available.
+- The 25th-to-24th financial cycle still applies.
+
+## 62. Local Verification Commands for Phase 8
+
+Codex did not run these commands because you asked Codex not to run npm test/typecheck/lint/build.
+
+Please run these in Windows PowerShell:
+
+```powershell
+cd "D:\AI project\My_budget_project"
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
+
+All four should pass before approving Phase 8.
+
+## 63. Browser Checks for Phase 8
+
+Start the app locally:
+
+```powershell
+cd "D:\AI project\My_budget_project"
+npm run dev
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+Manual browser checks:
+
+1. Log in.
+2. Open **Cat**.
+3. Add a new expense category.
+4. Edit the category.
+5. Deactivate the category.
+6. Open **Plan / แผนเงิน**.
+7. Add a monthly subscription and pay it using **Pay subscription**.
+8. Confirm Dashboard no longer double counts the paid subscription.
+9. Add an annual expense and use **Reserve this month**.
+10. Confirm Dashboard no longer double counts that month’s reserve.
+11. Use **Pay annual bill** and confirm the transaction is created correctly.
+12. Confirm inactive categories, subscriptions, and annual expenses do not affect Dashboard totals.
+
+## 64. Phase 8 Files Created or Modified
+
+Important Phase 8 files:
+
+- Category route: `src/app/(private)/categories/page.tsx`
+- Category loading state: `src/app/(private)/categories/loading.tsx`
+- Category server actions: `src/app/(private)/categories/actions.ts`
+- Category form: `src/components/categories/category-form.tsx`
+- Planning server actions: `src/app/(private)/planning/actions.ts`
+- Planning workflow forms: `src/components/planning/payment-workflow-forms.tsx`
+- Planning page workflow integration: `src/app/(private)/planning/page.tsx`
+- Dashboard data mapper: `src/lib/finance/dashboard-data.ts`
+- Finance tests: `src/lib/finance/dashboard.test.ts`
+- App navigation: `src/components/layout/app-shell.tsx`
+- Initial schema draft: `supabase/migrations/001_initial_schema.sql`
+- Phase 8 migration: `supabase/migrations/006_expand_category_kinds.sql`
+- Documentation: `README.md`

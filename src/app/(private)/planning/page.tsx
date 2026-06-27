@@ -1,16 +1,19 @@
 import { Banknote, CalendarClock, PiggyBank, Repeat, WalletCards } from "lucide-react";
 import { AnnualExpenseForm } from "@/components/planning/annual-expense-form";
 import { BudgetForm } from "@/components/planning/budget-form";
+import { PayAnnualBillForm, PaySubscriptionForm, ReserveAnnualExpenseForm, ReserveSubscriptionForm } from "@/components/planning/payment-workflow-forms";
 import { SubscriptionForm } from "@/components/planning/subscription-form";
 import { getFinancialCycle } from "@/lib/finance/cycle";
+import type { CategoryKind } from "@/lib/finance/types";
 import { createClient } from "@/lib/supabase/server";
 import { setAnnualExpenseActive, setBudgetActive, setSubscriptionActive } from "./actions";
 
 type BudgetRow = { id: string; category_id: string | null; label: string; amount: number | string; cycle_start_date: string; active: boolean };
 type SubscriptionRow = { id: string; category_id: string | null; name: string; frequency: "monthly" | "yearly"; price: number | string; billing_day: number; payment_method: string | null; active: boolean };
 type AnnualExpenseRow = { id: string; category_id: string | null; name: string; annual_amount: number | string; monthly_reserve: number | string | null; due_date: string | null; active: boolean };
-type CategoryRow = { id: string; name: string; kind: "income" | "expense"; active: boolean };
+type CategoryRow = { id: string; name: string; kind: CategoryKind; active: boolean };
 type TransactionRow = { id: string; category_id: string | null; type: string; amount: number | string; cycle_start_date: string; related_entity_id: string | null };
+type AccountRow = { id: string; name: string; type: string; active: boolean };
 
 function toNumber(value: number | string | null | undefined) {
   const numberValue = Number(value ?? 0);
@@ -56,23 +59,29 @@ export default async function PlanningPage() {
   const cycle = getFinancialCycle(new Date());
   const cycleStartDate = toDateInput(cycle.start);
   const supabase = await createClient();
-  const [budgetsResult, subscriptionsResult, annualResult, categoriesResult, transactionsResult] = await Promise.all([
+  const [accountsResult, budgetsResult, subscriptionsResult, annualResult, categoriesResult, transactionsResult] = await Promise.all([
+    supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
     supabase.from("budgets").select("id,category_id,label,amount,cycle_start_date,active").eq("cycle_start_date", cycleStartDate).order("active", { ascending: false }).order("label"),
     supabase.from("subscriptions").select("id,category_id,name,frequency,price,billing_day,payment_method,active").order("active", { ascending: false }).order("name"),
     supabase.from("annual_expenses").select("id,category_id,name,annual_amount,monthly_reserve,due_date,active").order("active", { ascending: false }).order("name"),
-    supabase.from("categories").select("id,name,kind,active").eq("kind", "expense").order("name"),
+    supabase.from("categories").select("id,name,kind,active").order("name"),
     supabase.from("transactions").select("id,category_id,type,amount,cycle_start_date,related_entity_id").eq("cycle_start_date", cycleStartDate)
   ]);
 
+  const accounts = (accountsResult.data ?? []) as AccountRow[];
   const budgets = (budgetsResult.data ?? []) as BudgetRow[];
   const subscriptions = (subscriptionsResult.data ?? []) as SubscriptionRow[];
   const annualExpenses = (annualResult.data ?? []) as AnnualExpenseRow[];
   const categories = (categoriesResult.data ?? []) as CategoryRow[];
   const transactions = (transactionsResult.data ?? []) as TransactionRow[];
   const categoryNameById = new Map(categories.map((category) => [category.id, category.name]));
-  const loadError = budgetsResult.error ?? subscriptionsResult.error ?? annualResult.error ?? categoriesResult.error ?? transactionsResult.error;
+  const loadError = accountsResult.error ?? budgetsResult.error ?? subscriptionsResult.error ?? annualResult.error ?? categoriesResult.error ?? transactionsResult.error;
   const expenseTransactions = transactions.filter((transaction) => transaction.type === "expense");
   const reserveTransactions = transactions.filter((transaction) => transaction.type === "sinking_fund_reserve");
+  const cashLikeAccounts = accounts.filter((account) => account.active && account.type !== "investment");
+  const linkedThisCycle = (id: string) => transactions.some((transaction) => transaction.related_entity_id === id);
+  const paidThisCycle = (id: string) => expenseTransactions.some((transaction) => transaction.related_entity_id === id);
+  const reservedThisCycle = (id: string) => reserveTransactions.some((transaction) => transaction.related_entity_id === id);
 
   const budgetCards = budgets.map((budget) => {
     const used = expenseTransactions
@@ -87,14 +96,14 @@ export default async function PlanningPage() {
 
   const monthlySubscriptions = subscriptions.filter((subscription) => subscription.frequency === "monthly");
   const yearlySubscriptions = subscriptions.filter((subscription) => subscription.frequency === "yearly");
-  const monthlySubscriptionTotal = monthlySubscriptions.filter((subscription) => subscription.active).reduce((total, subscription) => total + toNumber(subscription.price), 0);
+  const monthlySubscriptionTotal = monthlySubscriptions.filter((subscription) => subscription.active).filter((subscription) => !paidThisCycle(subscription.id)).reduce((total, subscription) => total + toNumber(subscription.price), 0);
   const yearlyReserveTotal = yearlySubscriptions
     .filter((subscription) => subscription.active)
-    .filter((subscription) => !reserveTransactions.some((transaction) => transaction.related_entity_id === subscription.id))
+    .filter((subscription) => !linkedThisCycle(subscription.id))
     .reduce((total, subscription) => total + toNumber(subscription.price) / 12, 0);
   const annualReserveTotal = annualExpenses
     .filter((expense) => expense.active)
-    .filter((expense) => !reserveTransactions.some((transaction) => transaction.related_entity_id === expense.id))
+    .filter((expense) => !linkedThisCycle(expense.id))
     .reduce((total, expense) => total + (toNumber(expense.monthly_reserve) || toNumber(expense.annual_amount) / 12), 0);
 
   return (
@@ -189,7 +198,9 @@ export default async function PlanningPage() {
           {subscriptions.map((subscription) => {
             const categoryName = subscription.category_id ? categoryNameById.get(subscription.category_id) ?? "Other" : "Other";
             const reserveMonthly = subscription.frequency === "yearly" ? toNumber(subscription.price) / 12 : 0;
-            const paidOrReserved = reserveTransactions.some((transaction) => transaction.related_entity_id === subscription.id) || transactions.some((transaction) => transaction.related_entity_id === subscription.id && transaction.type === "expense");
+            const isReserved = reservedThisCycle(subscription.id);
+            const isPaid = paidThisCycle(subscription.id);
+            const paidOrReserved = isReserved || isPaid;
             return (
               <article key={subscription.id} className="rounded-panel border border-slate-200 bg-white p-4 shadow-card">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -202,10 +213,17 @@ export default async function PlanningPage() {
                     </div>
                     <p className="mt-3 text-2xl font-black text-ink">{formatMoney(subscription.price)}</p>
                     <p className="mt-1 text-sm font-semibold text-muted">{subscription.frequency === "monthly" ? "นับเป็น monthly fixed obligation" : "นับเป็น sinking fund reserve " + formatMoney(reserveMonthly) + "/เดือน"} · Billing day {subscription.billing_day}</p>
-                    {paidOrReserved ? <p className="mt-2 text-sm font-black text-emerald-700">จ่าย/กันเงินแล้วในรอบนี้</p> : null}
+                    {paidOrReserved ? <p className="mt-2 text-sm font-black text-emerald-700">{isPaid ? "Paid this cycle" : "Reserved this cycle"}</p> : null}
                   </div>
                   <ToggleActiveForm id={subscription.id} active={subscription.active} action={setSubscriptionActive} />
                 </div>
+                {subscription.active ? (
+                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                    {subscription.frequency === "yearly" ? <ReserveSubscriptionForm subscriptionId={subscription.id} amount={reserveMonthly} /> : null}
+                    <PaySubscriptionForm subscriptionId={subscription.id} categoryId={subscription.category_id} amount={toNumber(subscription.price)} accounts={cashLikeAccounts} frequency={subscription.frequency} />
+                  </div>
+                ) : null}
+                {subscription.active && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-sm font-bold text-amber-800">Add a cash-like account before paying subscriptions from this page.</p> : null}
                 <details className="mt-4">
                   <summary className="cursor-pointer text-sm font-black text-primary">แก้ไข subscription</summary>
                   <div className="mt-3"><SubscriptionForm subscription={{ ...subscription, category_name: categoryName }} compact /></div>
@@ -231,7 +249,9 @@ export default async function PlanningPage() {
           {annualExpenses.map((expense) => {
             const categoryName = expense.category_id ? categoryNameById.get(expense.category_id) ?? "Other" : "Other";
             const monthlyReserve = toNumber(expense.monthly_reserve) || toNumber(expense.annual_amount) / 12;
-            const reserved = reserveTransactions.some((transaction) => transaction.related_entity_id === expense.id);
+            const reserved = reservedThisCycle(expense.id);
+            const paid = paidThisCycle(expense.id);
+            const completedThisCycle = reserved || paid;
             return (
               <article key={expense.id} className="rounded-panel border border-slate-200 bg-white p-4 shadow-card">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -240,10 +260,10 @@ export default async function PlanningPage() {
                       <h3 className="text-lg font-black text-ink">{expense.name}</h3>
                       <StatusPill active={expense.active} />
                       <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{categoryName}</span>
-                      {reserved ? <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700">กันเงินแล้ว</span> : null}
+                      {completedThisCycle ? <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700">{paid ? "Paid" : "Reserved"}</span> : null}
                     </div>
                     <div className="mt-4 grid gap-3">
-                      <ProgressBar percent={reserved ? 100 : 0} />
+                      <ProgressBar percent={completedThisCycle ? 100 : 0} />
                       <div className="grid gap-2 text-sm font-bold text-muted sm:grid-cols-3">
                         <span>รายปี {formatMoney(expense.annual_amount)}</span>
                         <span>กันต่อเดือน {formatMoney(monthlyReserve)}</span>
@@ -253,6 +273,13 @@ export default async function PlanningPage() {
                   </div>
                   <ToggleActiveForm id={expense.id} active={expense.active} action={setAnnualExpenseActive} />
                 </div>
+                {expense.active ? (
+                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                    <ReserveAnnualExpenseForm annualExpenseId={expense.id} amount={monthlyReserve} />
+                    <PayAnnualBillForm annualExpenseId={expense.id} categoryId={expense.category_id} amount={toNumber(expense.annual_amount)} accounts={cashLikeAccounts} />
+                  </div>
+                ) : null}
+                {expense.active && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-sm font-bold text-amber-800">Add a cash-like account before paying annual bills from this page.</p> : null}
                 <details className="mt-4">
                   <summary className="cursor-pointer text-sm font-black text-primary">แก้ไข sinking fund</summary>
                   <div className="mt-3"><AnnualExpenseForm annualExpense={{ ...expense, category_name: categoryName }} compact /></div>
