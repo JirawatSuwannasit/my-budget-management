@@ -11,7 +11,7 @@ const navItems = [
   { href: "/accounts", label: "บัญชี", short: "Accounts", icon: WalletCards },
   { href: "/transactions", label: "รายการ", short: "Txns", icon: ListChecks },
   { href: "/planning", label: "แผนเงิน", short: "Plan", icon: BarChart3 },
-  { href: "/dashboard#cards", label: "บัตร", short: "Cards", icon: CreditCard },
+  { href: "/debts-cards", label: "หนี้/บัตร", short: "Debt", icon: CreditCard },
   { href: "/dashboard#settings", label: "ตั้งค่า", short: "More", icon: Settings }
 ];
 

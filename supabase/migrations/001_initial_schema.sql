@@ -115,6 +115,7 @@ create table public.debts (
   remaining_balance numeric(14,2) not null check (remaining_balance >= 0),
   interest_rate numeric(7,4) not null default 0 check (interest_rate >= 0),
   monthly_payment numeric(14,2) not null default 0 check (monthly_payment >= 0),
+  bonus_payment_amount numeric(14,2) not null default 0 check (bonus_payment_amount >= 0),
   target_payoff_date date,
   active boolean not null default true,
   created_at timestamptz not null default now(),

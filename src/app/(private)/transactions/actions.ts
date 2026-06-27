@@ -52,6 +52,12 @@ async function adjustAccountBalance(supabase: SupabaseServer, userId: string, ac
 async function applyAccountDeltas(supabase: SupabaseServer, userId: string, deltas: Array<{ accountId: string; delta: number }>) {
   for (const delta of deltas) await adjustAccountBalance(supabase, userId, delta.accountId, delta.delta);
 }
+function revalidateFinanceViews() {
+  revalidatePath("/transactions");
+  revalidatePath("/dashboard");
+  revalidatePath("/accounts");
+  revalidatePath("/debts-cards");
+}
 async function updateStatementPaidAmount(supabase: SupabaseServer, userId: string, statementId: string, delta: number) {
   const { data, error } = await supabase.from("credit_card_statements").select("statement_amount_due,paid_amount").eq("id", statementId).eq("user_id", userId).single();
   if (error) throw new Error(error.message);
@@ -163,13 +169,13 @@ export async function saveTransaction(_previousState: TransactionActionState, fo
       const { error } = await supabase.from("transactions").update(payload.transaction).eq("id", id).eq("user_id", userId);
       if (error) throw new Error(error.message);
       await applyTransactionSideEffects(supabase, userId, id, payload);
-      revalidatePath("/transactions"); revalidatePath("/dashboard"); revalidatePath("/accounts");
+      revalidateFinanceViews();
       return { status: "success", message: "Transaction updated." };
     }
     const { data: inserted, error } = await supabase.from("transactions").insert(payload.transaction).select("id").single();
     if (error) throw new Error(error.message);
     await applyTransactionSideEffects(supabase, userId, inserted.id, payload);
-    revalidatePath("/transactions"); revalidatePath("/dashboard"); revalidatePath("/accounts");
+    revalidateFinanceViews();
     return { status: "success", message: "Transaction added." };
   } catch (error) {
     return { status: "error", message: error instanceof Error ? error.message : "Could not save transaction." };
@@ -184,5 +190,5 @@ export async function deleteTransaction(formData: FormData) {
   await revertTransactionSideEffects(supabase, userId, existing as TransactionRow);
   const { error } = await supabase.from("transactions").delete().eq("id", id).eq("user_id", userId);
   if (error) throw new Error(error.message);
-  revalidatePath("/transactions"); revalidatePath("/dashboard"); revalidatePath("/accounts");
+  revalidateFinanceViews();
 }

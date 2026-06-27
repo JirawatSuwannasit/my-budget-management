@@ -1130,7 +1130,219 @@ Still planned for later phases:
 - Full category management UI
 - Dedicated subscription payment workflow
 - Dedicated annual bill payment workflow
-- Debt CRUD UI
-- Credit card CRUD UI
-- Credit card statement closing workflow
 - Full Thai/English language switcher UI
+
+## 45. Phase 7: Debts and Credit Cards
+
+Phase 7 adds private app screens for:
+
+- Debt list and debt progress
+- Add/edit/deactivate debt
+- Debt payment workflow
+- Credit card list
+- Add/edit/deactivate credit card
+- Credit card statement tracking
+- Credit card expense workflow
+- Credit card payment workflow
+
+No deployment was performed by Codex in this phase.
+
+## 46. Phase 7 Database Migration
+
+A new migration was added:
+
+```text
+supabase/migrations/005_add_debt_bonus_payment_amount.sql
+```
+
+Run this migration in Supabase before testing Phase 7 in the browser. It adds:
+
+- `debts.bonus_payment_amount`
+- A useful `debts(user_id, type)` index
+- `notify pgrst, 'reload schema';`
+
+Beginner-friendly SQL Editor method:
+
+1. Open your Supabase project.
+2. Click **SQL Editor** in the left sidebar.
+3. Click **New query**.
+4. Open this local file:
+
+```text
+D:\AI project\My_budget_project\supabase\migrations\005_add_debt_bonus_payment_amount.sql
+```
+
+5. Copy all SQL from the file.
+6. Paste it into Supabase SQL Editor.
+7. Click **Run**.
+8. Wait for Supabase to finish.
+
+If Supabase still reports a schema cache error, wait a few seconds, refresh the app, and run this SQL once:
+
+```sql
+notify pgrst, 'reload schema';
+```
+
+## 47. How to Add a Debt
+
+Open **Debt** from the bottom navigation or desktop sidebar.
+
+Use **Add debt**.
+
+Recommended first example:
+
+- Debt name: `Interest-free debt 500,000`
+- Debt type: `Interest-free debt`
+- Original amount: `500000`
+- Remaining balance: `500000`
+- Interest: `0`
+- Monthly payment: `9000`
+- Bonus payment: `50000`
+- Target payoff date: choose a date within about 3 years
+- Active debt: checked
+
+The debt card shows original amount, remaining balance, monthly payment, bonus payment, estimated months remaining, payoff progress, and payment history.
+
+## 48. How to Record a Debt Payment
+
+Before recording a debt payment, you need:
+
+- At least one active debt
+- At least one active cash-like account, such as `main_bank`, `other_bank`, `cash`, or `wallet`
+
+Use **Record debt payment**.
+
+Effect:
+
+- Creates a `debt_payment` transaction
+- Reduces the selected cash-like account balance
+- Reduces the debt remaining balance
+- Reduces the remaining planned debt payment for the current 25th-to-24th cycle
+- Prevents the dashboard from reserving the paid amount again
+
+## 49. How to Add a Credit Card
+
+Open **Debt**, then use **Add credit card**.
+
+Fields:
+
+- Card name
+- Billing cut day
+- Payment due day
+- Active card
+
+The card section shows current cycle spending, statement amount due, paid amount, remaining payable, and statement status.
+
+## 50. Credit Card Expenses vs Cash Expenses
+
+A cash or bank expense reduces the account balance immediately.
+
+A credit card expense works differently:
+
+- It creates a `credit_card_expense` transaction.
+- It increases card liability/current card spending.
+- It does not reduce cash immediately.
+- Cash decreases later only when you record a credit card payment.
+
+This prevents double counting in real available money.
+
+## 51. How to Add and Pay a Credit Card Statement
+
+Use **Add statement** to create the card statement amount that is due.
+
+Statement fields:
+
+- Credit card
+- Cycle start
+- Cycle end
+- Due date
+- Statement amount due
+- Paid amount
+
+Use **Pay credit card statement** when you actually pay from a cash-like account.
+
+Effect:
+
+- Creates a `credit_card_payment` transaction
+- Reduces the selected cash-like account balance
+- Increases the statement paid amount
+- Reduces remaining card payable
+- Updates statement status to unpaid, partial, or paid
+- Prevents the dashboard from reserving the paid amount again
+
+## 52. Phase 7 Dashboard Integration
+
+The dashboard continues to use the approved no-double-counting rules:
+
+- Real available money subtracts only remaining planned debt payments.
+- Real available money subtracts only remaining credit card payable.
+- Paid debt payments are not reserved again in the same financial cycle.
+- Paid credit card payments are not reserved again after cash has already decreased.
+- Credit card expenses do not reduce cash until paid.
+- Investment accounts remain excluded from real available money.
+- The 25th-to-24th financial cycle still applies.
+
+## 53. Local Verification Commands for Phase 7
+
+Codex did not run these commands because you asked Codex not to run npm test/typecheck/lint/build.
+
+Please run these in Windows PowerShell:
+
+```powershell
+cd "D:\AI project\My_budget_project"
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
+
+All four should pass before approving Phase 7.
+
+## 54. Browser Checks for Phase 7
+
+Start the app locally:
+
+```powershell
+cd "D:\AI project\My_budget_project"
+npm run dev
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+Manual browser checks:
+
+1. Log in.
+2. Open **Debt**.
+3. Add the 500,000 THB interest-free debt.
+4. Add a debt payment.
+5. Confirm debt remaining balance decreases.
+6. Open **Dashboard** and confirm planned debt payment/remaining debt updates.
+7. Add a credit card.
+8. Add a credit card expense.
+9. Confirm cash balance does not decrease immediately.
+10. Confirm card liability/current cycle spending increases.
+11. Add a credit card statement if one does not exist yet.
+12. Pay a credit card statement.
+13. Confirm cash balance decreases and remaining payable decreases.
+14. Confirm dashboard real available money avoids double counting.
+
+## 55. Phase 7 Files Created or Modified
+
+Important Phase 7 files:
+
+- Debt/card route: `src/app/(private)/debts-cards/page.tsx`
+- Debt/card loading state: `src/app/(private)/debts-cards/loading.tsx`
+- Debt/card server actions: `src/app/(private)/debts-cards/actions.ts`
+- Debt form: `src/components/debts-cards/debt-form.tsx`
+- Credit card form: `src/components/debts-cards/card-form.tsx`
+- Statement form: `src/components/debts-cards/statement-form.tsx`
+- Debt/card payment forms: `src/components/debts-cards/payment-forms.tsx`
+- Transaction revalidation: `src/app/(private)/transactions/actions.ts`
+- App navigation: `src/components/layout/app-shell.tsx`
+- Initial schema draft: `supabase/migrations/001_initial_schema.sql`
+- Phase 7 upgrade migration: `supabase/migrations/005_add_debt_bonus_payment_amount.sql`
+- Documentation: `README.md`
