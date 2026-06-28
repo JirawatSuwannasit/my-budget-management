@@ -33,6 +33,19 @@ textarea {
   font: inherit;
 }
 
+/* Accessibility: a consistent, visible keyboard focus ring across all interactive elements. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid #087f8c;
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
 .safe-bottom {
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
 }

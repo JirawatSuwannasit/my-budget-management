@@ -1,4 +1,4 @@
-import { CalendarDays, Languages, LogOut, Settings, ShieldCheck, Smartphone, WalletCards } from "lucide-react";
+import { CalendarDays, Database, Download, Languages, LogOut, Settings, ShieldCheck, Smartphone, WalletCards } from "lucide-react";
 import { LogoutButton } from "@/components/settings/logout-button";
 import { SettingsForm } from "@/components/settings/settings-form";
 import { dictionaries, isLocale } from "@/lib/i18n/dictionaries";
@@ -83,6 +83,23 @@ export default async function SettingsPage() {
               <p className="rounded-2xl bg-slate-50 p-3">{t.pwaTheme}</p>
               <p className="rounded-2xl bg-slate-50 p-3">{t.pwaOffline}</p>
             </div>
+          </article>
+
+          <article className="rounded-panel border border-slate-200 bg-white p-5 shadow-card">
+            <div className="mb-3 flex items-center gap-2">
+              <Database className="text-primary" size={20} aria-hidden="true" />
+              <h2 className="text-xl font-black text-ink">{t.backupTitle}</h2>
+            </div>
+            <p className="mb-4 text-sm font-semibold text-muted">{t.backupText}</p>
+            <div className="grid gap-2">
+              <a href="/settings/export" download className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-black text-white shadow-card transition hover:bg-primary/90">
+                <Download size={18} aria-hidden="true" /> {t.exportJson}
+              </a>
+              <a href="/settings/export?format=csv" download className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary">
+                <Download size={18} aria-hidden="true" /> {t.exportCsv}
+              </a>
+            </div>
+            <p className="mt-3 text-xs font-bold text-muted">{t.importFutureNote}</p>
           </article>
 
           <article className="rounded-panel border border-slate-200 bg-white p-5 shadow-card">

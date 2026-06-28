@@ -176,10 +176,10 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, upco
       <section id="budgets" className="grid gap-4 rounded-panel border border-slate-200 bg-white p-4 shadow-card md:p-5">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-xs font-black uppercase tracking-normal text-muted">Budget and reserve pacing</p>
+            <p className="text-xs font-black uppercase tracking-normal text-muted">{t.budgetReservePacing}</p>
             <h2 className="mt-1 text-xl font-black text-ink">{t.budgetSinkingTitle}</h2>
           </div>
-          <Link href="/planning" className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-white shadow-card" aria-label="Manage budgets"><Plus size={20} aria-hidden="true" /></Link>
+          <Link href="/planning" className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-white shadow-card" aria-label={t.budgetSinkingTitle}><Plus size={20} aria-hidden="true" /></Link>
         </div>
         {input.reservedBudgets.length === 0 && sinkingFunds.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-bold text-muted">{t.noBudgets}</p>

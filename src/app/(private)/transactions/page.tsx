@@ -2,6 +2,7 @@ import { ListChecks } from "lucide-react";
 import { DeleteTransactionForm } from "@/components/transactions/delete-transaction-form";
 import { TransactionForm } from "@/components/transactions/transaction-form";
 import { createClient } from "@/lib/supabase/server";
+import { dictionaries, isLocale } from "@/lib/i18n/dictionaries";
 import type { AccountType, CategoryKind, TransactionType } from "@/lib/finance/types";
 
 type AccountRow = { id: string; name: string; type: AccountType; active: boolean };
@@ -13,17 +14,6 @@ type AnnualExpenseRow = { id: string; name: string; active: boolean };
 type SubscriptionRow = { id: string; name: string; frequency: "monthly" | "yearly"; active: boolean };
 type TransactionRow = { id: string; account_id: string | null; destination_account_id: string | null; category_id: string | null; type: TransactionType; amount: number | string; transaction_date: string; cycle_start_date: string; related_entity_id: string | null; notes: string | null; created_at: string };
 
-const typeLabels: Record<TransactionType, string> = {
-  income: "รายรับ",
-  expense: "รายจ่าย",
-  transfer: "โอนระหว่างบัญชี",
-  credit_card_expense: "ใช้บัตรเครดิต",
-  credit_card_payment: "จ่ายบัตรเครดิต",
-  debt_payment: "จ่ายหนี้",
-  investment_transfer: "โอนไปลงทุน",
-  sinking_fund_reserve: "กันเงินรายปี"
-};
-
 function formatMoney(value: number | string) {
   return new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(Number(value));
 }
@@ -33,6 +23,10 @@ export default async function TransactionsPage() {
   const {
     data: { user }
   } = await supabase.auth.getUser();
+  const { data: profile } = user ? await supabase.from("profiles").select("locale").eq("user_id", user.id).maybeSingle() : { data: null };
+  const locale = isLocale(profile?.locale) ? profile.locale : "th";
+  const t = dictionaries[locale].transactions;
+
   const [accountsResult, categoriesResult, debtsResult, cardsResult, statementsResult, annualResult, subscriptionsResult, transactionsResult, appSettingsResult] = await Promise.all([
     supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
     supabase.from("categories").select("id,name,kind,active").order("name"),
@@ -58,9 +52,9 @@ export default async function TransactionsPage() {
     ...subscriptions.filter((item) => item.active && item.frequency === "yearly").map((item) => ({ id: item.id, label: item.name, kind: "subscription" as const }))
   ];
   const payables = [
-    ...subscriptions.filter((item) => item.active && item.frequency === "monthly").map((item) => ({ id: item.id, label: item.name + " - monthly subscription", kind: "monthly_subscription" as const })),
-    ...subscriptions.filter((item) => item.active && item.frequency === "yearly").map((item) => ({ id: item.id, label: item.name + " - yearly subscription", kind: "yearly_subscription" as const })),
-    ...annualExpenses.filter((item) => item.active).map((item) => ({ id: item.id, label: item.name + " - annual expense", kind: "annual_expense" as const }))
+    ...subscriptions.filter((item) => item.active && item.frequency === "monthly").map((item) => ({ id: item.id, label: item.name + " - " + dictionaries[locale].upcoming.types.subscription, kind: "monthly_subscription" as const })),
+    ...subscriptions.filter((item) => item.active && item.frequency === "yearly").map((item) => ({ id: item.id, label: item.name + " - " + dictionaries[locale].planning.yearly, kind: "yearly_subscription" as const })),
+    ...annualExpenses.filter((item) => item.active).map((item) => ({ id: item.id, label: item.name + " - " + dictionaries[locale].planning.form.annualExpense, kind: "annual_expense" as const }))
   ];
   const accountName = new Map(accounts.map((account) => [account.id, account.name]));
   const defaultAccountId = (appSettingsResult.data as { default_account_id: string | null } | null)?.default_account_id ?? null;
@@ -71,46 +65,46 @@ export default async function TransactionsPage() {
       <section className="rounded-[28px] border border-primary/15 bg-gradient-to-br from-white via-teal-50 to-blue-50 p-5 shadow-soft md:p-8">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-normal text-primary">Transactions</p>
-            <h1 className="mt-4 text-3xl font-black text-ink md:text-5xl">บันทึกรายการเงิน</h1>
-            <p className="mt-3 max-w-2xl text-sm font-semibold text-muted md:text-base">เพิ่มรายจ่ายได้เร็ว โอนเงินไม่ถูกนับเป็นรายจ่าย และรายการลงทุนจะแยกจากการใช้จ่ายประจำวัน</p>
+            <p className="w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-normal text-primary">{t.eyebrow}</p>
+            <h1 className="mt-4 text-3xl font-black text-ink md:text-5xl">{t.title}</h1>
+            <p className="mt-3 max-w-2xl text-sm font-semibold text-muted md:text-base">{t.subtitle}</p>
           </div>
           <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-white shadow-card"><ListChecks size={22} aria-hidden="true" /></div>
         </div>
       </section>
 
-      {loadError ? <p className="rounded-panel border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-800">โหลดข้อมูลไม่สำเร็จ: {loadError.message}</p> : null}
-      {accounts.length === 0 ? <p className="rounded-panel border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-900">เพิ่มบัญชีก่อน จึงจะบันทึกรายรับ รายจ่าย หรือโอนได้</p> : null}
+      {loadError ? <p className="rounded-panel border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-800">{t.loadError}: {loadError.message}</p> : null}
+      {accounts.length === 0 ? <p className="rounded-panel border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-900">{t.needAccount}</p> : null}
 
       <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
         <div>
-          <h2 className="mb-3 text-xl font-black text-ink">เพิ่มรายการ</h2>
-          <TransactionForm accounts={accounts} categories={categories} debts={debts} cards={cards} statements={statements} reserves={reserves} payables={payables} defaultAccountId={defaultAccountId} />
+          <h2 className="mb-3 text-xl font-black text-ink">{t.addTransaction}</h2>
+          <TransactionForm accounts={accounts} categories={categories} debts={debts} cards={cards} statements={statements} reserves={reserves} payables={payables} defaultAccountId={defaultAccountId} locale={locale} />
         </div>
 
         <div className="grid gap-3">
           <div className="flex items-center justify-between gap-4">
-            <h2 className="text-xl font-black text-ink">รายการล่าสุด</h2>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-muted shadow-card">ล่าสุด {transactions.length}</span>
+            <h2 className="text-xl font-black text-ink">{t.recent}</h2>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-muted shadow-card">{t.recentPrefix} {transactions.length}</span>
           </div>
-          {transactions.length === 0 ? <p className="rounded-panel border border-dashed border-slate-300 bg-white/80 p-5 text-sm font-bold text-muted">ยังไม่มีรายการ เริ่มจากเพิ่มรายรับหรือรายจ่ายแรก</p> : null}
+          {transactions.length === 0 ? <p className="rounded-panel border border-dashed border-slate-300 bg-white/80 p-5 text-sm font-bold text-muted">{t.empty}</p> : null}
           {transactions.map((transaction) => (
             <article key={transaction.id} className="rounded-panel border border-slate-200 bg-white p-4 shadow-card">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{typeLabels[transaction.type]}</span>
+                    <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{t.types[transaction.type]}</span>
                     <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-muted">{transaction.transaction_date}</span>
                   </div>
                   <p className="mt-2 text-2xl font-black text-ink">{formatMoney(transaction.amount)}</p>
-                  <p className="mt-1 text-sm font-semibold text-muted">{transaction.account_id ? accountName.get(transaction.account_id) ?? "Account" : "No cash account"}{transaction.destination_account_id ? " -> " + (accountName.get(transaction.destination_account_id) ?? "Destination") : ""}</p>
+                  <p className="mt-1 text-sm font-semibold text-muted">{transaction.account_id ? accountName.get(transaction.account_id) ?? t.accountFallback : t.noCashAccount}{transaction.destination_account_id ? " -> " + (accountName.get(transaction.destination_account_id) ?? t.destinationFallback) : ""}</p>
                   {transaction.notes ? <p className="mt-2 text-sm font-semibold text-muted">{transaction.notes}</p> : null}
                 </div>
-                <DeleteTransactionForm id={transaction.id} label="ลบถ้าปลอดภัย" />
+                <DeleteTransactionForm id={transaction.id} locale={locale} />
               </div>
               <details className="mt-4">
-                <summary className="cursor-pointer text-sm font-black text-primary">แก้ไขรายการ</summary>
-                <div className="mt-3"><TransactionForm accounts={accounts} categories={categories} debts={debts} cards={cards} statements={statements} reserves={reserves} payables={payables} transaction={transaction} compact /></div>
+                <summary className="cursor-pointer text-sm font-black text-primary">{t.editTransaction}</summary>
+                <div className="mt-3"><TransactionForm accounts={accounts} categories={categories} debts={debts} cards={cards} statements={statements} reserves={reserves} payables={payables} transaction={transaction} defaultAccountId={defaultAccountId} locale={locale} compact /></div>
               </details>
             </article>
           ))}

@@ -1947,3 +1947,78 @@ Then open `http://localhost:3000` and check:
 - Annual expense row `due_date` exposed: `src/lib/finance/dashboard-data.ts`
 - i18n dictionary (nav + `upcoming` section, th/en): `src/lib/i18n/dictionaries.ts`
 - Documentation: `README.md`
+
+## 88. v1.0 Hardening: Backup, Robustness, Accessibility, i18n
+
+The final v1 pass added no new finance features. It focused on data safety, robustness, accessibility, and finishing localization.
+
+### Personal data backup (read-only export)
+
+- **Settings → Personal data backup** offers two downloads:
+  - **Full JSON** (`/settings/export`): accounts, transactions, budgets, subscriptions, annual_expenses, debts, debt_payments, credit_cards, credit_card_statements, card_transactions, categories, plus your profile and app_settings — wrapped with `exportedAt`, `schemaVersion`, and your user id/email.
+  - **Transactions CSV** (`/settings/export?format=csv`).
+- The export route is a server **Route Handler** scoped to the logged-in user by RLS (and `user_id` filters for profile/app_settings). It is **read-only** — it never writes data. Unauthenticated requests get `401`.
+- **Import is intentionally out of scope for v1** (see future work). The UI says so.
+
+### Robustness
+
+- Every `save*` server action runs in try/catch and returns a **localized** `{ status, message }` — never an unhandled throw — covering not-logged-in, invalid input, and Supabase errors. `accounts/actions.ts` was brought in line with the rest (previously English-only).
+- Negative balances remain impossible through transactions: `adjustAccountBalance` rejects any update that would drop an account below zero, and transaction edit/delete reverses linked card/debt/statement side-records before re-applying.
+- Known minor: the small `setXActive` toggle actions (account/category/debt/card active switches) surface a Supabase/RLS failure via the Next error boundary rather than an inline message. This is a rare path; converting them to inline status is a candidate for a future pass.
+
+### Accessibility & mobile
+
+- Global, visible keyboard **focus ring** (`:focus-visible`) on links, buttons, inputs, selects, textareas, and summaries.
+- Icon-only controls have localized `aria-label`s; decorative icons are `aria-hidden`.
+- Primary buttons and toggle controls use ≥44px tap targets (`min-h-11`/`min-h-12`).
+- Layouts use wrapping/grids and avoid fixed wide content; no horizontal scroll at 360–414px (bottom nav is a 9-column grid).
+
+### i18n completeness
+
+- The **Accounts** area (page + form + actions) and the **Transactions** area (page + form + delete confirm) were fully moved into the dictionary; account-type and transaction-type labels/helpers now come from `th`/`en`.
+- Remaining Thai literals are intentional: dictionary values, locale-keyed example/datalist suggestions, inline `locale === "th" ? … : …` strings, and the pre-login screen (no locale preference exists before login — documented).
+
+## 89. v1.0 Release Checklist
+
+- [x] `.gitignore` excludes `.env`, `.env.local`, `.env.*.local`, `.vercel/`; only `.env.example` is committed.
+- [x] No `service_role` / service key anywhere under `src` (verified by grep). The browser and server clients use the anon key; all access is RLS-scoped to the logged-in user.
+- [x] RLS assumption: every finance table is protected by row-level security keyed on `auth.uid()` / `user_id`; the app never bypasses it. Keep RLS enabled in Supabase.
+- [x] PWA: `public/manifest.webmanifest`, icons, and a service worker (`public/sw.js`) are present and the app is installable; `public/offline.html` is the offline fallback for navigations.
+- [x] `npm test`, `npm run typecheck`, `npm run lint`, `npm run build` all pass.
+- [ ] **You run the release:** commit, tag (e.g. `v1.0.0`), push, and deploy. (This pass intentionally does not push, tag, or deploy.)
+
+### Final manual QA checklist
+
+1. Log in; confirm protected routes redirect to `/login` when logged out.
+2. Settings → download the **Full JSON** backup; open it and confirm all tables, profile, and app_settings are present and contain only your data.
+3. Settings → download the **Transactions CSV**; confirm it opens in a spreadsheet.
+4. Switch language to English, then Thai; spot-check Dashboard, Accounts, Transactions, Planning, Debts/Cards, Categories, Reports, Upcoming, Settings — no stray untranslated labels.
+5. Add/edit/deactivate an account and a transaction; confirm localized success/error messages.
+6. Try to overspend an account (expense larger than balance); confirm it is blocked with a localized message.
+7. Edit and delete a credit-card-payment / debt-payment transaction; confirm balances and the linked statement/debt reverse correctly.
+8. Tab through a form with the keyboard; confirm a visible focus ring on every control and that icon-only buttons are announced.
+9. At 360–414px width, confirm no horizontal scrolling and the bottom nav (9 items) is fully visible.
+10. Install the PWA and confirm the offline fallback page appears when offline.
+
+## 90. v1.0 Complete — Feature Summary & Out of Scope
+
+**v1.0 delivers (Phases 1–11 + hardening):**
+
+- Private, single-user finance app on Next.js 15 + Supabase Auth/Postgres/RLS.
+- Accounts (cash-like vs investment), transactions (income, expense, transfer, investment transfer, credit-card expense/payment, debt payment, sinking-fund reserve) with balance side-effects and safe edit/delete reversal.
+- Configurable financial cycle start day (1–28); the cycle drives the dashboard, planning, transactions, and debts/cards (not retroactive).
+- Dashboard "real available money" model that reserves obligations once and never double-counts.
+- Planning (budgets, subscriptions, annual expenses / sinking funds), Debts & credit cards (statements, payments).
+- Categories management.
+- Reports & history (cycle history, income-vs-expense trend, spending by category, debt payoff trajectory).
+- Due & to-do reminders (in-app, read-only) with dashboard panel and nav badges.
+- Read-only personal data export (JSON + transactions CSV).
+- Thai/English localization, Settings, and Android PWA with offline fallback.
+
+**Out of scope / future work (honest list):**
+
+- **Data import / restore** — export only in v1; a validated importer that re-inserts under the current user with RLS is future work.
+- **Real web push / background notifications** — needs a service-worker `push` handler, VAPID keys, a `push_subscriptions` table, and a scheduled sender (see §84).
+- **Multi-currency** — the app is THB-only; the currency control is fixed/read-only. Multi-currency storage + formatting is future work.
+- **Multi-user / sharing** — the app assumes one private user; no roles or shared budgets.
+- **Inline error UI for the small active/inactive toggle actions** (currently surfaced via the error boundary).
