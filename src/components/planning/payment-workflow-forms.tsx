@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { saveTransaction, type TransactionActionState } from "@/app/(private)/transactions/actions";
+import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 
 export type PlanningAccountOption = { id: string; name: string; type: string; active: boolean };
 
@@ -20,12 +21,13 @@ function ResultMessage({ state }: { state: TransactionActionState }) {
   return <p className={"rounded-2xl px-4 py-3 text-sm font-bold " + (state.status === "success" ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800")}>{state.message}</p>;
 }
 
-function AccountSelect({ accounts }: { accounts: PlanningAccountOption[] }) {
+function AccountSelect({ accounts, locale }: { accounts: PlanningAccountOption[]; locale: Locale }) {
+  const t = dictionaries[locale].planning.payment;
   return (
     <label className="grid gap-2 text-xs font-black text-ink">
-      Pay from
+      {t.payFrom}
       <select name="account_id" required defaultValue={accounts[0]?.id ?? ""} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60">
-        <option value="" disabled>Choose account</option>
+        <option value="" disabled>{t.chooseAccount}</option>
         {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
       </select>
     </label>
@@ -37,74 +39,85 @@ export function PaySubscriptionForm({
   categoryId,
   amount,
   accounts,
-  frequency
+  frequency,
+  locale
 }: {
   subscriptionId: string;
   categoryId: string | null;
   amount: number;
   accounts: PlanningAccountOption[];
   frequency: "monthly" | "yearly";
+  locale: Locale;
 }) {
   const [state, formAction, isPending] = useActionState(saveTransaction, initialState);
+  const t = dictionaries[locale].planning.payment;
+  const common = dictionaries[locale].common;
 
   return (
     <form action={formAction} className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+      <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="type" value="expense" />
       <input type="hidden" name="amount" value={amount} />
       <input type="hidden" name="category_id" value={categoryId ?? ""} />
       <input type="hidden" name="expense_related_entity_id" value={subscriptionId} />
       <input type="hidden" name="notes" value={frequency === "yearly" ? "Annual subscription paid from planning page" : "Monthly subscription paid from planning page"} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <AccountSelect accounts={accounts} />
+        <AccountSelect accounts={accounts} locale={locale} />
         <label className="grid gap-2 text-xs font-black text-ink">
-          Payment date
+          {t.paymentDate}
           <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
       </div>
       <button disabled={isPending || accounts.length === 0} className="rounded-2xl bg-primary px-4 py-2.5 text-xs font-black text-white shadow-card transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
-        {isPending ? "Saving..." : frequency === "yearly" ? "Pay annual subscription" : "Pay subscription"}
+        {isPending ? common.saving : frequency === "yearly" ? t.payAnnualSubscription : t.paySubscription}
       </button>
       <ResultMessage state={state} />
     </form>
   );
 }
 
-export function ReserveSubscriptionForm({ subscriptionId, amount }: { subscriptionId: string; amount: number }) {
+export function ReserveSubscriptionForm({ subscriptionId, amount, locale }: { subscriptionId: string; amount: number; locale: Locale }) {
   const [state, formAction, isPending] = useActionState(saveTransaction, initialState);
+  const t = dictionaries[locale].planning.payment;
+  const common = dictionaries[locale].common;
 
   return (
     <form action={formAction} className="grid gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3">
+      <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="type" value="sinking_fund_reserve" />
       <input type="hidden" name="amount" value={amount} />
       <input type="hidden" name="reserve_entity_id" value={subscriptionId} />
       <input type="hidden" name="notes" value="Monthly reserve for annual subscription from planning page" />
       <label className="grid gap-2 text-xs font-black text-ink">
-        Reserve date
+        {t.reserveDate}
         <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-emerald-100 bg-white px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
       </label>
       <button disabled={isPending} className="rounded-2xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-card transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
-        {isPending ? "Saving..." : "Reserve monthly amount"}
+        {isPending ? common.saving : t.reserveMonthlyAmount}
       </button>
       <ResultMessage state={state} />
     </form>
   );
 }
 
-export function ReserveAnnualExpenseForm({ annualExpenseId, amount }: { annualExpenseId: string; amount: number }) {
+export function ReserveAnnualExpenseForm({ annualExpenseId, amount, locale }: { annualExpenseId: string; amount: number; locale: Locale }) {
   const [state, formAction, isPending] = useActionState(saveTransaction, initialState);
+  const t = dictionaries[locale].planning.payment;
+  const common = dictionaries[locale].common;
 
   return (
     <form action={formAction} className="grid gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3">
+      <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="type" value="sinking_fund_reserve" />
       <input type="hidden" name="amount" value={amount} />
       <input type="hidden" name="reserve_entity_id" value={annualExpenseId} />
       <input type="hidden" name="notes" value="Monthly reserve for annual expense from planning page" />
       <label className="grid gap-2 text-xs font-black text-ink">
-        Reserve date
+        {t.reserveDate}
         <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-emerald-100 bg-white px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
       </label>
       <button disabled={isPending} className="rounded-2xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-card transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
-        {isPending ? "Saving..." : "Reserve this month"}
+        {isPending ? common.saving : t.reserveThisMonth}
       </button>
       <ResultMessage state={state} />
     </form>
@@ -115,31 +128,36 @@ export function PayAnnualBillForm({
   annualExpenseId,
   categoryId,
   amount,
-  accounts
+  accounts,
+  locale
 }: {
   annualExpenseId: string;
   categoryId: string | null;
   amount: number;
   accounts: PlanningAccountOption[];
+  locale: Locale;
 }) {
   const [state, formAction, isPending] = useActionState(saveTransaction, initialState);
+  const t = dictionaries[locale].planning.payment;
+  const common = dictionaries[locale].common;
 
   return (
     <form action={formAction} className="grid gap-3 rounded-2xl border border-amber-100 bg-amber-50 p-3">
+      <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="type" value="expense" />
       <input type="hidden" name="amount" value={amount} />
       <input type="hidden" name="category_id" value={categoryId ?? ""} />
       <input type="hidden" name="expense_related_entity_id" value={annualExpenseId} />
       <input type="hidden" name="notes" value="Annual bill paid from planning page" />
       <div className="grid gap-3 sm:grid-cols-2">
-        <AccountSelect accounts={accounts} />
+        <AccountSelect accounts={accounts} locale={locale} />
         <label className="grid gap-2 text-xs font-black text-ink">
-          Payment date
+          {t.paymentDate}
           <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-amber-100 bg-white px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
       </div>
       <button disabled={isPending || accounts.length === 0} className="rounded-2xl bg-amber-600 px-4 py-2.5 text-xs font-black text-white shadow-card transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60">
-        {isPending ? "Saving..." : "Pay annual bill"}
+        {isPending ? common.saving : t.payAnnualBill}
       </button>
       <ResultMessage state={state} />
     </form>

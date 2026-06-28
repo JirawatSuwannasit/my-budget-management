@@ -5,6 +5,7 @@ import { PayAnnualBillForm, PaySubscriptionForm, ReserveAnnualExpenseForm, Reser
 import { SubscriptionForm } from "@/components/planning/subscription-form";
 import { getFinancialCycle } from "@/lib/finance/cycle";
 import type { CategoryKind } from "@/lib/finance/types";
+import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/server";
 import { setAnnualExpenseActive, setBudgetActive, setSubscriptionActive } from "./actions";
 
@@ -41,16 +42,19 @@ function ProgressBar({ percent, warning = false }: { percent: number; warning?: 
   );
 }
 
-function StatusPill({ active }: { active: boolean }) {
-  return <span className={"rounded-full px-2.5 py-1 text-xs font-black " + (active ? "bg-emerald-50 text-emerald-800" : "bg-slate-100 text-muted")}>{active ? "Active" : "Inactive"}</span>;
+function StatusPill({ active, locale }: { active: boolean; locale: Locale }) {
+  const common = dictionaries[locale].common;
+  return <span className={"rounded-full px-2.5 py-1 text-xs font-black " + (active ? "bg-emerald-50 text-emerald-800" : "bg-slate-100 text-muted")}>{active ? common.active : common.inactive}</span>;
 }
 
-function ToggleActiveForm({ id, active, action, activeLabel = "ปิดใช้งาน", inactiveLabel = "เปิดใช้งาน" }: { id: string; active: boolean; action: (formData: FormData) => void | Promise<void>; activeLabel?: string; inactiveLabel?: string }) {
+function ToggleActiveForm({ id, active, action, locale }: { id: string; active: boolean; action: (formData: FormData) => void | Promise<void>; locale: Locale }) {
+  const common = dictionaries[locale].common;
   return (
     <form action={action}>
       <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="active" value={active ? "false" : "true"} />
-      <button className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary">{active ? activeLabel : inactiveLabel}</button>
+      <button className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary">{active ? common.deactivate : common.activate}</button>
     </form>
   );
 }
@@ -59,7 +63,11 @@ export default async function PlanningPage() {
   const cycle = getFinancialCycle(new Date());
   const cycleStartDate = toDateInput(cycle.start);
   const supabase = await createClient();
-  const [accountsResult, budgetsResult, subscriptionsResult, annualResult, categoriesResult, transactionsResult] = await Promise.all([
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  const [profileResult, accountsResult, budgetsResult, subscriptionsResult, annualResult, categoriesResult, transactionsResult] = await Promise.all([
+    user ? supabase.from("profiles").select("locale").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
     supabase.from("budgets").select("id,category_id,label,amount,cycle_start_date,active").eq("cycle_start_date", cycleStartDate).order("active", { ascending: false }).order("label"),
     supabase.from("subscriptions").select("id,category_id,name,frequency,price,billing_day,payment_method,active").order("active", { ascending: false }).order("name"),
@@ -68,6 +76,9 @@ export default async function PlanningPage() {
     supabase.from("transactions").select("id,category_id,type,amount,cycle_start_date,related_entity_id").eq("cycle_start_date", cycleStartDate)
   ]);
 
+  const locale = isLocale(profileResult.data?.locale) ? profileResult.data.locale : "th";
+  const t = dictionaries[locale].planning;
+  const common = dictionaries[locale].common;
   const accounts = (accountsResult.data ?? []) as AccountRow[];
   const budgets = (budgetsResult.data ?? []) as BudgetRow[];
   const subscriptions = (subscriptionsResult.data ?? []) as SubscriptionRow[];
@@ -75,7 +86,7 @@ export default async function PlanningPage() {
   const categories = (categoriesResult.data ?? []) as CategoryRow[];
   const transactions = (transactionsResult.data ?? []) as TransactionRow[];
   const categoryNameById = new Map(categories.map((category) => [category.id, category.name]));
-  const loadError = accountsResult.error ?? budgetsResult.error ?? subscriptionsResult.error ?? annualResult.error ?? categoriesResult.error ?? transactionsResult.error;
+  const loadError = profileResult.error ?? accountsResult.error ?? budgetsResult.error ?? subscriptionsResult.error ?? annualResult.error ?? categoriesResult.error ?? transactionsResult.error;
   const expenseTransactions = transactions.filter((transaction) => transaction.type === "expense");
   const reserveTransactions = transactions.filter((transaction) => transaction.type === "sinking_fund_reserve");
   const cashLikeAccounts = accounts.filter((account) => account.active && account.type !== "investment");
@@ -91,7 +102,7 @@ export default async function PlanningPage() {
     const remaining = amount - used;
     const percent = amount <= 0 ? 0 : Math.round((used / amount) * 100);
     const dailyAvailable = Math.max(0, remaining) / Math.max(1, cycle.daysRemaining);
-    return { ...budget, used, amount, remaining, percent, dailyAvailable, categoryName: budget.category_id ? categoryNameById.get(budget.category_id) ?? "Expense category" : "No category" };
+    return { ...budget, used, amount, remaining, percent, dailyAvailable, categoryName: budget.category_id ? categoryNameById.get(budget.category_id) ?? common.expenseCategory : common.noCategory };
   });
 
   const monthlySubscriptions = subscriptions.filter((subscription) => subscription.frequency === "monthly");
@@ -111,27 +122,27 @@ export default async function PlanningPage() {
       <section className="rounded-[28px] border border-primary/15 bg-gradient-to-br from-white via-teal-50 to-blue-50 p-5 shadow-soft md:p-8">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-normal text-primary">Phase 6 planning</p>
-            <h1 className="mt-4 text-3xl font-black text-ink md:text-5xl">งบ, subscriptions, sinking funds</h1>
-            <p className="mt-3 max-w-2xl text-sm font-semibold text-muted md:text-base">จัดการงบรายรอบ 25-24, ค่า subscription รายเดือน/รายปี และเงินกันสำหรับค่าใช้จ่ายรายปีที่ต้องหักจากเงินใช้ได้จริง</p>
+            <p className="w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-normal text-primary">{t.phase}</p>
+            <h1 className="mt-4 text-3xl font-black text-ink md:text-5xl">{t.title}</h1>
+            <p className="mt-3 max-w-2xl text-sm font-semibold text-muted md:text-base">{t.subtitle}</p>
           </div>
           <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-white shadow-card"><WalletCards size={22} aria-hidden="true" /></div>
         </div>
       </section>
 
-      {loadError ? <p className="rounded-panel border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-800">โหลดข้อมูลไม่สำเร็จ: {loadError.message}</p> : null}
+      {loadError ? <p className="rounded-panel border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-800">{t.loadError}: {loadError.message}</p> : null}
 
       <section className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-panel border border-slate-200 bg-white p-4 shadow-card">
-          <p className="text-xs font-black uppercase tracking-normal text-muted">งบคงเหลือรวม</p>
+          <p className="text-xs font-black uppercase tracking-normal text-muted">{t.totalBudgetRemaining}</p>
           <p className="mt-3 text-3xl font-black text-ink">{formatMoney(budgetCards.reduce((total, budget) => total + Math.max(0, budget.remaining), 0))}</p>
         </div>
         <div className="rounded-panel border border-amber-100 bg-amber-50 p-4 text-amber-900 shadow-card">
-          <p className="text-xs font-black uppercase tracking-normal opacity-70">Monthly subscriptions</p>
+          <p className="text-xs font-black uppercase tracking-normal opacity-70">{t.monthlySubscriptions}</p>
           <p className="mt-3 text-3xl font-black">{formatMoney(monthlySubscriptionTotal)}</p>
         </div>
         <div className="rounded-panel border border-emerald-100 bg-emerald-50 p-4 text-emerald-900 shadow-card">
-          <p className="text-xs font-black uppercase tracking-normal opacity-70">Monthly sinking reserve</p>
+          <p className="text-xs font-black uppercase tracking-normal opacity-70">{t.monthlySinkingReserve}</p>
           <p className="mt-3 text-3xl font-black">{formatMoney(yearlyReserveTotal + annualReserveTotal)}</p>
         </div>
       </section>
@@ -140,43 +151,43 @@ export default async function PlanningPage() {
         <div>
           <div className="mb-3 flex items-center gap-2">
             <Banknote className="text-primary" size={20} aria-hidden="true" />
-            <h2 className="text-xl font-black text-ink">เพิ่มงบรายเดือน</h2>
+            <h2 className="text-xl font-black text-ink">{t.addMonthlyBudget}</h2>
           </div>
-          <BudgetForm cycleStartDate={cycleStartDate} />
-          <p className="mt-3 rounded-2xl border border-slate-200 bg-white/80 p-4 text-sm font-bold text-muted">รอบงบนี้: {cycle.label}. ค่าใช้จ่ายจะนับเข้า budget เมื่อ transaction expense ใช้หมวดเดียวกับงบ</p>
+          <BudgetForm cycleStartDate={cycleStartDate} locale={locale} />
+          <p className="mt-3 rounded-2xl border border-slate-200 bg-white/80 p-4 text-sm font-bold text-muted">{t.budgetCycleHelpPrefix}: {cycle.label}. {t.budgetCycleHelpSuffix}</p>
         </div>
 
         <div className="grid gap-3">
           <div className="flex items-center justify-between gap-4">
-            <h2 className="text-xl font-black text-ink">Budget progress</h2>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-muted shadow-card">{budgetCards.length} budgets</span>
+            <h2 className="text-xl font-black text-ink">{t.budgetProgress}</h2>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-muted shadow-card">{budgetCards.length} {t.budgetsSuffix}</span>
           </div>
-          {budgetCards.length === 0 ? <p className="rounded-panel border border-dashed border-slate-300 bg-white/80 p-5 text-sm font-bold text-muted">ยังไม่มีงบในรอบนี้ เพิ่มงบเช่น Daily living expenses, Transportation, Miscellaneous shopping หรือ Luxury / non-essential spending</p> : null}
+          {budgetCards.length === 0 ? <p className="rounded-panel border border-dashed border-slate-300 bg-white/80 p-5 text-sm font-bold text-muted">{t.noBudgets}</p> : null}
           {budgetCards.map((budget) => (
             <article key={budget.id} className={"rounded-panel border p-4 shadow-card " + (budget.remaining < 0 ? "border-rose-200 bg-rose-50" : "border-slate-200 bg-white")}>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-lg font-black text-ink">{budget.label}</h3>
-                    <StatusPill active={budget.active} />
+                    <StatusPill active={budget.active} locale={locale} />
                     <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{budget.categoryName}</span>
-                    {budget.remaining < 0 ? <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-black text-rose-700">เกินงบ</span> : null}
+                    {budget.remaining < 0 ? <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-black text-rose-700">{t.overBudget}</span> : null}
                   </div>
                   <div className="mt-4 grid gap-3">
                     <ProgressBar percent={budget.percent} warning={budget.remaining < 0} />
                     <div className="grid gap-2 text-sm font-bold text-muted sm:grid-cols-4">
-                      <span>งบ {formatMoney(budget.amount)}</span>
-                      <span>ใช้แล้ว {formatMoney(budget.used)}</span>
-                      <span>เหลือ {formatMoney(budget.remaining)}</span>
-                      <span>เฉลี่ย/วัน {formatMoney(budget.dailyAvailable)}</span>
+                      <span>{t.budget} {formatMoney(budget.amount)}</span>
+                      <span>{t.used} {formatMoney(budget.used)}</span>
+                      <span>{t.remaining} {formatMoney(budget.remaining)}</span>
+                      <span>{t.dailyAverage} {formatMoney(budget.dailyAvailable)}</span>
                     </div>
                   </div>
                 </div>
-                <ToggleActiveForm id={budget.id} active={budget.active} action={setBudgetActive} />
+                <ToggleActiveForm id={budget.id} active={budget.active} action={setBudgetActive} locale={locale} />
               </div>
               <details className="mt-4">
-                <summary className="cursor-pointer text-sm font-black text-primary">แก้ไขงบ</summary>
-                <div className="mt-3"><BudgetForm budget={{ ...budget, category_name: budget.categoryName }} cycleStartDate={cycleStartDate} compact /></div>
+                <summary className="cursor-pointer text-sm font-black text-primary">{t.editBudget}</summary>
+                <div className="mt-3"><BudgetForm budget={{ ...budget, category_name: budget.categoryName }} cycleStartDate={cycleStartDate} compact locale={locale} /></div>
               </details>
             </article>
           ))}
@@ -187,16 +198,16 @@ export default async function PlanningPage() {
         <div>
           <div className="mb-3 flex items-center gap-2">
             <Repeat className="text-primary" size={20} aria-hidden="true" />
-            <h2 className="text-xl font-black text-ink">เพิ่ม subscription</h2>
+            <h2 className="text-xl font-black text-ink">{t.addSubscription}</h2>
           </div>
-          <SubscriptionForm />
+          <SubscriptionForm locale={locale} />
         </div>
 
         <div className="grid gap-3">
-          <h2 className="text-xl font-black text-ink">Subscriptions</h2>
-          {subscriptions.length === 0 ? <p className="rounded-panel border border-dashed border-slate-300 bg-white/80 p-5 text-sm font-bold text-muted">ยังไม่มี subscription เพิ่ม AI รายเดือน หรือ football streaming รายปีเพื่อให้ dashboard คำนวณ obligation/reserve</p> : null}
+          <h2 className="text-xl font-black text-ink">{t.subscriptions}</h2>
+          {subscriptions.length === 0 ? <p className="rounded-panel border border-dashed border-slate-300 bg-white/80 p-5 text-sm font-bold text-muted">{t.noSubscriptions}</p> : null}
           {subscriptions.map((subscription) => {
-            const categoryName = subscription.category_id ? categoryNameById.get(subscription.category_id) ?? "Other" : "Other";
+            const categoryName = subscription.category_id ? categoryNameById.get(subscription.category_id) ?? common.other : common.other;
             const reserveMonthly = subscription.frequency === "yearly" ? toNumber(subscription.price) / 12 : 0;
             const isReserved = reservedThisCycle(subscription.id);
             const isPaid = paidThisCycle(subscription.id);
@@ -207,26 +218,26 @@ export default async function PlanningPage() {
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-lg font-black text-ink">{subscription.name}</h3>
-                      <StatusPill active={subscription.active} />
+                      <StatusPill active={subscription.active} locale={locale} />
                       <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{categoryName}</span>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-muted">{subscription.frequency === "monthly" ? "รายเดือน" : "รายปี"}</span>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-muted">{subscription.frequency === "monthly" ? t.monthly : t.yearly}</span>
                     </div>
                     <p className="mt-3 text-2xl font-black text-ink">{formatMoney(subscription.price)}</p>
-                    <p className="mt-1 text-sm font-semibold text-muted">{subscription.frequency === "monthly" ? "นับเป็น monthly fixed obligation" : "นับเป็น sinking fund reserve " + formatMoney(reserveMonthly) + "/เดือน"} · Billing day {subscription.billing_day}</p>
-                    {paidOrReserved ? <p className="mt-2 text-sm font-black text-emerald-700">{isPaid ? "Paid this cycle" : "Reserved this cycle"}</p> : null}
+                    <p className="mt-1 text-sm font-semibold text-muted">{subscription.frequency === "monthly" ? t.monthlyFixedObligation : t.yearlySinkingFundReserve + " " + formatMoney(reserveMonthly) + "/" + t.monthly} · {t.billingDay} {subscription.billing_day}</p>
+                    {paidOrReserved ? <p className="mt-2 text-sm font-black text-emerald-700">{isPaid ? t.paidThisCycle : t.reservedThisCycle}</p> : null}
                   </div>
-                  <ToggleActiveForm id={subscription.id} active={subscription.active} action={setSubscriptionActive} />
+                  <ToggleActiveForm id={subscription.id} active={subscription.active} action={setSubscriptionActive} locale={locale} />
                 </div>
                 {subscription.active ? (
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                    {subscription.frequency === "yearly" ? <ReserveSubscriptionForm subscriptionId={subscription.id} amount={reserveMonthly} /> : null}
-                    <PaySubscriptionForm subscriptionId={subscription.id} categoryId={subscription.category_id} amount={toNumber(subscription.price)} accounts={cashLikeAccounts} frequency={subscription.frequency} />
+                    {subscription.frequency === "yearly" ? <ReserveSubscriptionForm subscriptionId={subscription.id} amount={reserveMonthly} locale={locale} /> : null}
+                    <PaySubscriptionForm subscriptionId={subscription.id} categoryId={subscription.category_id} amount={toNumber(subscription.price)} accounts={cashLikeAccounts} frequency={subscription.frequency} locale={locale} />
                   </div>
                 ) : null}
-                {subscription.active && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-sm font-bold text-amber-800">Add a cash-like account before paying subscriptions from this page.</p> : null}
+                {subscription.active && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-sm font-bold text-amber-800">{t.addCashLikeAccountSubscription}</p> : null}
                 <details className="mt-4">
-                  <summary className="cursor-pointer text-sm font-black text-primary">แก้ไข subscription</summary>
-                  <div className="mt-3"><SubscriptionForm subscription={{ ...subscription, category_name: categoryName }} compact /></div>
+                  <summary className="cursor-pointer text-sm font-black text-primary">{t.editSubscription}</summary>
+                  <div className="mt-3"><SubscriptionForm subscription={{ ...subscription, category_name: categoryName }} compact locale={locale} /></div>
                 </details>
               </article>
             );
@@ -238,16 +249,16 @@ export default async function PlanningPage() {
         <div>
           <div className="mb-3 flex items-center gap-2">
             <PiggyBank className="text-primary" size={20} aria-hidden="true" />
-            <h2 className="text-xl font-black text-ink">เพิ่ม sinking fund</h2>
+            <h2 className="text-xl font-black text-ink">{t.addSinkingFund}</h2>
           </div>
-          <AnnualExpenseForm />
+          <AnnualExpenseForm locale={locale} />
         </div>
 
         <div className="grid gap-3">
-          <h2 className="text-xl font-black text-ink">Annual expenses / sinking funds</h2>
-          {annualExpenses.length === 0 ? <p className="rounded-panel border border-dashed border-slate-300 bg-white/80 p-5 text-sm font-bold text-muted">ยังไม่มีค่าใช้จ่ายรายปี เพิ่ม Condo common fee, Condo insurance หรือ Annual football app subscription</p> : null}
+          <h2 className="text-xl font-black text-ink">{t.annualExpenses}</h2>
+          {annualExpenses.length === 0 ? <p className="rounded-panel border border-dashed border-slate-300 bg-white/80 p-5 text-sm font-bold text-muted">{t.noAnnualExpenses}</p> : null}
           {annualExpenses.map((expense) => {
-            const categoryName = expense.category_id ? categoryNameById.get(expense.category_id) ?? "Other" : "Other";
+            const categoryName = expense.category_id ? categoryNameById.get(expense.category_id) ?? common.other : common.other;
             const monthlyReserve = toNumber(expense.monthly_reserve) || toNumber(expense.annual_amount) / 12;
             const reserved = reservedThisCycle(expense.id);
             const paid = paidThisCycle(expense.id);
@@ -258,31 +269,31 @@ export default async function PlanningPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-lg font-black text-ink">{expense.name}</h3>
-                      <StatusPill active={expense.active} />
+                      <StatusPill active={expense.active} locale={locale} />
                       <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{categoryName}</span>
-                      {completedThisCycle ? <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700">{paid ? "Paid" : "Reserved"}</span> : null}
+                      {completedThisCycle ? <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700">{paid ? common.paid : common.reserved}</span> : null}
                     </div>
                     <div className="mt-4 grid gap-3">
                       <ProgressBar percent={completedThisCycle ? 100 : 0} />
                       <div className="grid gap-2 text-sm font-bold text-muted sm:grid-cols-3">
-                        <span>รายปี {formatMoney(expense.annual_amount)}</span>
-                        <span>กันต่อเดือน {formatMoney(monthlyReserve)}</span>
-                        <span>{expense.due_date ? "ครบกำหนด " + expense.due_date : "ยังไม่ระบุวันครบกำหนด"}</span>
+                        <span>{t.annual} {formatMoney(expense.annual_amount)}</span>
+                        <span>{t.monthlyReserve} {formatMoney(monthlyReserve)}</span>
+                        <span>{expense.due_date ? t.due + " " + expense.due_date : t.noDueDate}</span>
                       </div>
                     </div>
                   </div>
-                  <ToggleActiveForm id={expense.id} active={expense.active} action={setAnnualExpenseActive} />
+                  <ToggleActiveForm id={expense.id} active={expense.active} action={setAnnualExpenseActive} locale={locale} />
                 </div>
                 {expense.active ? (
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                    <ReserveAnnualExpenseForm annualExpenseId={expense.id} amount={monthlyReserve} />
-                    <PayAnnualBillForm annualExpenseId={expense.id} categoryId={expense.category_id} amount={toNumber(expense.annual_amount)} accounts={cashLikeAccounts} />
+                    <ReserveAnnualExpenseForm annualExpenseId={expense.id} amount={monthlyReserve} locale={locale} />
+                    <PayAnnualBillForm annualExpenseId={expense.id} categoryId={expense.category_id} amount={toNumber(expense.annual_amount)} accounts={cashLikeAccounts} locale={locale} />
                   </div>
                 ) : null}
-                {expense.active && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-sm font-bold text-amber-800">Add a cash-like account before paying annual bills from this page.</p> : null}
+                {expense.active && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-sm font-bold text-amber-800">{t.addCashLikeAccountAnnual}</p> : null}
                 <details className="mt-4">
-                  <summary className="cursor-pointer text-sm font-black text-primary">แก้ไข sinking fund</summary>
-                  <div className="mt-3"><AnnualExpenseForm annualExpense={{ ...expense, category_name: categoryName }} compact /></div>
+                  <summary className="cursor-pointer text-sm font-black text-primary">{t.editSinkingFund}</summary>
+                  <div className="mt-3"><AnnualExpenseForm annualExpense={{ ...expense, category_name: categoryName }} compact locale={locale} /></div>
                 </details>
               </article>
             );
@@ -293,9 +304,9 @@ export default async function PlanningPage() {
       <section className="rounded-panel border border-slate-200 bg-white p-5 text-sm font-semibold text-muted shadow-card">
         <div className="mb-2 flex items-center gap-2 text-ink">
           <CalendarClock size={18} className="text-primary" aria-hidden="true" />
-          <h2 className="text-lg font-black">Dashboard logic</h2>
+          <h2 className="text-lg font-black">{t.dashboardLogic}</h2>
         </div>
-        <p>Monthly subscriptions reduce real available money until paid in the current cycle. Yearly subscriptions and annual expenses reduce real available money as monthly reserves until marked with a sinking fund reserve transaction. Budgets reduce only their unspent reserved amount, so paid expenses are not double counted.</p>
+        <p>{t.dashboardLogicText}</p>
       </section>
     </div>
   );

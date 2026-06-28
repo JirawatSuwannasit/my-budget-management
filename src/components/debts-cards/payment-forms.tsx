@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { saveTransaction, type TransactionActionState } from "@/app/(private)/transactions/actions";
+import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 
 export type AccountOption = { id: string; name: string; type: string; active?: boolean };
 export type DebtOption = { id: string; name: string; monthly_payment?: number | string; remaining_balance?: number | string; active?: boolean };
@@ -23,117 +24,127 @@ function ResultMessage({ state }: { state: TransactionActionState }) {
   return <p className={"rounded-2xl px-4 py-3 text-sm font-bold " + (state.status === "success" ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800")}>{state.message}</p>;
 }
 
-function AccountSelect({ accounts }: { accounts: AccountOption[] }) {
+function AccountSelect({ accounts, locale }: { accounts: AccountOption[]; locale: Locale }) {
+  const t = dictionaries[locale].debtsCards.form;
   return (
     <label className="grid gap-2 text-sm font-black text-ink">
-      Pay from account
+      {t.payFromAccount}
       <select name="account_id" required defaultValue={accounts[0]?.id ?? ""} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60">
-        <option value="" disabled>Choose account</option>
+        <option value="" disabled>{t.chooseAccount}</option>
         {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
       </select>
     </label>
   );
 }
 
-export function DebtPaymentForm({ debts, accounts }: { debts: DebtOption[]; accounts: AccountOption[] }) {
+export function DebtPaymentForm({ debts, accounts, locale }: { debts: DebtOption[]; accounts: AccountOption[]; locale: Locale }) {
   const [state, formAction, isPending] = useActionState(saveTransaction, initialState);
+  const t = dictionaries[locale].debtsCards.form;
+  const common = dictionaries[locale].common;
 
   return (
     <form action={formAction} className="grid gap-4 rounded-panel border border-emerald-100 bg-emerald-50/70 p-4 shadow-card">
+      <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="type" value="debt_payment" />
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-black text-ink">
-          Debt
+          {t.debt}
           <select name="debt_id" required defaultValue={debts[0]?.id ?? ""} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60">
-            <option value="" disabled>Choose debt</option>
+            <option value="" disabled>{t.chooseDebt}</option>
             {debts.map((debt) => <option key={debt.id} value={debt.id}>{debt.name}</option>)}
           </select>
         </label>
-        <AccountSelect accounts={accounts} />
+        <AccountSelect accounts={accounts} locale={locale} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-black text-ink">
-          Amount
+          {t.amount}
           <input name="amount" type="number" min="0.01" step="0.01" required className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
         <label className="grid gap-2 text-sm font-black text-ink">
-          Payment date
+          {t.paymentDate}
           <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
       </div>
       <input type="hidden" name="notes" value="Debt payment from debts and cards page" />
       <button disabled={isPending || debts.length === 0 || accounts.length === 0} className="rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-card transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
-        {isPending ? "Saving..." : "Record debt payment"}
+        {isPending ? common.saving : t.recordDebtPayment}
       </button>
       <ResultMessage state={state} />
     </form>
   );
 }
 
-export function CardExpenseForm({ cards }: { cards: CardOption[] }) {
+export function CardExpenseForm({ cards, locale }: { cards: CardOption[]; locale: Locale }) {
   const [state, formAction, isPending] = useActionState(saveTransaction, initialState);
+  const t = dictionaries[locale].debtsCards.form;
+  const common = dictionaries[locale].common;
 
   return (
     <form action={formAction} className="grid gap-4 rounded-panel border border-amber-100 bg-amber-50/70 p-4 shadow-card">
+      <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="type" value="credit_card_expense" />
       <label className="grid gap-2 text-sm font-black text-ink">
-        Credit card
+        {t.creditCard}
         <select name="credit_card_id" required defaultValue={cards[0]?.id ?? ""} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60">
-          <option value="" disabled>Choose card</option>
+          <option value="" disabled>{t.chooseCard}</option>
           {cards.map((card) => <option key={card.id} value={card.id}>{card.name}</option>)}
         </select>
       </label>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-black text-ink">
-          Amount
+          {t.amount}
           <input name="amount" type="number" min="0.01" step="0.01" required className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
         <label className="grid gap-2 text-sm font-black text-ink">
-          Expense date
+          {t.expenseDate}
           <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
       </div>
       <label className="grid gap-2 text-sm font-black text-ink">
-        Notes
-        <input name="notes" placeholder="Example: Grocery, online shopping" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
+        {t.notes}
+        <input name="notes" placeholder={t.notesPlaceholder} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
       </label>
       <button disabled={isPending || cards.length === 0} className="rounded-2xl bg-amber-600 px-5 py-3 text-sm font-black text-white shadow-card transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60">
-        {isPending ? "Saving..." : "Add card expense"}
+        {isPending ? common.saving : t.addCardExpense}
       </button>
       <ResultMessage state={state} />
     </form>
   );
 }
 
-export function CardPaymentForm({ statements, accounts }: { statements: StatementOption[]; accounts: AccountOption[] }) {
+export function CardPaymentForm({ statements, accounts, locale }: { statements: StatementOption[]; accounts: AccountOption[]; locale: Locale }) {
   const [state, formAction, isPending] = useActionState(saveTransaction, initialState);
+  const t = dictionaries[locale].debtsCards.form;
+  const common = dictionaries[locale].common;
 
   return (
     <form action={formAction} className="grid gap-4 rounded-panel border border-blue-100 bg-blue-50/70 p-4 shadow-card">
+      <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="type" value="credit_card_payment" />
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-black text-ink">
-          Statement
+          {t.statement}
           <select name="statement_id" required defaultValue={statements[0]?.id ?? ""} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60">
-            <option value="" disabled>Choose statement</option>
+            <option value="" disabled>{t.chooseStatement}</option>
             {statements.map((statement) => <option key={statement.id} value={statement.id}>{statement.label}</option>)}
           </select>
         </label>
-        <AccountSelect accounts={accounts} />
+        <AccountSelect accounts={accounts} locale={locale} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-black text-ink">
-          Amount
+          {t.amount}
           <input name="amount" type="number" min="0.01" step="0.01" required className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
         <label className="grid gap-2 text-sm font-black text-ink">
-          Payment date
+          {t.paymentDate}
           <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
       </div>
       <input type="hidden" name="notes" value="Credit card payment from debts and cards page" />
       <button disabled={isPending || statements.length === 0 || accounts.length === 0} className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white shadow-card transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
-        {isPending ? "Saving..." : "Pay statement"}
+        {isPending ? common.saving : t.payStatement}
       </button>
       <ResultMessage state={state} />
     </form>

@@ -2,10 +2,10 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { saveTransaction, type TransactionActionState } from "@/app/(private)/transactions/actions";
-import type { AccountType, TransactionType } from "@/lib/finance/types";
+import type { AccountType, CategoryKind, TransactionType } from "@/lib/finance/types";
 
 export type TransactionFormAccount = { id: string; name: string; type: AccountType; active: boolean };
-export type TransactionFormCategory = { id: string; name: string; kind: "income" | "expense"; active: boolean };
+export type TransactionFormCategory = { id: string; name: string; kind: CategoryKind; active: boolean };
 export type TransactionFormDebt = { id: string; name: string; active: boolean };
 export type TransactionFormCard = { id: string; name: string; active: boolean };
 export type TransactionFormStatement = { id: string; card_id: string; due_date: string; statement_amount_due: number | string; paid_amount: number | string; remaining_payable: number | string; status: "unpaid" | "partial" | "paid" };

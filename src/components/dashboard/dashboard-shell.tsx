@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowDownLeft, ArrowUpRight, Banknote, CalendarDays, CircleDollarSign, CreditCard, Landmark, PiggyBank, Plus, ShieldCheck, TrendingUp, WalletCards } from "lucide-react";
 import type { FinancialCycle } from "@/lib/finance/cycle";
 import type { DashboardInput, DashboardSnapshot } from "@/lib/finance/types";
-import { dictionaries } from "@/lib/i18n/dictionaries";
+import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 
 type DashboardShellProps = {
   cycle: FinancialCycle;
@@ -14,9 +14,8 @@ type DashboardShellProps = {
   status: "ready" | "empty" | "error";
   notices: string[];
   errorMessage?: string;
+  locale: Locale;
 };
-
-const th = dictionaries.th;
 
 function formatMoney(value: number) {
   return new Intl.NumberFormat("th-TH", {
@@ -70,9 +69,10 @@ function ProgressRow({ label, used, total, detail, color = "bg-primary" }: { lab
   );
 }
 
-export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, source, status, notices, errorMessage }: DashboardShellProps) {
+export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, source, status, notices, errorMessage, locale }: DashboardShellProps) {
+  const t = dictionaries[locale].dashboard;
   const dailyAvailable = cycle.daysRemaining > 0 ? snapshot.realAvailableMoney / cycle.daysRemaining : snapshot.realAvailableMoney;
-  const sourceLabel = source === "supabase" ? "Live Supabase data" : "Demo data";
+  const sourceLabel = source === "supabase" ? t.sourceSupabase : t.sourceDemo;
   const sinkingFunds = input.sinkingFundReserves.map((fund) => ({
     ...fund,
     used: fund.reservedThisCycle ? fund.monthlyReserve : 0
@@ -90,49 +90,49 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, sour
             <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">Supabase error: {errorMessage}</p>
           ) : null}
           {status === "empty" ? (
-            <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">Add accounts, active subscriptions, budgets, debts, card statements, or transactions in Supabase to replace this demo dashboard with real private data.</p>
+            <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">{locale === "th" ? "เพิ่มบัญชี subscription งบ หนี้ statement บัตร หรือรายการเงิน เพื่อใช้ข้อมูลจริงแทนข้อมูลตัวอย่าง" : "Add accounts, subscriptions, budgets, debts, card statements, or transactions to replace this demo dashboard with real private data."}</p>
           ) : null}
         </div>
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="mb-4 flex flex-wrap gap-2">
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-normal text-primary">25th to 24th cycle</span>
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-normal text-primary">{t.cycleBadge}</span>
               <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-muted shadow-card">{cycle.label}</span>
             </div>
-            <h1 className="max-w-3xl text-3xl font-black leading-tight text-ink md:text-5xl">{th.realAvailable}</h1>
-            <p className="mt-3 max-w-2xl text-sm font-semibold text-muted md:text-base">Uses only cash-like accounts. Paid cash expenses are already reflected in balances, so the app subtracts only unpaid obligations and remaining reserves.</p>
+            <h1 className="max-w-3xl text-3xl font-black leading-tight text-ink md:text-5xl">{t.realAvailable}</h1>
+            <p className="mt-3 max-w-2xl text-sm font-semibold text-muted md:text-base">{t.subtitle}</p>
           </div>
           <div className="rounded-3xl bg-ink p-5 text-white shadow-soft md:min-w-80">
-            <p className="text-sm font-bold text-white/65">Real available money</p>
+            <p className="text-sm font-bold text-white/65">{t.realAvailableCard}</p>
             <p className="mt-2 text-4xl font-black leading-none md:text-5xl">{formatMoney(snapshot.realAvailableMoney)}</p>
-            <p className="mt-4 text-sm text-white/70">Daily safe amount: <strong className="text-white">{formatMoney(dailyAvailable)}</strong></p>
+            <p className="mt-4 text-sm text-white/70">{t.dailySafeAmount}: <strong className="text-white">{formatMoney(dailyAvailable)}</strong></p>
           </div>
         </div>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label={th.cashLike} value={formatMoney(snapshot.cashLikeBalance)} icon={WalletCards} tone="success" />
-        <StatCard label={th.cycleIncome} value={formatMoney(snapshot.cycleIncome)} icon={ArrowDownLeft} tone="income" />
-        <StatCard label={th.investmentTracking} value={formatMoney(snapshot.investmentTransfersThisCycle)} icon={TrendingUp} tone="neutral" />
-        <StatCard label={th.dailyAvailable} value={formatMoney(dailyAvailable)} icon={CircleDollarSign} tone="success" />
+        <StatCard label={t.cashLike} value={formatMoney(snapshot.cashLikeBalance)} icon={WalletCards} tone="success" />
+        <StatCard label={t.cycleIncome} value={formatMoney(snapshot.cycleIncome)} icon={ArrowDownLeft} tone="income" />
+        <StatCard label={t.investmentTracking} value={formatMoney(snapshot.investmentTransfersThisCycle)} icon={TrendingUp} tone="neutral" />
+        <StatCard label={t.dailyAvailable} value={formatMoney(dailyAvailable)} icon={CircleDollarSign} tone="success" />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-panel border border-slate-200 bg-white p-4 shadow-card md:p-5">
           <div className="mb-5 flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-black uppercase tracking-normal text-muted">Reserved before spending</p>
-              <h2 className="mt-1 text-xl font-black text-ink">Available money breakdown</h2>
+              <p className="text-xs font-black uppercase tracking-normal text-muted">{t.reservedBeforeSpending}</p>
+              <h2 className="mt-1 text-xl font-black text-ink">{t.availableBreakdown}</h2>
             </div>
             <ShieldCheck className="text-primary" size={24} aria-hidden="true" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <StatCard label={th.unpaidObligations} value={formatMoney(snapshot.unpaidObligations)} icon={ArrowUpRight} tone="warning" />
-            <StatCard label={th.cardPayable} value={formatMoney(snapshot.remainingCreditCardPayable)} icon={CreditCard} tone="danger" />
-            <StatCard label={th.plannedDebt} value={formatMoney(snapshot.plannedDebtPayments)} icon={Landmark} tone="danger" />
-            <StatCard label={th.sinkingFunds} value={formatMoney(snapshot.monthlySinkingFundReserves)} icon={PiggyBank} tone="warning" />
-            <StatCard label={th.reservedBudgets} value={formatMoney(snapshot.unspentReservedBudgets)} icon={Banknote} tone="neutral" />
-            <StatCard label="Investment account balance" value={formatMoney(snapshot.investmentBalance)} icon={TrendingUp} tone="neutral" />
+            <StatCard label={t.unpaidObligations} value={formatMoney(snapshot.unpaidObligations)} icon={ArrowUpRight} tone="warning" />
+            <StatCard label={t.cardPayable} value={formatMoney(snapshot.remainingCreditCardPayable)} icon={CreditCard} tone="danger" />
+            <StatCard label={t.plannedDebt} value={formatMoney(snapshot.plannedDebtPayments)} icon={Landmark} tone="danger" />
+            <StatCard label={t.sinkingFunds} value={formatMoney(snapshot.monthlySinkingFundReserves)} icon={PiggyBank} tone="warning" />
+            <StatCard label={t.reservedBudgets} value={formatMoney(snapshot.unspentReservedBudgets)} icon={Banknote} tone="neutral" />
+            <StatCard label={t.investmentAccountBalance} value={formatMoney(snapshot.investmentBalance)} icon={TrendingUp} tone="neutral" />
           </div>
         </div>
 
@@ -140,17 +140,17 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, sour
           <div id="cards" className="rounded-panel border border-slate-200 bg-white p-4 shadow-card md:p-5">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-xs font-black uppercase tracking-normal text-muted">Credit card lifecycle</p>
-                <h2 className="mt-1 text-xl font-black text-ink">Liability first, cash later</h2>
+                <p className="text-xs font-black uppercase tracking-normal text-muted">{t.cardLifecycle}</p>
+                <h2 className="mt-1 text-xl font-black text-ink">{t.cardLifecycleTitle}</h2>
               </div>
               <CreditCard className="text-cardpay" size={24} aria-hidden="true" />
             </div>
             <div className="grid gap-3 text-sm font-semibold text-muted">
-              <p>Credit card expense increases card liability and current cycle spending. It does not reduce cash immediately.</p>
-              <p>Card payment decreases cash-like balance and reduces remaining payable.</p>
+              <p>{t.cardLifecycleText1}</p>
+              <p>{t.cardLifecycleText2}</p>
               <div className="rounded-2xl bg-amber-50 p-4 text-amber-900">
-                Current cycle card spending: <strong>{formatMoney(snapshot.currentCardCycleSpending)}</strong><br />
-                Remaining statement payable: <strong>{formatMoney(snapshot.remainingCreditCardPayable)}</strong>
+                {t.currentCardSpending}: <strong>{formatMoney(snapshot.currentCardCycleSpending)}</strong><br />
+                {t.remainingStatementPayable}: <strong>{formatMoney(snapshot.remainingCreditCardPayable)}</strong>
               </div>
             </div>
           </div>
@@ -158,12 +158,12 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, sour
           <div className="rounded-panel border border-slate-200 bg-white p-4 shadow-card md:p-5">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="text-xs font-black uppercase tracking-normal text-muted">Financial cycle</p>
-                <h2 className="mt-1 text-xl font-black text-ink">Salary assignment</h2>
+                <p className="text-xs font-black uppercase tracking-normal text-muted">{t.financialCycle}</p>
+                <h2 className="mt-1 text-xl font-black text-ink">{t.salaryAssignment}</h2>
               </div>
               <CalendarDays className="text-primary" size={24} aria-hidden="true" />
             </div>
-            <p className="text-sm font-semibold text-muted">Salary belongs to the cycle starting {formatDate(cycle.start)}. If the 25th is on a weekend, it can be paid on {formatDate(salaryPaymentDate)} but still counts in this cycle.</p>
+            <p className="text-sm font-semibold text-muted">{t.salaryTextPrefix} {formatDate(cycle.start)}. {t.salaryTextMiddle} {formatDate(salaryPaymentDate)} {t.salaryTextSuffix}</p>
           </div>
         </div>
       </section>
@@ -172,12 +172,12 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, sour
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-xs font-black uppercase tracking-normal text-muted">Budget and reserve pacing</p>
-            <h2 className="mt-1 text-xl font-black text-ink">งบและ sinking funds</h2>
+            <h2 className="mt-1 text-xl font-black text-ink">{t.budgetSinkingTitle}</h2>
           </div>
           <Link href="/planning" className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-white shadow-card" aria-label="Manage budgets"><Plus size={20} aria-hidden="true" /></Link>
         </div>
         {input.reservedBudgets.length === 0 && sinkingFunds.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-bold text-muted">ยังไม่มีงบหรือ sinking fund สำหรับรอบนี้ กดปุ่ม + เพื่อเพิ่มในหน้าแผนเงิน</p>
+          <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-bold text-muted">{t.noBudgets}</p>
         ) : null}
         {input.reservedBudgets.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -190,7 +190,7 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, sour
                   label={budget.label}
                   used={budget.usedAmount}
                   total={budget.budgetAmount}
-                  detail={"เหลือ " + formatMoney(remaining) + " · เฉลี่ย/วัน " + formatMoney(daily)}
+                  detail={t.remaining + " " + formatMoney(remaining) + " - " + t.dailyAverage + " " + formatMoney(daily)}
                 />
               );
             })}
@@ -204,7 +204,7 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, sour
                 label={fund.label}
                 used={fund.used}
                 total={fund.monthlyReserve}
-                detail={(fund.reservedThisCycle ? "กันเงินแล้ว " : "ยังต้องกัน ") + formatMoney(fund.monthlyReserve)}
+                detail={(fund.reservedThisCycle ? t.reservedDone + " " : t.stillNeedReserve + " ") + formatMoney(fund.monthlyReserve)}
                 color="bg-emerald-600"
               />
             ))}
@@ -213,12 +213,12 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, sour
       </section>
 
       <section id="transactions" className="rounded-panel border border-dashed border-slate-300 bg-white/72 p-5 text-sm font-semibold text-muted">
-        {source === "supabase" ? "This dashboard is calculated from your Supabase accounts, subscriptions, budgets, annual expenses, debts, card statements, card transactions, and investment transfers." : "Demo data is shown because no Supabase finance records are available yet. The calculation path is the same one used for live data."}
+        {source === "supabase" ? t.dashboardSourceLive : t.dashboardSourceDemo}
       </section>
 
       <section id="settings" className="rounded-panel border border-slate-200 bg-white p-5 shadow-card">
-        <h2 className="text-xl font-black text-ink">Settings foundation</h2>
-        <p className="mt-2 text-sm font-semibold text-muted">Thai is the default language, English is prepared in the i18n structure, and THB is the default currency.</p>
+        <h2 className="text-xl font-black text-ink">{t.settingsFoundation}</h2>
+        <p className="mt-2 text-sm font-semibold text-muted">{t.settingsFoundationText}</p>
       </section>
     </div>
   );

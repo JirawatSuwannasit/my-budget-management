@@ -4,20 +4,26 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BarChart3, CreditCard, Landmark, LayoutDashboard, ListChecks, Settings, Tag, WalletCards } from "lucide-react";
+import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/browser";
 
-const navItems = [
-  { href: "/dashboard", label: "หน้าหลัก", short: "Home", icon: LayoutDashboard },
-  { href: "/accounts", label: "บัญชี", short: "Accounts", icon: WalletCards },
-  { href: "/transactions", label: "รายการ", short: "Txns", icon: ListChecks },
-  { href: "/planning", label: "แผนเงิน", short: "Plan", icon: BarChart3 },
-  { href: "/categories", label: "หมวด", short: "Cat", icon: Tag },
-  { href: "/debts-cards", label: "หนี้/บัตร", short: "Debt", icon: CreditCard },
-  { href: "/dashboard#settings", label: "ตั้งค่า", short: "More", icon: Settings }
-];
+function getNavItems(locale: Locale) {
+  const nav = dictionaries[locale].nav;
+  return [
+    { href: "/dashboard", label: nav.dashboard, short: nav.shortDashboard, icon: LayoutDashboard },
+    { href: "/accounts", label: nav.accounts, short: nav.shortAccounts, icon: WalletCards },
+    { href: "/transactions", label: nav.transactions, short: nav.shortTransactions, icon: ListChecks },
+    { href: "/planning", label: nav.planning, short: nav.shortPlanning, icon: BarChart3 },
+    { href: "/categories", label: nav.categories, short: nav.shortCategories, icon: Tag },
+    { href: "/debts-cards", label: nav.debtsCards, short: nav.shortDebtsCards, icon: CreditCard },
+    { href: "/settings", label: nav.settings, short: nav.shortSettings, icon: Settings }
+  ];
+}
 
-export function AppShell({ children, userEmail }: Readonly<{ children: ReactNode; userEmail: string }>) {
+export function AppShell({ children, userEmail, locale }: Readonly<{ children: ReactNode; userEmail: string; locale: Locale }>) {
   const pathname = usePathname();
+  const dictionary = dictionaries[locale];
+  const navItems = getNavItems(locale);
 
   async function signOut() {
     const supabase = createClient();
@@ -36,7 +42,7 @@ export function AppShell({ children, userEmail }: Readonly<{ children: ReactNode
               <span className="block text-xs font-semibold text-muted">{userEmail}</span>
             </span>
           </Link>
-          <button onClick={signOut} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary">ออกจากระบบ</button>
+          <button onClick={signOut} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary">{dictionary.nav.signOut}</button>
         </div>
       </header>
 

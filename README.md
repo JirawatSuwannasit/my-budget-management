@@ -1349,6 +1349,8 @@ Important Phase 7 files:
 
 ## 56. Phase 8: Category Management and Payment Workflow Polish
 
+Phase 8 was approved after local tests passed and the changes were pushed to GitHub.
+
 Phase 8 adds safer day-to-day management for categories, subscriptions, and annual expenses:
 
 - Category management page
@@ -1533,4 +1535,150 @@ Important Phase 8 files:
 - App navigation: `src/components/layout/app-shell.tsx`
 - Initial schema draft: `supabase/migrations/001_initial_schema.sql`
 - Phase 8 migration: `supabase/migrations/006_expand_category_kinds.sql`
+- Documentation: `README.md`
+
+## 65. Phase 9: Settings, Language Switcher, and PWA/Mobile Polish
+
+Phase 9 adds daily-use polish:
+
+- Settings page
+- Thai/English language switcher
+- Saved language preference in `profiles.locale`
+- Currency and financial cycle preference controls
+- Bonus month configuration
+- Default account selection
+- Android PWA install guidance
+- Improved manifest/offline fallback
+- Navigation and Dashboard key-label translation
+
+No deployment was performed by Codex in this phase.
+
+## 66. Phase 9 Database Notes
+
+No new database migration is required for Phase 9.
+
+The existing schema already includes:
+
+- `profiles.locale`
+- `profiles.currency`
+- `profiles.financial_cycle_start_day`
+- `app_settings.bonus_months`
+- `app_settings.default_account_id`
+
+The Settings page writes to those existing tables using the logged-in user only.
+
+## 67. How to Change Language
+
+Open **Settings / ตั้งค่า** from the bottom navigation or desktop sidebar.
+
+To switch from Thai to English:
+
+1. Open **Settings**.
+2. Find **Language / ภาษา**.
+3. Choose **English**.
+4. Click **Save settings**.
+5. Open Dashboard or refresh the page if needed.
+
+To switch back to Thai:
+
+1. Open **Settings**.
+2. Choose **Thai / ไทย**.
+3. Click **Save settings**.
+
+Translated areas in Phase 9:
+
+- Main navigation
+- Logout label
+- Dashboard key labels
+- Settings page labels
+
+Not every older detailed form message is fully translated yet. The priority in Phase 9 is the daily navigation and main finance summary.
+
+## 68. Android PWA Install Steps
+
+If the app is deployed to Vercel or opened from a secure HTTPS address:
+
+1. Open the site in Chrome on Android.
+2. Log in.
+3. Tap the three-dot menu in Chrome.
+4. Tap **Install app** or **Add to Home screen** if shown.
+5. Confirm the install.
+6. Open **My Budget** from the Android home screen.
+
+PWA settings now use:
+
+- App name: `My Budget Management`
+- Short name: `My Budget`
+- Theme color: `#087f8c`
+- Display mode: `standalone`
+- Orientation: `portrait-primary`
+- Offline fallback page: `public/offline.html`
+
+## 69. Local Verification Commands for Phase 9
+
+Codex did not run these commands because you asked Codex not to run npm test/typecheck/lint/build.
+
+Please run these in Windows PowerShell:
+
+```powershell
+cd "D:\AI project\My_budget_project"
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
+
+All four should pass before approving Phase 9.
+
+## 70. Browser and Mobile Checks for Phase 9
+
+Start the app locally:
+
+```powershell
+cd "D:\AI project\My_budget_project"
+npm run dev
+```
+
+Then open:
+
+```text
+http://localhost:3000
+```
+
+Manual checks:
+
+1. Log in.
+2. Open **Settings**.
+3. Switch language from Thai to English.
+4. Save settings.
+5. Confirm navigation labels update.
+6. Confirm Dashboard key labels update.
+7. Switch language back from English to Thai.
+8. Confirm forms still work after switching language.
+9. Open the app at an Android-sized browser width.
+10. Confirm no horizontal scrolling or clipped bottom navigation buttons.
+11. Confirm logout still works.
+12. Confirm protected pages still require login after logout.
+13. If deployed to Vercel later, confirm the production site still works after pushing.
+
+## 71. Phase 9 Files Created or Modified
+
+Important Phase 9 files:
+
+- Settings route: `src/app/(private)/settings/page.tsx`
+- Settings loading state: `src/app/(private)/settings/loading.tsx`
+- Settings server actions: `src/app/(private)/settings/actions.ts`
+- Settings form: `src/components/settings/settings-form.tsx`
+- Settings logout button: `src/components/settings/logout-button.tsx`
+- Transaction delete confirmation: `src/components/transactions/delete-transaction-form.tsx`
+- Transactions page delete wiring: `src/app/(private)/transactions/page.tsx`
+- App shell/navigation: `src/components/layout/app-shell.tsx`
+- Private layout settings load: `src/app/(private)/layout.tsx`
+- Dashboard route: `src/app/(private)/dashboard/page.tsx`
+- Dashboard UI labels: `src/components/dashboard/dashboard-shell.tsx`
+- i18n dictionary: `src/lib/i18n/dictionaries.ts`
+- PWA manifest: `public/manifest.webmanifest`
+- Service worker: `public/sw.js`
+- Offline fallback: `public/offline.html`
+- Root metadata/viewport: `src/app/layout.tsx`
 - Documentation: `README.md`

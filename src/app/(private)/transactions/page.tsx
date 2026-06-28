@@ -1,11 +1,11 @@
-﻿import { ListChecks, Trash2 } from "lucide-react";
+import { ListChecks } from "lucide-react";
+import { DeleteTransactionForm } from "@/components/transactions/delete-transaction-form";
 import { TransactionForm } from "@/components/transactions/transaction-form";
-import { deleteTransaction } from "./actions";
 import { createClient } from "@/lib/supabase/server";
-import type { AccountType, TransactionType } from "@/lib/finance/types";
+import type { AccountType, CategoryKind, TransactionType } from "@/lib/finance/types";
 
 type AccountRow = { id: string; name: string; type: AccountType; active: boolean };
-type CategoryRow = { id: string; name: string; kind: "income" | "expense"; active: boolean };
+type CategoryRow = { id: string; name: string; kind: CategoryKind; active: boolean };
 type DebtRow = { id: string; name: string; active: boolean };
 type CardRow = { id: string; name: string; active: boolean };
 type StatementRow = { id: string; card_id: string; due_date: string; statement_amount_due: number | string; paid_amount: number | string; remaining_payable: number | string; status: "unpaid" | "partial" | "paid" };
@@ -98,13 +98,10 @@ export default async function TransactionsPage() {
                     <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-muted">{transaction.transaction_date}</span>
                   </div>
                   <p className="mt-2 text-2xl font-black text-ink">{formatMoney(transaction.amount)}</p>
-                  <p className="mt-1 text-sm font-semibold text-muted">{transaction.account_id ? accountName.get(transaction.account_id) ?? "Account" : "No cash account"}{transaction.destination_account_id ? " → " + (accountName.get(transaction.destination_account_id) ?? "Destination") : ""}</p>
+                  <p className="mt-1 text-sm font-semibold text-muted">{transaction.account_id ? accountName.get(transaction.account_id) ?? "Account" : "No cash account"}{transaction.destination_account_id ? " -> " + (accountName.get(transaction.destination_account_id) ?? "Destination") : ""}</p>
                   {transaction.notes ? <p className="mt-2 text-sm font-semibold text-muted">{transaction.notes}</p> : null}
                 </div>
-                <form action={deleteTransaction}>
-                  <input type="hidden" name="id" value={transaction.id} />
-                  <button className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-black text-rose-700 transition hover:bg-rose-100"><Trash2 size={14} aria-hidden="true" /> ลบถ้าปลอดภัย</button>
-                </form>
+                <DeleteTransactionForm id={transaction.id} label="ลบถ้าปลอดภัย" />
               </div>
               <details className="mt-4">
                 <summary className="cursor-pointer text-sm font-black text-primary">แก้ไขรายการ</summary>

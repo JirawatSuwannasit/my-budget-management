@@ -5,6 +5,7 @@ import { DebtForm } from "@/components/debts-cards/debt-form";
 import { CardExpenseForm, CardPaymentForm, DebtPaymentForm } from "@/components/debts-cards/payment-forms";
 import { CreditCardStatementForm } from "@/components/debts-cards/statement-form";
 import { getFinancialCycle } from "@/lib/finance/cycle";
+import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/server";
 import { setCreditCardActive, setDebtActive } from "./actions";
 
@@ -26,14 +27,6 @@ type CardRow = { id: string; name: string; billing_cut_day: number; payment_due_
 type StatementRow = { id: string; card_id: string; cycle_start: string; cycle_end: string; statement_amount_due: number | string; paid_amount: number | string; remaining_payable: number | string; due_date: string; status: "unpaid" | "partial" | "paid" };
 type CardTransactionRow = { id: string; card_id: string; statement_id: string | null; amount: number | string; transaction_date: string; billing_cycle_start: string; notes: string | null };
 type CardPaymentRow = { id: string; card_id: string; statement_id: string | null; account_id: string | null; amount: number | string; payment_date: string; created_at: string };
-
-const debtTypeLabels: Record<DebtRow["type"], string> = {
-  personal_loan: "Personal loan",
-  interest_free: "Interest-free debt",
-  installment: "Product installment",
-  credit_card_debt: "Credit card debt",
-  other: "Other"
-};
 
 function toNumber(value: number | string | null | undefined) {
   const numberValue = Number(value ?? 0);
@@ -60,22 +53,26 @@ function ProgressBar({ percent, color = "bg-primary" }: { percent: number; color
   );
 }
 
-function StatusPill({ active }: { active: boolean }) {
-  return <span className={"rounded-full px-2.5 py-1 text-xs font-black " + (active ? "bg-emerald-50 text-emerald-800" : "bg-slate-100 text-muted")}>{active ? "Active" : "Inactive"}</span>;
+function StatusPill({ active, locale }: { active: boolean; locale: Locale }) {
+  const common = dictionaries[locale].common;
+  return <span className={"rounded-full px-2.5 py-1 text-xs font-black " + (active ? "bg-emerald-50 text-emerald-800" : "bg-slate-100 text-muted")}>{active ? common.active : common.inactive}</span>;
 }
 
-function StatementStatusPill({ status }: { status: StatementRow["status"] }) {
+function StatementStatusPill({ status, locale }: { status: StatementRow["status"]; locale: Locale }) {
+  const common = dictionaries[locale].common;
   const className = status === "paid" ? "bg-emerald-50 text-emerald-800" : status === "partial" ? "bg-amber-50 text-amber-800" : "bg-rose-50 text-rose-800";
-  const label = status === "paid" ? "Paid" : status === "partial" ? "Partial" : "Unpaid";
+  const label = status === "paid" ? common.paid : status === "partial" ? common.partial : common.unpaid;
   return <span className={"rounded-full px-2.5 py-1 text-xs font-black " + className}>{label}</span>;
 }
 
-function ToggleActiveForm({ id, active, kind }: { id: string; active: boolean; kind: "debt" | "card" }) {
+function ToggleActiveForm({ id, active, kind, locale }: { id: string; active: boolean; kind: "debt" | "card"; locale: Locale }) {
+  const common = dictionaries[locale].common;
   return (
     <form action={kind === "debt" ? setDebtActive : setCreditCardActive}>
       <input type="hidden" name="id" value={id} />
+      <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="active" value={active ? "false" : "true"} />
-      <button className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary">{active ? "Deactivate" : "Activate"}</button>
+      <button className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary">{active ? common.deactivate : common.activate}</button>
     </form>
   );
 }
@@ -89,8 +86,12 @@ export default async function DebtsCardsPage() {
   const cycleStartDate = toDateInput(cycle.start);
   const cycleEndDate = toDateInput(cycle.end);
   const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
 
-  const [accountsResult, debtsResult, debtPaymentsResult, cardsResult, statementsResult, cardTransactionsResult, cardPaymentsResult] = await Promise.all([
+  const [profileResult, accountsResult, debtsResult, debtPaymentsResult, cardsResult, statementsResult, cardTransactionsResult, cardPaymentsResult] = await Promise.all([
+    user ? supabase.from("profiles").select("locale").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
     supabase.from("debts").select("id,name,type,original_amount,remaining_balance,interest_rate,monthly_payment,bonus_payment_amount,target_payoff_date,active").order("active", { ascending: false }).order("name"),
     supabase.from("debt_payments").select("id,debt_id,account_id,amount,paid_date,source,notes,created_at").order("paid_date", { ascending: false }).limit(80),
@@ -100,6 +101,8 @@ export default async function DebtsCardsPage() {
     supabase.from("card_payments").select("id,card_id,statement_id,account_id,amount,payment_date,created_at").order("payment_date", { ascending: false }).limit(80)
   ]);
 
+  const locale = isLocale(profileResult.data?.locale) ? profileResult.data.locale : "th";
+  const t = dictionaries[locale].debtsCards;
   const accounts = (accountsResult.data ?? []) as AccountRow[];
   const debts = (debtsResult.data ?? []) as DebtRow[];
   const debtPayments = (debtPaymentsResult.data ?? []) as DebtPaymentRow[];
@@ -107,7 +110,7 @@ export default async function DebtsCardsPage() {
   const statements = (statementsResult.data ?? []) as StatementRow[];
   const cardTransactions = (cardTransactionsResult.data ?? []) as CardTransactionRow[];
   const cardPayments = (cardPaymentsResult.data ?? []) as CardPaymentRow[];
-  const loadError = accountsResult.error ?? debtsResult.error ?? debtPaymentsResult.error ?? cardsResult.error ?? statementsResult.error ?? cardTransactionsResult.error ?? cardPaymentsResult.error;
+  const loadError = profileResult.error ?? accountsResult.error ?? debtsResult.error ?? debtPaymentsResult.error ?? cardsResult.error ?? statementsResult.error ?? cardTransactionsResult.error ?? cardPaymentsResult.error;
 
   const activeDebts = debts.filter((debt) => debt.active);
   const activeCards = cards.filter((card) => card.active);
@@ -129,7 +132,7 @@ export default async function DebtsCardsPage() {
     .map((statement) => ({
       id: statement.id,
       card_id: statement.card_id,
-      label: (cardNameById.get(statement.card_id) ?? "Credit card") + " - remaining " + formatMoney(statement.remaining_payable) + " due " + statement.due_date,
+      label: (cardNameById.get(statement.card_id) ?? t.form.creditCard) + " - " + t.statementOptionRemaining + " " + formatMoney(statement.remaining_payable) + " " + t.statementOptionDue + " " + statement.due_date,
       remaining_payable: toNumber(statement.remaining_payable),
       due_date: statement.due_date,
       status: statement.status
@@ -140,39 +143,39 @@ export default async function DebtsCardsPage() {
       <section className="rounded-[28px] border border-primary/15 bg-gradient-to-br from-white via-blue-50 to-emerald-50 p-5 shadow-soft md:p-8">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-normal text-primary">Phase 7 debt + cards</p>
-            <h1 className="mt-4 text-3xl font-black text-ink md:text-5xl">Debts and credit cards</h1>
-            <p className="mt-3 max-w-2xl text-sm font-semibold text-muted md:text-base">Manage debt payoff, card spending, statements, and payments while keeping real available money free from double counting.</p>
+            <p className="w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-normal text-primary">{t.phase}</p>
+            <h1 className="mt-4 text-3xl font-black text-ink md:text-5xl">{t.title}</h1>
+            <p className="mt-3 max-w-2xl text-sm font-semibold text-muted md:text-base">{t.subtitle}</p>
           </div>
           <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-white shadow-card"><CreditCard size={22} aria-hidden="true" /></div>
         </div>
       </section>
 
-      {loadError ? <p className="rounded-panel border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-800">Could not load debt/card data: {loadError.message}</p> : null}
+      {loadError ? <p className="rounded-panel border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-800">{t.loadError}: {loadError.message}</p> : null}
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-panel border border-slate-200 bg-white p-4 shadow-card"><p className="text-xs font-black uppercase tracking-normal text-muted">Debt remaining</p><p className="mt-3 text-3xl font-black text-ink">{formatMoney(totalDebtRemaining)}</p></div>
-        <div className="rounded-panel border border-emerald-100 bg-emerald-50 p-4 text-emerald-900 shadow-card"><p className="text-xs font-black uppercase tracking-normal opacity-70">Planned debt left</p><p className="mt-3 text-3xl font-black">{formatMoney(plannedDebtThisCycle)}</p></div>
-        <div className="rounded-panel border border-amber-100 bg-amber-50 p-4 text-amber-900 shadow-card"><p className="text-xs font-black uppercase tracking-normal opacity-70">Current card spending</p><p className="mt-3 text-3xl font-black">{formatMoney(currentCardSpending)}</p></div>
-        <div className="rounded-panel border border-blue-100 bg-blue-50 p-4 text-blue-900 shadow-card"><p className="text-xs font-black uppercase tracking-normal opacity-70">Card payable left</p><p className="mt-3 text-3xl font-black">{formatMoney(remainingCardPayable)}</p></div>
+        <div className="rounded-panel border border-slate-200 bg-white p-4 shadow-card"><p className="text-xs font-black uppercase tracking-normal text-muted">{t.debtRemaining}</p><p className="mt-3 text-3xl font-black text-ink">{formatMoney(totalDebtRemaining)}</p></div>
+        <div className="rounded-panel border border-emerald-100 bg-emerald-50 p-4 text-emerald-900 shadow-card"><p className="text-xs font-black uppercase tracking-normal opacity-70">{t.plannedDebtLeft}</p><p className="mt-3 text-3xl font-black">{formatMoney(plannedDebtThisCycle)}</p></div>
+        <div className="rounded-panel border border-amber-100 bg-amber-50 p-4 text-amber-900 shadow-card"><p className="text-xs font-black uppercase tracking-normal opacity-70">{t.currentCardSpending}</p><p className="mt-3 text-3xl font-black">{formatMoney(currentCardSpending)}</p></div>
+        <div className="rounded-panel border border-blue-100 bg-blue-50 p-4 text-blue-900 shadow-card"><p className="text-xs font-black uppercase tracking-normal opacity-70">{t.cardPayableLeft}</p><p className="mt-3 text-3xl font-black">{formatMoney(remainingCardPayable)}</p></div>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[0.82fr_1.18fr]">
         <div className="grid gap-4">
           <div>
-            <div className="mb-3 flex items-center gap-2"><TrendingDown className="text-primary" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">Add debt</h2></div>
-            <DebtForm />
+            <div className="mb-3 flex items-center gap-2"><TrendingDown className="text-primary" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.addDebt}</h2></div>
+            <DebtForm locale={locale} />
           </div>
           <div>
-            <div className="mb-3 flex items-center gap-2"><Banknote className="text-emerald-600" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">Record debt payment</h2></div>
-            <DebtPaymentForm debts={activeDebts} accounts={cashLikeAccounts} />
-            {activeDebts.length === 0 || cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-amber-50 p-4 text-sm font-bold text-amber-800">You need one active debt and one cash-like account before recording a debt payment.</p> : null}
+            <div className="mb-3 flex items-center gap-2"><Banknote className="text-emerald-600" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.recordDebtPayment}</h2></div>
+            <DebtPaymentForm debts={activeDebts} accounts={cashLikeAccounts} locale={locale} />
+            {activeDebts.length === 0 || cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-amber-50 p-4 text-sm font-bold text-amber-800">{t.debtPaymentRequirement}</p> : null}
           </div>
         </div>
 
         <div className="grid gap-3">
-          <div className="flex items-center justify-between gap-4"><h2 className="text-xl font-black text-ink">Debt progress</h2><span className="rounded-full bg-white px-3 py-1 text-xs font-black text-muted shadow-card">{debts.length} debts</span></div>
-          {debts.length === 0 ? <EmptyState>No debts yet. Add the 500,000 THB interest-free example with 9,000 THB monthly payment and 50,000 THB bonus payment to start tracking payoff.</EmptyState> : null}
+          <div className="flex items-center justify-between gap-4"><h2 className="text-xl font-black text-ink">{t.debtProgress}</h2><span className="rounded-full bg-white px-3 py-1 text-xs font-black text-muted shadow-card">{debts.length} {t.debtsSuffix}</span></div>
+          {debts.length === 0 ? <EmptyState>{t.noDebts}</EmptyState> : null}
           {debts.map((debt) => {
             const original = toNumber(debt.original_amount);
             const remaining = toNumber(debt.remaining_balance);
@@ -189,23 +192,23 @@ export default async function DebtsCardsPage() {
               <article key={debt.id} className="rounded-panel border border-slate-200 bg-white p-4 shadow-card">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-black text-ink">{debt.name}</h3><StatusPill active={debt.active} /><span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{debtTypeLabels[debt.type]}</span></div>
+                    <div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-black text-ink">{debt.name}</h3><StatusPill active={debt.active} locale={locale} /><span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{t.debtTypes[debt.type]}</span></div>
                     <div className="mt-4 grid gap-3">
                       <ProgressBar percent={progress} color="bg-emerald-500" />
                       <div className="grid gap-2 text-sm font-bold text-muted sm:grid-cols-3">
-                        <span>Original {formatMoney(original)}</span><span>Remaining {formatMoney(remaining)}</span><span>Paid {progress}%</span><span>Monthly {formatMoney(monthly)}</span><span>Bonus {formatMoney(bonus)}</span><span>Cycle plan left {formatMoney(plannedLeft)}</span>
+                        <span>{t.original} {formatMoney(original)}</span><span>{t.remaining} {formatMoney(remaining)}</span><span>{t.paid} {progress}%</span><span>{t.monthly} {formatMoney(monthly)}</span><span>{t.bonus} {formatMoney(bonus)}</span><span>{t.cyclePlanLeft} {formatMoney(plannedLeft)}</span>
                       </div>
-                      <p className="text-sm font-semibold text-muted">{estimatedMonths ? "About " + estimatedMonths + " months remaining" : "Cannot estimate months remaining yet"} {debt.target_payoff_date ? "- target " + debt.target_payoff_date : ""}</p>
+                      <p className="text-sm font-semibold text-muted">{estimatedMonths ? t.aboutMonthsRemainingPrefix + " " + estimatedMonths + " " + t.aboutMonthsRemainingSuffix : t.cannotEstimateMonths} {debt.target_payoff_date ? "- " + t.target + " " + debt.target_payoff_date : ""}</p>
                     </div>
                     <div className="mt-4 rounded-2xl bg-slate-50 p-3">
-                      <p className="mb-2 text-xs font-black uppercase tracking-normal text-muted">Payment history</p>
-                      {history.length === 0 ? <p className="text-sm font-bold text-muted">No payments yet.</p> : null}
+                      <p className="mb-2 text-xs font-black uppercase tracking-normal text-muted">{t.paymentHistory}</p>
+                      {history.length === 0 ? <p className="text-sm font-bold text-muted">{t.noPayments}</p> : null}
                       <div className="grid gap-2">{history.map((payment) => <p key={payment.id} className="flex items-center justify-between gap-3 text-sm font-bold text-ink"><span>{payment.paid_date}</span><span>{formatMoney(payment.amount)}</span></p>)}</div>
                     </div>
                   </div>
-                  <ToggleActiveForm id={debt.id} active={debt.active} kind="debt" />
+                  <ToggleActiveForm id={debt.id} active={debt.active} kind="debt" locale={locale} />
                 </div>
-                <details className="mt-4"><summary className="cursor-pointer text-sm font-black text-primary">Edit debt</summary><div className="mt-3"><DebtForm debt={debt} compact /></div></details>
+                <details className="mt-4"><summary className="cursor-pointer text-sm font-black text-primary">{t.editDebt}</summary><div className="mt-3"><DebtForm debt={debt} compact locale={locale} /></div></details>
               </article>
             );
           })}
@@ -214,13 +217,13 @@ export default async function DebtsCardsPage() {
 
       <section className="grid gap-4 xl:grid-cols-[0.82fr_1.18fr]">
         <div className="grid gap-4">
-          <div><div className="mb-3 flex items-center gap-2"><CreditCard className="text-primary" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">Add credit card</h2></div><CreditCardForm /></div>
-          <div><div className="mb-3 flex items-center gap-2"><ReceiptText className="text-primary" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">Add statement</h2></div><CreditCardStatementForm cards={activeCards} defaultCycleStart={cycleStartDate} defaultCycleEnd={cycleEndDate} /></div>
+          <div><div className="mb-3 flex items-center gap-2"><CreditCard className="text-primary" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.addCreditCard}</h2></div><CreditCardForm locale={locale} /></div>
+          <div><div className="mb-3 flex items-center gap-2"><ReceiptText className="text-primary" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.addStatement}</h2></div><CreditCardStatementForm cards={activeCards} defaultCycleStart={cycleStartDate} defaultCycleEnd={cycleEndDate} locale={locale} /></div>
         </div>
 
         <div className="grid gap-3">
-          <div className="flex items-center justify-between gap-4"><h2 className="text-xl font-black text-ink">Credit cards</h2><span className="rounded-full bg-white px-3 py-1 text-xs font-black text-muted shadow-card">{cards.length} cards</span></div>
-          {cards.length === 0 ? <EmptyState>No credit cards yet. Add a card first, then add expenses and statements.</EmptyState> : null}
+          <div className="flex items-center justify-between gap-4"><h2 className="text-xl font-black text-ink">{t.creditCards}</h2><span className="rounded-full bg-white px-3 py-1 text-xs font-black text-muted shadow-card">{cards.length} {t.cardsSuffix}</span></div>
+          {cards.length === 0 ? <EmptyState>{t.noCards}</EmptyState> : null}
           {cards.map((card) => {
             const cardStatements = statements.filter((statement) => statement.card_id === card.id);
             const cardOpenPayable = cardStatements.reduce((total, statement) => total + toNumber(statement.remaining_payable), 0);
@@ -233,42 +236,42 @@ export default async function DebtsCardsPage() {
               <article key={card.id} className="rounded-panel border border-slate-200 bg-white p-4 shadow-card">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-black text-ink">{card.name}</h3><StatusPill active={card.active} /><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-muted">Cut day {card.billing_cut_day}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-muted">Due day {card.payment_due_day}</span></div>
+                    <div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-black text-ink">{card.name}</h3><StatusPill active={card.active} locale={locale} /><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-muted">{t.cutDay} {card.billing_cut_day}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-muted">{t.dueDay} {card.payment_due_day}</span></div>
                     <div className="mt-4 grid gap-3 sm:grid-cols-4">
-                      <div className="rounded-2xl bg-amber-50 p-3 text-amber-900"><p className="text-xs font-black opacity-70">Current spending</p><p className="mt-1 text-lg font-black">{formatMoney(cardCycleSpending)}</p></div>
-                      <div className="rounded-2xl bg-slate-50 p-3"><p className="text-xs font-black text-muted">Statement due</p><p className="mt-1 text-lg font-black text-ink">{formatMoney(cardDue)}</p></div>
-                      <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-900"><p className="text-xs font-black opacity-70">Paid</p><p className="mt-1 text-lg font-black">{formatMoney(cardPaid)}</p></div>
-                      <div className="rounded-2xl bg-blue-50 p-3 text-blue-900"><p className="text-xs font-black opacity-70">Remaining</p><p className="mt-1 text-lg font-black">{formatMoney(cardOpenPayable)}</p></div>
+                      <div className="rounded-2xl bg-amber-50 p-3 text-amber-900"><p className="text-xs font-black opacity-70">{t.currentSpending}</p><p className="mt-1 text-lg font-black">{formatMoney(cardCycleSpending)}</p></div>
+                      <div className="rounded-2xl bg-slate-50 p-3"><p className="text-xs font-black text-muted">{t.statementDue}</p><p className="mt-1 text-lg font-black text-ink">{formatMoney(cardDue)}</p></div>
+                      <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-900"><p className="text-xs font-black opacity-70">{t.paid}</p><p className="mt-1 text-lg font-black">{formatMoney(cardPaid)}</p></div>
+                      <div className="rounded-2xl bg-blue-50 p-3 text-blue-900"><p className="text-xs font-black opacity-70">{t.remaining}</p><p className="mt-1 text-lg font-black">{formatMoney(cardOpenPayable)}</p></div>
                     </div>
                   </div>
-                  <ToggleActiveForm id={card.id} active={card.active} kind="card" />
+                  <ToggleActiveForm id={card.id} active={card.active} kind="card" locale={locale} />
                 </div>
 
                 <div className="mt-4 grid gap-3 lg:grid-cols-2">
                   <div className="rounded-2xl bg-slate-50 p-3">
-                    <p className="mb-2 text-xs font-black uppercase tracking-normal text-muted">Statements</p>
-                    {cardStatements.length === 0 ? <p className="text-sm font-bold text-muted">No statements yet.</p> : null}
+                    <p className="mb-2 text-xs font-black uppercase tracking-normal text-muted">{t.statements}</p>
+                    {cardStatements.length === 0 ? <p className="text-sm font-bold text-muted">{t.noStatements}</p> : null}
                     <div className="grid gap-2">
                       {cardStatements.slice(0, 4).map((statement) => (
                         <div key={statement.id} className="rounded-2xl bg-white p-3 text-sm font-bold text-ink">
-                          <div className="flex flex-wrap items-center justify-between gap-2"><span>{statement.cycle_start} - {statement.cycle_end}</span><StatementStatusPill status={statement.status} /></div>
-                          <p className="mt-2 text-muted">Due {statement.due_date} - remaining {formatMoney(statement.remaining_payable)}</p>
-                          <details className="mt-2"><summary className="cursor-pointer text-xs font-black text-primary">Edit statement</summary><div className="mt-3"><CreditCardStatementForm cards={activeCards} statement={statement} defaultCycleStart={cycleStartDate} defaultCycleEnd={cycleEndDate} /></div></details>
+                          <div className="flex flex-wrap items-center justify-between gap-2"><span>{statement.cycle_start} - {statement.cycle_end}</span><StatementStatusPill status={statement.status} locale={locale} /></div>
+                          <p className="mt-2 text-muted">{t.dueLabel} {statement.due_date} - {t.remaining} {formatMoney(statement.remaining_payable)}</p>
+                          <details className="mt-2"><summary className="cursor-pointer text-xs font-black text-primary">{t.editStatement}</summary><div className="mt-3"><CreditCardStatementForm cards={activeCards} statement={statement} defaultCycleStart={cycleStartDate} defaultCycleEnd={cycleEndDate} locale={locale} /></div></details>
                         </div>
                       ))}
                     </div>
                   </div>
                   <div className="rounded-2xl bg-slate-50 p-3">
-                    <p className="mb-2 text-xs font-black uppercase tracking-normal text-muted">Recent card activity</p>
-                    {recentCardTransactions.length === 0 && recentPayments.length === 0 ? <p className="text-sm font-bold text-muted">No card activity yet.</p> : null}
+                    <p className="mb-2 text-xs font-black uppercase tracking-normal text-muted">{t.recentCardActivity}</p>
+                    {recentCardTransactions.length === 0 && recentPayments.length === 0 ? <p className="text-sm font-bold text-muted">{t.noCardActivity}</p> : null}
                     <div className="grid gap-2">
-                      {recentCardTransactions.map((transaction) => <p key={transaction.id} className="flex items-center justify-between gap-3 text-sm font-bold text-ink"><span>{transaction.transaction_date}</span><span>Expense {formatMoney(transaction.amount)}</span></p>)}
-                      {recentPayments.map((payment) => <p key={payment.id} className="flex items-center justify-between gap-3 text-sm font-bold text-emerald-800"><span>{payment.payment_date}</span><span>Payment {formatMoney(payment.amount)}</span></p>)}
+                      {recentCardTransactions.map((transaction) => <p key={transaction.id} className="flex items-center justify-between gap-3 text-sm font-bold text-ink"><span>{transaction.transaction_date}</span><span>{t.expense} {formatMoney(transaction.amount)}</span></p>)}
+                      {recentPayments.map((payment) => <p key={payment.id} className="flex items-center justify-between gap-3 text-sm font-bold text-emerald-800"><span>{payment.payment_date}</span><span>{t.payment} {formatMoney(payment.amount)}</span></p>)}
                     </div>
                   </div>
                 </div>
 
-                <details className="mt-4"><summary className="cursor-pointer text-sm font-black text-primary">Edit card</summary><div className="mt-3"><CreditCardForm card={card} /></div></details>
+                <details className="mt-4"><summary className="cursor-pointer text-sm font-black text-primary">{t.editCard}</summary><div className="mt-3"><CreditCardForm card={card} locale={locale} /></div></details>
               </article>
             );
           })}
@@ -277,20 +280,20 @@ export default async function DebtsCardsPage() {
 
       <section className="grid gap-4 xl:grid-cols-2">
         <div>
-          <div className="mb-3 flex items-center gap-2"><CreditCard className="text-amber-600" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">Add credit card expense</h2></div>
-          <CardExpenseForm cards={activeCards} />
-          <p className="mt-3 rounded-2xl bg-white p-4 text-sm font-bold text-muted shadow-card">Credit card expense increases card liability and current cycle spending. It does not reduce cash until a card payment is recorded.</p>
+          <div className="mb-3 flex items-center gap-2"><CreditCard className="text-amber-600" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.addCreditCardExpense}</h2></div>
+          <CardExpenseForm cards={activeCards} locale={locale} />
+          <p className="mt-3 rounded-2xl bg-white p-4 text-sm font-bold text-muted shadow-card">{t.cardExpenseHelp}</p>
         </div>
         <div>
-          <div className="mb-3 flex items-center gap-2"><Landmark className="text-blue-600" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">Pay credit card statement</h2></div>
-          <CardPaymentForm statements={openStatementOptions} accounts={cashLikeAccounts} />
-          {openStatementOptions.length === 0 ? <p className="mt-3 rounded-2xl bg-amber-50 p-4 text-sm font-bold text-amber-800">You need an unpaid or partial statement before recording a card payment.</p> : null}
+          <div className="mb-3 flex items-center gap-2"><Landmark className="text-blue-600" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.payCreditCardStatement}</h2></div>
+          <CardPaymentForm statements={openStatementOptions} accounts={cashLikeAccounts} locale={locale} />
+          {openStatementOptions.length === 0 ? <p className="mt-3 rounded-2xl bg-amber-50 p-4 text-sm font-bold text-amber-800">{t.statementPaymentRequirement}</p> : null}
         </div>
       </section>
 
       <section className="rounded-panel border border-slate-200 bg-white p-5 text-sm font-semibold text-muted shadow-card">
-        <div className="mb-2 flex items-center gap-2 text-ink"><ReceiptText size={18} className="text-primary" aria-hidden="true" /><h2 className="text-lg font-black">Dashboard logic</h2></div>
-        <p>The dashboard subtracts only remaining planned debt payment and remaining card payable. Payments that already reduced cash are not reserved again in real available money.</p>
+        <div className="mb-2 flex items-center gap-2 text-ink"><ReceiptText size={18} className="text-primary" aria-hidden="true" /><h2 className="text-lg font-black">{t.dashboardLogic}</h2></div>
+        <p>{t.dashboardLogicText}</p>
       </section>
     </div>
   );

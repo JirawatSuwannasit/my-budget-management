@@ -3,8 +3,8 @@ import "./globals.css";
 import { RegisterServiceWorker } from "@/components/register-service-worker";
 
 export const metadata: Metadata = {
-  title: "Private Finance Dashboard",
-  description: "A private mobile-first finance control dashboard for real available money.",
+  title: "My Budget Management",
+  description: "Private mobile-first finance control dashboard for real available money.",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: "/icon.svg",
