@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCycleStartForSalaryPayment, getFinancialCycle } from "./cycle";
+import { getCycleStartForSalaryPayment, getFinancialCycle, getSalaryPaymentForCycle } from "./cycle";
 import { calculateDashboardSnapshot } from "./dashboard";
 import { getAccountBalanceDeltas } from "./transaction-effects";
 import { hasRealDashboardRows, mapDashboardRowsToInput, type DashboardRows } from "./dashboard-data";
@@ -171,6 +171,40 @@ describe("financial cycle rules", () => {
 
     expect(saturdayCycleStart).toEqual(new Date(2026, 6, 25, 12));
     expect(sundayCycleStart).toEqual(new Date(2026, 9, 25, 12));
+  });
+
+  it("runs a calendar-month cycle when the start day is 1", () => {
+    const onStartDay = getFinancialCycle(new Date(2026, 7, 1, 9), 1);
+    const dayBefore = getFinancialCycle(new Date(2026, 6, 31, 9), 1);
+
+    expect(onStartDay.start).toEqual(new Date(2026, 7, 1, 12));
+    expect(onStartDay.end).toEqual(new Date(2026, 7, 31, 12));
+    expect(dayBefore.start).toEqual(new Date(2026, 6, 1, 12));
+    expect(dayBefore.end).toEqual(new Date(2026, 6, 31, 12));
+  });
+
+  it("wraps to the previous month before a start day of 15", () => {
+    const beforeBoundary = getFinancialCycle(new Date(2026, 7, 14, 9), 15);
+    const onBoundary = getFinancialCycle(new Date(2026, 7, 15, 9), 15);
+
+    expect(beforeBoundary.start).toEqual(new Date(2026, 6, 15, 12));
+    expect(beforeBoundary.end).toEqual(new Date(2026, 7, 14, 12));
+    expect(onBoundary.start).toEqual(new Date(2026, 7, 15, 12));
+    expect(onBoundary.end).toEqual(new Date(2026, 8, 14, 12));
+  });
+
+  it("shifts a weekend start day back to the prior Friday for a start day of 1", () => {
+    // 1 Aug 2026 is a Saturday, so a salary for the cycle starting on the 1st is paid on Friday 31 Jul.
+    const salaryPayment = getSalaryPaymentForCycle(new Date(2026, 7, 1, 12));
+
+    expect(salaryPayment).toEqual(new Date(2026, 6, 31, 12));
+  });
+
+  it("assigns an early cross-month salary payment to the cycle starting on the 1st", () => {
+    // Friday 31 Jul 2026 is the early payment for the cycle that starts Saturday 1 Aug 2026.
+    const cycleStart = getCycleStartForSalaryPayment(new Date(2026, 6, 31, 9), 1);
+
+    expect(cycleStart).toEqual(new Date(2026, 7, 1, 12));
   });
 });
 

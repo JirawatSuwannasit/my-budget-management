@@ -21,12 +21,14 @@ function ResultMessage({ state }: { state: TransactionActionState }) {
   return <p className={"rounded-2xl px-4 py-3 text-sm font-bold " + (state.status === "success" ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800")}>{state.message}</p>;
 }
 
-function AccountSelect({ accounts, locale }: { accounts: PlanningAccountOption[]; locale: Locale }) {
+function AccountSelect({ accounts, defaultAccountId, locale }: { accounts: PlanningAccountOption[]; defaultAccountId?: string | null; locale: Locale }) {
   const t = dictionaries[locale].planning.payment;
+  // Pre-select the user's default account when it is one of the available (active cash-like) accounts.
+  const preferredAccountId = defaultAccountId && accounts.some((account) => account.id === defaultAccountId) ? defaultAccountId : accounts[0]?.id ?? "";
   return (
     <label className="grid gap-2 text-xs font-black text-ink">
       {t.payFrom}
-      <select name="account_id" required defaultValue={accounts[0]?.id ?? ""} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60">
+      <select name="account_id" required defaultValue={preferredAccountId} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60">
         <option value="" disabled>{t.chooseAccount}</option>
         {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
       </select>
@@ -39,6 +41,7 @@ export function PaySubscriptionForm({
   categoryId,
   amount,
   accounts,
+  defaultAccountId,
   frequency,
   locale
 }: {
@@ -46,6 +49,7 @@ export function PaySubscriptionForm({
   categoryId: string | null;
   amount: number;
   accounts: PlanningAccountOption[];
+  defaultAccountId?: string | null;
   frequency: "monthly" | "yearly";
   locale: Locale;
 }) {
@@ -62,7 +66,7 @@ export function PaySubscriptionForm({
       <input type="hidden" name="expense_related_entity_id" value={subscriptionId} />
       <input type="hidden" name="notes" value={frequency === "yearly" ? "Annual subscription paid from planning page" : "Monthly subscription paid from planning page"} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <AccountSelect accounts={accounts} locale={locale} />
+        <AccountSelect accounts={accounts} defaultAccountId={defaultAccountId} locale={locale} />
         <label className="grid gap-2 text-xs font-black text-ink">
           {t.paymentDate}
           <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
@@ -129,12 +133,14 @@ export function PayAnnualBillForm({
   categoryId,
   amount,
   accounts,
+  defaultAccountId,
   locale
 }: {
   annualExpenseId: string;
   categoryId: string | null;
   amount: number;
   accounts: PlanningAccountOption[];
+  defaultAccountId?: string | null;
   locale: Locale;
 }) {
   const [state, formAction, isPending] = useActionState(saveTransaction, initialState);
@@ -150,7 +156,7 @@ export function PayAnnualBillForm({
       <input type="hidden" name="expense_related_entity_id" value={annualExpenseId} />
       <input type="hidden" name="notes" value="Annual bill paid from planning page" />
       <div className="grid gap-3 sm:grid-cols-2">
-        <AccountSelect accounts={accounts} locale={locale} />
+        <AccountSelect accounts={accounts} defaultAccountId={defaultAccountId} locale={locale} />
         <label className="grid gap-2 text-xs font-black text-ink">
           {t.paymentDate}
           <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-amber-100 bg-white px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />

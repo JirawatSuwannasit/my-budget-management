@@ -3,7 +3,7 @@ import { AnnualExpenseForm } from "@/components/planning/annual-expense-form";
 import { BudgetForm } from "@/components/planning/budget-form";
 import { PayAnnualBillForm, PaySubscriptionForm, ReserveAnnualExpenseForm, ReserveSubscriptionForm } from "@/components/planning/payment-workflow-forms";
 import { SubscriptionForm } from "@/components/planning/subscription-form";
-import { getFinancialCycle } from "@/lib/finance/cycle";
+import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
 import type { CategoryKind } from "@/lib/finance/types";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/server";
@@ -60,20 +60,22 @@ function ToggleActiveForm({ id, active, action, locale }: { id: string; active: 
 }
 
 export default async function PlanningPage() {
-  const cycle = getFinancialCycle(new Date());
-  const cycleStartDate = toDateInput(cycle.start);
   const supabase = await createClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();
-  const [profileResult, accountsResult, budgetsResult, subscriptionsResult, annualResult, categoriesResult, transactionsResult] = await Promise.all([
+  const startDay = user ? await getUserCycleStartDay(supabase, user.id) : undefined;
+  const cycle = getFinancialCycle(new Date(), startDay);
+  const cycleStartDate = toDateInput(cycle.start);
+  const [profileResult, accountsResult, budgetsResult, subscriptionsResult, annualResult, categoriesResult, transactionsResult, appSettingsResult] = await Promise.all([
     user ? supabase.from("profiles").select("locale").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
     supabase.from("budgets").select("id,category_id,label,amount,cycle_start_date,active").eq("cycle_start_date", cycleStartDate).order("active", { ascending: false }).order("label"),
     supabase.from("subscriptions").select("id,category_id,name,frequency,price,billing_day,payment_method,active").order("active", { ascending: false }).order("name"),
     supabase.from("annual_expenses").select("id,category_id,name,annual_amount,monthly_reserve,due_date,active").order("active", { ascending: false }).order("name"),
     supabase.from("categories").select("id,name,kind,active").order("name"),
-    supabase.from("transactions").select("id,category_id,type,amount,cycle_start_date,related_entity_id").eq("cycle_start_date", cycleStartDate)
+    supabase.from("transactions").select("id,category_id,type,amount,cycle_start_date,related_entity_id").eq("cycle_start_date", cycleStartDate),
+    user ? supabase.from("app_settings").select("default_account_id").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null })
   ]);
 
   const locale = isLocale(profileResult.data?.locale) ? profileResult.data.locale : "th";
@@ -86,6 +88,7 @@ export default async function PlanningPage() {
   const categories = (categoriesResult.data ?? []) as CategoryRow[];
   const transactions = (transactionsResult.data ?? []) as TransactionRow[];
   const categoryNameById = new Map(categories.map((category) => [category.id, category.name]));
+  const defaultAccountId = (appSettingsResult.data as { default_account_id: string | null } | null)?.default_account_id ?? null;
   const loadError = profileResult.error ?? accountsResult.error ?? budgetsResult.error ?? subscriptionsResult.error ?? annualResult.error ?? categoriesResult.error ?? transactionsResult.error;
   const expenseTransactions = transactions.filter((transaction) => transaction.type === "expense");
   const reserveTransactions = transactions.filter((transaction) => transaction.type === "sinking_fund_reserve");
@@ -231,7 +234,7 @@ export default async function PlanningPage() {
                 {subscription.active ? (
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
                     {subscription.frequency === "yearly" ? <ReserveSubscriptionForm subscriptionId={subscription.id} amount={reserveMonthly} locale={locale} /> : null}
-                    <PaySubscriptionForm subscriptionId={subscription.id} categoryId={subscription.category_id} amount={toNumber(subscription.price)} accounts={cashLikeAccounts} frequency={subscription.frequency} locale={locale} />
+                    <PaySubscriptionForm subscriptionId={subscription.id} categoryId={subscription.category_id} amount={toNumber(subscription.price)} accounts={cashLikeAccounts} defaultAccountId={defaultAccountId} frequency={subscription.frequency} locale={locale} />
                   </div>
                 ) : null}
                 {subscription.active && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-sm font-bold text-amber-800">{t.addCashLikeAccountSubscription}</p> : null}
@@ -287,7 +290,7 @@ export default async function PlanningPage() {
                 {expense.active ? (
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
                     <ReserveAnnualExpenseForm annualExpenseId={expense.id} amount={monthlyReserve} locale={locale} />
-                    <PayAnnualBillForm annualExpenseId={expense.id} categoryId={expense.category_id} amount={toNumber(expense.annual_amount)} accounts={cashLikeAccounts} locale={locale} />
+                    <PayAnnualBillForm annualExpenseId={expense.id} categoryId={expense.category_id} amount={toNumber(expense.annual_amount)} accounts={cashLikeAccounts} defaultAccountId={defaultAccountId} locale={locale} />
                   </div>
                 ) : null}
                 {expense.active && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-amber-50 p-3 text-sm font-bold text-amber-800">{t.addCashLikeAccountAnnual}</p> : null}

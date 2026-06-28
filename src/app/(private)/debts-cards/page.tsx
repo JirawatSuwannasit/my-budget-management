@@ -4,7 +4,7 @@ import { CreditCardForm } from "@/components/debts-cards/card-form";
 import { DebtForm } from "@/components/debts-cards/debt-form";
 import { CardExpenseForm, CardPaymentForm, DebtPaymentForm } from "@/components/debts-cards/payment-forms";
 import { CreditCardStatementForm } from "@/components/debts-cards/statement-form";
-import { getFinancialCycle } from "@/lib/finance/cycle";
+import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/server";
 import { setCreditCardActive, setDebtActive } from "./actions";
@@ -82,15 +82,16 @@ function EmptyState({ children }: { children: ReactNode }) {
 }
 
 export default async function DebtsCardsPage() {
-  const cycle = getFinancialCycle(new Date());
-  const cycleStartDate = toDateInput(cycle.start);
-  const cycleEndDate = toDateInput(cycle.end);
   const supabase = await createClient();
   const {
     data: { user }
   } = await supabase.auth.getUser();
+  const startDay = user ? await getUserCycleStartDay(supabase, user.id) : undefined;
+  const cycle = getFinancialCycle(new Date(), startDay);
+  const cycleStartDate = toDateInput(cycle.start);
+  const cycleEndDate = toDateInput(cycle.end);
 
-  const [profileResult, accountsResult, debtsResult, debtPaymentsResult, cardsResult, statementsResult, cardTransactionsResult, cardPaymentsResult] = await Promise.all([
+  const [profileResult, accountsResult, debtsResult, debtPaymentsResult, cardsResult, statementsResult, cardTransactionsResult, cardPaymentsResult, appSettingsResult] = await Promise.all([
     user ? supabase.from("profiles").select("locale").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
     supabase.from("debts").select("id,name,type,original_amount,remaining_balance,interest_rate,monthly_payment,bonus_payment_amount,target_payoff_date,active").order("active", { ascending: false }).order("name"),
@@ -98,7 +99,8 @@ export default async function DebtsCardsPage() {
     supabase.from("credit_cards").select("id,name,billing_cut_day,payment_due_day,active").order("active", { ascending: false }).order("name"),
     supabase.from("credit_card_statements").select("id,card_id,cycle_start,cycle_end,statement_amount_due,paid_amount,remaining_payable,due_date,status").order("due_date", { ascending: false }).limit(80),
     supabase.from("card_transactions").select("id,card_id,statement_id,amount,transaction_date,billing_cycle_start,notes").order("transaction_date", { ascending: false }).limit(120),
-    supabase.from("card_payments").select("id,card_id,statement_id,account_id,amount,payment_date,created_at").order("payment_date", { ascending: false }).limit(80)
+    supabase.from("card_payments").select("id,card_id,statement_id,account_id,amount,payment_date,created_at").order("payment_date", { ascending: false }).limit(80),
+    user ? supabase.from("app_settings").select("default_account_id").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null })
   ]);
 
   const locale = isLocale(profileResult.data?.locale) ? profileResult.data.locale : "th";
@@ -116,6 +118,7 @@ export default async function DebtsCardsPage() {
   const activeCards = cards.filter((card) => card.active);
   const cashLikeAccounts = accounts.filter((account) => account.active && account.type !== "investment");
   const cardNameById = new Map(cards.map((card) => [card.id, card.name]));
+  const defaultAccountId = (appSettingsResult.data as { default_account_id: string | null } | null)?.default_account_id ?? null;
 
   const totalDebtRemaining = activeDebts.reduce((total, debt) => total + toNumber(debt.remaining_balance), 0);
   const plannedDebtThisCycle = activeDebts.reduce((total, debt) => {
@@ -168,7 +171,7 @@ export default async function DebtsCardsPage() {
           </div>
           <div>
             <div className="mb-3 flex items-center gap-2"><Banknote className="text-emerald-600" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.recordDebtPayment}</h2></div>
-            <DebtPaymentForm debts={activeDebts} accounts={cashLikeAccounts} locale={locale} />
+            <DebtPaymentForm debts={activeDebts} accounts={cashLikeAccounts} defaultAccountId={defaultAccountId} locale={locale} />
             {activeDebts.length === 0 || cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-amber-50 p-4 text-sm font-bold text-amber-800">{t.debtPaymentRequirement}</p> : null}
           </div>
         </div>
@@ -286,7 +289,7 @@ export default async function DebtsCardsPage() {
         </div>
         <div>
           <div className="mb-3 flex items-center gap-2"><Landmark className="text-blue-600" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.payCreditCardStatement}</h2></div>
-          <CardPaymentForm statements={openStatementOptions} accounts={cashLikeAccounts} locale={locale} />
+          <CardPaymentForm statements={openStatementOptions} accounts={cashLikeAccounts} defaultAccountId={defaultAccountId} locale={locale} />
           {openStatementOptions.length === 0 ? <p className="mt-3 rounded-2xl bg-amber-50 p-4 text-sm font-bold text-amber-800">{t.statementPaymentRequirement}</p> : null}
         </div>
       </section>

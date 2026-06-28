@@ -54,9 +54,14 @@ export function SettingsForm({ locale, currency, financialCycleStartDay, bonusMo
 
         <label className="grid gap-2 text-sm font-black text-ink">
           {t.currency}
-          <select name="currency" defaultValue={currency} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white">
+          {/* Currency is fixed to THB in this phase. Multi-currency formatting is out of scope until a later phase,
+              so this control is rendered read-only rather than faking a switch. The disabled select still shows the
+              value, and the hidden input keeps "THB" in the submitted form data. */}
+          <select name="currency" defaultValue={currency} disabled aria-readonly="true" className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-semibold text-muted outline-none transition">
             <option value="THB">THB</option>
           </select>
+          <input type="hidden" name="currency" value="THB" />
+          <span className="text-xs font-bold text-muted">{t.currencyFixedNote}</span>
         </label>
       </div>
 

@@ -1682,3 +1682,94 @@ Important Phase 9 files:
 - Offline fallback: `public/offline.html`
 - Root metadata/viewport: `src/app/layout.tsx`
 - Documentation: `README.md`
+
+## 72. Phase 9.1: Configurable Cycle, Default Account, and Settings i18n
+
+Phase 9.1 repairs two settings that were saved but not yet wired into behavior, and finishes Settings localization:
+
+- **Financial cycle start day now drives the cycle.** Previously the financial cycle was hardcoded to the 25th-to-24th window. The `profiles.financial_cycle_start_day` value now genuinely controls the cycle everywhere (dashboard, planning, transactions, debts/cards).
+- **Default account is now used.** `app_settings.default_account_id` now pre-selects the account in the transaction form and in the planning/debts-cards payment forms, when that account is present and active. The selection can still be changed.
+- **Settings page is fully localized** in Thai and English (private-access card, daily-use polish card, the three PWA info boxes, and the load-error prefix).
+- **Currency control** is rendered as fixed/read-only `THB`. Multi-currency formatting is intentionally out of scope until a later phase; the control no longer pretends to offer a switch.
+
+No new database migration is required. All columns (`profiles.financial_cycle_start_day`, `app_settings.default_account_id`) already exist.
+
+## 73. How the Configurable Financial Cycle Works
+
+Set the start day in **Settings / ตั้งค่า** → **Financial cycle start day / วันเริ่มรอบการเงิน** (allowed range 1–28, kept narrow to avoid short-month bugs in February).
+
+For a start day `D`:
+
+- The current cycle **starts** on day `D` of this month once today is on or after `D`; before `D`, it started on day `D` of the previous month.
+- The current cycle **ends** on day `(D - 1)` of the following month, at local noon.
+- Example, `D = 25` (the original behavior, unchanged): 25 Jul → 24 Aug.
+- Example, `D = 1`: a full calendar month, e.g. 1 Aug → 31 Aug.
+- Example, `D = 15`: 15 Aug → 14 Sep.
+
+Salary weekend handling is now relative to the configured start day, not a hardcoded 25th: if the start day lands on a Saturday it is treated as paid the Friday before, and on a Sunday the Friday two days before — even when that early payment falls in the previous month (which can happen for a start day of 1).
+
+The user's start day is read once per page/action from `profiles.financial_cycle_start_day` via the `getUserCycleStartDay` helper, which defaults to 25 and clamps to 1–28.
+
+## 74. Important: Changing the Start Day Is Not Retroactive
+
+Changing the financial cycle start day affects **new cycles going forward only**. It does **not** re-bucket historical records.
+
+- Existing transactions keep the `cycle_start_date` that was stored when they were created.
+- Existing budgets keep their stored `cycle_start_date`.
+- After changing the start day, new transactions and the dashboard/planning/debts-cards cycle windows use the new boundary, while past records remain in their original cycle buckets.
+
+If you want past records to match a new start day, edit those records directly; the app will not move them automatically.
+
+## 75. Local Verification Commands for Phase 9.1
+
+```powershell
+cd "D:\AI project\My_budget_project"
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
+
+All four pass for Phase 9.1.
+
+## 76. Browser Checks for Phase 9.1
+
+Start the app locally:
+
+```powershell
+cd "D:\AI project\My_budget_project"
+npm run dev
+```
+
+Then open `http://localhost:3000` and check:
+
+1. Log in.
+2. Open **Settings**. Confirm the Currency control shows `THB` as fixed/read-only with the "THB only" note.
+3. Confirm the **Private access** card, **Daily-use polish** card, and the three PWA info boxes are localized; switch language and confirm they translate.
+4. Set **Financial cycle start day** to `1` and save.
+5. Open **Dashboard**. Confirm the cycle date-range label shows the 1st through the end of the month.
+6. Open **Planning**. Confirm the budget cycle label/help text matches the 1st-to-end-of-month window, and that new budgets are created against that cycle.
+7. Add a new transaction dated inside the current month. Confirm it buckets into the 1st-start cycle (it appears in the planning/dashboard current cycle).
+8. Change the start day back to `25` and save. Confirm the dashboard/planning cycle returns exactly to the 25th–24th window.
+9. Confirm older transactions/budgets created under a different start day keep their original cycle bucket (not retroactively moved).
+10. In **Settings**, set a **Default account** and save.
+11. Open the **Transactions** form (new transaction). Confirm the source account is pre-selected to the default account, and that you can still change it.
+12. Open **Planning** payment forms (pay subscription / pay annual bill) and **Debts/Cards** payment forms (debt payment / card payment). Confirm the "Pay from" account is pre-selected to the default account when it is active and cash-like.
+
+## 77. Phase 9.1 Files Modified
+
+- Cycle logic + helper: `src/lib/finance/cycle.ts`
+- Cycle tests: `src/lib/finance/dashboard.test.ts`
+- Dashboard route: `src/app/(private)/dashboard/page.tsx`
+- Planning route: `src/app/(private)/planning/page.tsx`
+- Planning actions: `src/app/(private)/planning/actions.ts`
+- Transactions route: `src/app/(private)/transactions/page.tsx`
+- Transactions actions: `src/app/(private)/transactions/actions.ts`
+- Debts/Cards route: `src/app/(private)/debts-cards/page.tsx`
+- Transaction form (default account): `src/components/transactions/transaction-form.tsx`
+- Planning payment forms (default account): `src/components/planning/payment-workflow-forms.tsx`
+- Debts/Cards payment forms (default account): `src/components/debts-cards/payment-forms.tsx`
+- Settings page (i18n): `src/app/(private)/settings/page.tsx`
+- Settings form (fixed currency): `src/components/settings/settings-form.tsx`
+- i18n dictionary: `src/lib/i18n/dictionaries.ts`
+- Documentation: `README.md`

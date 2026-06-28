@@ -24,12 +24,14 @@ function ResultMessage({ state }: { state: TransactionActionState }) {
   return <p className={"rounded-2xl px-4 py-3 text-sm font-bold " + (state.status === "success" ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800")}>{state.message}</p>;
 }
 
-function AccountSelect({ accounts, locale }: { accounts: AccountOption[]; locale: Locale }) {
+function AccountSelect({ accounts, defaultAccountId, locale }: { accounts: AccountOption[]; defaultAccountId?: string | null; locale: Locale }) {
   const t = dictionaries[locale].debtsCards.form;
+  // Pre-select the user's default account when it is one of the available (active cash-like) accounts.
+  const preferredAccountId = defaultAccountId && accounts.some((account) => account.id === defaultAccountId) ? defaultAccountId : accounts[0]?.id ?? "";
   return (
     <label className="grid gap-2 text-sm font-black text-ink">
       {t.payFromAccount}
-      <select name="account_id" required defaultValue={accounts[0]?.id ?? ""} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60">
+      <select name="account_id" required defaultValue={preferredAccountId} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60">
         <option value="" disabled>{t.chooseAccount}</option>
         {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
       </select>
@@ -37,7 +39,7 @@ function AccountSelect({ accounts, locale }: { accounts: AccountOption[]; locale
   );
 }
 
-export function DebtPaymentForm({ debts, accounts, locale }: { debts: DebtOption[]; accounts: AccountOption[]; locale: Locale }) {
+export function DebtPaymentForm({ debts, accounts, defaultAccountId, locale }: { debts: DebtOption[]; accounts: AccountOption[]; defaultAccountId?: string | null; locale: Locale }) {
   const [state, formAction, isPending] = useActionState(saveTransaction, initialState);
   const t = dictionaries[locale].debtsCards.form;
   const common = dictionaries[locale].common;
@@ -54,7 +56,7 @@ export function DebtPaymentForm({ debts, accounts, locale }: { debts: DebtOption
             {debts.map((debt) => <option key={debt.id} value={debt.id}>{debt.name}</option>)}
           </select>
         </label>
-        <AccountSelect accounts={accounts} locale={locale} />
+        <AccountSelect accounts={accounts} defaultAccountId={defaultAccountId} locale={locale} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-black text-ink">
@@ -113,7 +115,7 @@ export function CardExpenseForm({ cards, locale }: { cards: CardOption[]; locale
   );
 }
 
-export function CardPaymentForm({ statements, accounts, locale }: { statements: StatementOption[]; accounts: AccountOption[]; locale: Locale }) {
+export function CardPaymentForm({ statements, accounts, defaultAccountId, locale }: { statements: StatementOption[]; accounts: AccountOption[]; defaultAccountId?: string | null; locale: Locale }) {
   const [state, formAction, isPending] = useActionState(saveTransaction, initialState);
   const t = dictionaries[locale].debtsCards.form;
   const common = dictionaries[locale].common;
@@ -130,7 +132,7 @@ export function CardPaymentForm({ statements, accounts, locale }: { statements: 
             {statements.map((statement) => <option key={statement.id} value={statement.id}>{statement.label}</option>)}
           </select>
         </label>
-        <AccountSelect accounts={accounts} locale={locale} />
+        <AccountSelect accounts={accounts} defaultAccountId={defaultAccountId} locale={locale} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-black text-ink">

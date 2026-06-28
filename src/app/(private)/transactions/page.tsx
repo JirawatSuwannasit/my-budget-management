@@ -30,7 +30,10 @@ function formatMoney(value: number | string) {
 
 export default async function TransactionsPage() {
   const supabase = await createClient();
-  const [accountsResult, categoriesResult, debtsResult, cardsResult, statementsResult, annualResult, subscriptionsResult, transactionsResult] = await Promise.all([
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  const [accountsResult, categoriesResult, debtsResult, cardsResult, statementsResult, annualResult, subscriptionsResult, transactionsResult, appSettingsResult] = await Promise.all([
     supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
     supabase.from("categories").select("id,name,kind,active").order("name"),
     supabase.from("debts").select("id,name,active").order("active", { ascending: false }).order("name"),
@@ -38,7 +41,8 @@ export default async function TransactionsPage() {
     supabase.from("credit_card_statements").select("id,card_id,due_date,statement_amount_due,paid_amount,remaining_payable,status").order("due_date", { ascending: true }),
     supabase.from("annual_expenses").select("id,name,active").order("name"),
     supabase.from("subscriptions").select("id,name,frequency,active").order("name"),
-    supabase.from("transactions").select("id,account_id,destination_account_id,category_id,type,amount,transaction_date,cycle_start_date,related_entity_id,notes,created_at").order("transaction_date", { ascending: false }).order("created_at", { ascending: false }).limit(100)
+    supabase.from("transactions").select("id,account_id,destination_account_id,category_id,type,amount,transaction_date,cycle_start_date,related_entity_id,notes,created_at").order("transaction_date", { ascending: false }).order("created_at", { ascending: false }).limit(100),
+    user ? supabase.from("app_settings").select("default_account_id").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null })
   ]);
 
   const accounts = (accountsResult.data ?? []) as AccountRow[];
@@ -59,6 +63,7 @@ export default async function TransactionsPage() {
     ...annualExpenses.filter((item) => item.active).map((item) => ({ id: item.id, label: item.name + " - annual expense", kind: "annual_expense" as const }))
   ];
   const accountName = new Map(accounts.map((account) => [account.id, account.name]));
+  const defaultAccountId = (appSettingsResult.data as { default_account_id: string | null } | null)?.default_account_id ?? null;
   const loadError = accountsResult.error ?? categoriesResult.error ?? debtsResult.error ?? cardsResult.error ?? statementsResult.error ?? annualResult.error ?? subscriptionsResult.error ?? transactionsResult.error;
 
   return (
@@ -80,7 +85,7 @@ export default async function TransactionsPage() {
       <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
         <div>
           <h2 className="mb-3 text-xl font-black text-ink">เพิ่มรายการ</h2>
-          <TransactionForm accounts={accounts} categories={categories} debts={debts} cards={cards} statements={statements} reserves={reserves} payables={payables} />
+          <TransactionForm accounts={accounts} categories={categories} debts={debts} cards={cards} statements={statements} reserves={reserves} payables={payables} defaultAccountId={defaultAccountId} />
         </div>
 
         <div className="grid gap-3">
