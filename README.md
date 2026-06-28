@@ -1773,3 +1773,79 @@ Then open `http://localhost:3000` and check:
 - Settings form (fixed currency): `src/components/settings/settings-form.tsx`
 - i18n dictionary: `src/lib/i18n/dictionaries.ts`
 - Documentation: `README.md`
+
+## 78. Phase 10: Reports & History
+
+Phase 10 adds a new **read-only** route, `/reports`, so the app answers "how have my finances trended over time", not just "how much can I use right now".
+
+- New private, RLS-scoped, locale-aware route at `/reports` (server components).
+- Added to navigation (sidebar + bottom bar) with a line-chart icon.
+- Fully localized in Thai and English (a new `reports` dictionary section).
+- **Read-only by design:** Reports never write data or change balances. No new database migration was needed, and **no chart library was added** — all charts are lightweight inline SVG / CSS bars to keep the bundle small and stay server-rendered.
+
+## 79. What /reports Shows
+
+1. **Cycle history** — for the most recent ~12 financial cycles (derived by grouping transactions on their stored `cycle_start_date`), each cycle shows income, normal expenses, investment transfers, debt paid, sinking-fund reserved, and net (income − expenses). The current cycle is always shown and highlighted.
+2. **Income vs expense trend** — a compact grouped-bar chart across the recent cycles.
+3. **Spending by category** — for a selected cycle (default = current), the top expense categories with each category's share of the cycle's total. Only active categories are counted (matching dashboard behavior); overflow categories are grouped into "Other". Switch cycles with the cycle chips (a `?cycle=YYYY-MM-DD` query param; no client JS required).
+4. **Debt payoff trajectory** — remaining balance over time, reconstructed from `debts` plus `debt_payments` (current remaining + payments made after each cycle), drawn as an inline SVG line chart.
+5. **Empty / loading / error states** consistent with the rest of the app.
+
+Each cycle's date window is derived from the cycle's own start date — end = (that start day − 1) of the following month — so historical cycles stay correct even if you changed the cycle start day later (Phase 9.1 is not retroactive).
+
+## 80. Data Sources and Reuse
+
+`/reports` reuses existing finance helpers rather than duplicating calculation logic:
+
+- `getUserCycleStartDay` / `getFinancialCycle` from `src/lib/finance/cycle.ts` for the configured cycle.
+- `loadDashboardRows` / `hasRealDashboardRows` from `src/lib/finance/dashboard-data.ts` for the same RLS-scoped Supabase rows the dashboard already loads.
+- A pure `buildReportsData` aggregator in `src/lib/finance/reports.ts`.
+
+For the current cycle, the reports figures match the dashboard: income and investment transfers use the same per-cycle grouping and the same active-category filter as `mapDashboardRowsToInput`, verified by a unit test.
+
+## 81. Local Verification Commands for Phase 10
+
+```powershell
+cd "D:\AI project\My_budget_project"
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
+
+All four pass for Phase 10 (37 unit tests, including 8 new `reports` tests).
+
+## 82. Browser Checks for Phase 10
+
+Start the app locally:
+
+```powershell
+cd "D:\AI project\My_budget_project"
+npm run dev
+```
+
+Then open `http://localhost:3000` and check:
+
+1. Log in.
+2. Open **Reports** from the sidebar (desktop) and the bottom navigation (mobile). Confirm the icon and label appear and the route loads.
+3. Confirm the page shows the read-only badge and note, and never offers any edit/save controls.
+4. Confirm the current cycle's income matches the Dashboard's "Cycle income" for the same cycle.
+5. Confirm the cycle history lists recent cycles with income, expenses, investment transfers, debt paid, sinking reserved, and net.
+6. Confirm the income-vs-expense trend bars render and scale sensibly.
+7. In **Spending by category**, click a different cycle chip and confirm the breakdown and total update (URL gains `?cycle=...`).
+8. Confirm only active categories appear and shares are shown as percentages.
+9. Confirm the debt payoff trajectory renders (or shows "No debt data yet" when there are no debts).
+10. Switch language between Thai and English and confirm every label on the page translates (no hardcoded English/Thai).
+11. With little or no data, confirm a clear empty state appears.
+12. At an Android-sized width, confirm there is no horizontal scrolling and the bottom navigation (now 8 items) is not clipped.
+
+## 83. Phase 10 Files Created or Modified
+
+- Reports route: `src/app/(private)/reports/page.tsx`
+- Reports loading state: `src/app/(private)/reports/loading.tsx`
+- Reports view (charts/UI): `src/components/reports/reports-view.tsx`
+- Reports aggregation logic: `src/lib/finance/reports.ts`
+- Reports tests: `src/lib/finance/reports.test.ts`
+- Navigation (added Reports item, 8-column mobile grid): `src/components/layout/app-shell.tsx`
+- i18n dictionary (nav + `reports` section, th/en): `src/lib/i18n/dictionaries.ts`
+- Documentation: `README.md`
