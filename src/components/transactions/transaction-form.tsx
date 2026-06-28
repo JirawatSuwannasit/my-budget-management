@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { saveTransaction, type TransactionActionState } from "@/app/(private)/transactions/actions";
 import type { AccountType, CategoryKind, TransactionType } from "@/lib/finance/types";
+import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 
 export type TransactionFormAccount = { id: string; name: string; type: AccountType; active: boolean };
 export type TransactionFormCategory = { id: string; name: string; kind: CategoryKind; active: boolean };
@@ -23,19 +24,20 @@ type Props = {
   payables: TransactionFormPayable[];
   transaction?: TransactionFormValue;
   defaultAccountId?: string | null;
+  locale: Locale;
   compact?: boolean;
 };
 
 const initialState: TransactionActionState = { status: "idle", message: "" };
-const transactionTypes: Array<{ value: TransactionType; label: string; helper: string }> = [
-  { value: "expense", label: "รายจ่าย", helper: "ลดเงินสด/บัญชีทันที" },
-  { value: "income", label: "รายรับ", helper: "เพิ่มเงินเข้าบัญชี" },
-  { value: "transfer", label: "โอนระหว่างบัญชี", helper: "ไม่ถือเป็นรายจ่าย" },
-  { value: "credit_card_expense", label: "ใช้บัตรเครดิต", helper: "เพิ่มหนี้บัตร ไม่ลดเงินสดทันที" },
-  { value: "credit_card_payment", label: "จ่ายบัตรเครดิต", helper: "ลดเงินสดและยอดค้างบัตร" },
-  { value: "debt_payment", label: "จ่ายหนี้", helper: "ลดเงินสดและยอดหนี้" },
-  { value: "investment_transfer", label: "โอนไปลงทุน", helper: "แยกจากรายจ่ายปกติ" },
-  { value: "sinking_fund_reserve", label: "กันเงินรายปี", helper: "กันเงินแบบ virtual ใน v1" }
+const transactionTypeOrder: TransactionType[] = [
+  "expense",
+  "income",
+  "transfer",
+  "credit_card_expense",
+  "credit_card_payment",
+  "debt_payment",
+  "investment_transfer",
+  "sinking_fund_reserve"
 ];
 
 function todayInput() {
@@ -50,8 +52,9 @@ function formatMoney(value: number | string) {
   return new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(Number(value));
 }
 
-export function TransactionForm({ accounts, categories, debts, cards, statements, reserves, payables, transaction, defaultAccountId, compact = false }: Props) {
+export function TransactionForm({ accounts, categories, debts, cards, statements, reserves, payables, transaction, defaultAccountId, locale, compact = false }: Props) {
   const [state, formAction, isPending] = useActionState(saveTransaction, initialState);
+  const t = dictionaries[locale].transactions;
   const [type, setType] = useState<TransactionType>(transaction?.type ?? "expense");
   const activeAccounts = accounts.filter((account) => account.active);
   const cashLikeAccounts = activeAccounts.filter((account) => account.type !== "investment");
@@ -68,29 +71,30 @@ export function TransactionForm({ accounts, categories, debts, cards, statements
   return (
     <form action={formAction} className="grid gap-4 rounded-panel border border-slate-200 bg-white p-4 shadow-card">
       {transaction?.id ? <input type="hidden" name="id" value={transaction.id} /> : null}
+      <input type="hidden" name="locale" value={locale} />
       <div className={compact ? "grid gap-4" : "grid gap-4 md:grid-cols-[1.1fr_0.9fr]"}>
         <label className="grid gap-2 text-sm font-black text-ink">
-          ประเภทรายการ
+          {t.form.type}
           <select name="type" value={type} onChange={(event) => setType(event.target.value as TransactionType)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white">
-            {transactionTypes.map((item) => <option key={item.value} value={item.value}>{item.label} - {item.helper}</option>)}
+            {transactionTypeOrder.map((value) => <option key={value} value={value}>{t.types[value]} - {t.typeHelpers[value]}</option>)}
           </select>
         </label>
         <label className="grid gap-2 text-sm font-black text-ink">
-          วันที่
+          {t.form.date}
           <input name="transaction_date" type="date" defaultValue={transaction?.transaction_date ?? todayInput()} required className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white" />
         </label>
       </div>
 
       <label className="grid gap-2 text-sm font-black text-ink">
-        จำนวนเงิน
+        {t.form.amount}
         <input name="amount" type="number" step="0.01" min="0.01" defaultValue={transaction?.amount ?? ""} placeholder="0.00" required className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white" />
       </label>
 
       {needsSourceAccount ? (
         <label className="grid gap-2 text-sm font-black text-ink">
-          บัญชีต้นทาง / บัญชีรับเงิน
+          {t.form.sourceAccount}
           <select name="account_id" defaultValue={defaultSourceAccountId} required className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white">
-            <option value="">เลือกบัญชี</option>
+            <option value="">{t.form.chooseAccount}</option>
             {sourceAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
           </select>
         </label>
@@ -98,9 +102,9 @@ export function TransactionForm({ accounts, categories, debts, cards, statements
 
       {needsDestination ? (
         <label className="grid gap-2 text-sm font-black text-ink">
-          บัญชีปลายทาง
+          {t.form.destinationAccount}
           <select name="destination_account_id" defaultValue={transaction?.destination_account_id ?? ""} required className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white">
-            <option value="">เลือกบัญชีปลายทาง</option>
+            <option value="">{t.form.chooseDestination}</option>
             {destinationAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
           </select>
         </label>
@@ -108,9 +112,9 @@ export function TransactionForm({ accounts, categories, debts, cards, statements
 
       {(type === "income" || type === "expense") && categoryOptions.length > 0 ? (
         <label className="grid gap-2 text-sm font-black text-ink">
-          หมวดหมู่
+          {t.form.category}
           <select name="category_id" defaultValue={transaction?.category_id ?? ""} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white">
-            <option value="">ไม่ระบุ</option>
+            <option value="">{t.form.none}</option>
             {categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
           </select>
         </label>
@@ -118,9 +122,9 @@ export function TransactionForm({ accounts, categories, debts, cards, statements
 
       {type === "expense" && payables.length > 0 ? (
         <label className="grid gap-2 text-sm font-black text-ink">
-          ผูกกับ subscription / ค่าใช้จ่ายรายปี
+          {t.form.linkPayable}
           <select name="expense_related_entity_id" defaultValue={selectedRelated} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white">
-            <option value="">ไม่ผูก ใช้เป็นรายจ่ายทั่วไป</option>
+            <option value="">{t.form.noLink}</option>
             {payables.map((item) => <option key={item.kind + item.id} value={item.id}>{item.label}</option>)}
           </select>
         </label>
@@ -128,9 +132,9 @@ export function TransactionForm({ accounts, categories, debts, cards, statements
 
       {type === "credit_card_expense" ? (
         <label className="grid gap-2 text-sm font-black text-ink">
-          บัตรเครดิต
+          {t.form.creditCard}
           <select name="credit_card_id" defaultValue={selectedRelated} required className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white">
-            <option value="">เลือกบัตรเครดิต</option>
+            <option value="">{t.form.chooseCreditCard}</option>
             {cards.filter((card) => card.active).map((card) => <option key={card.id} value={card.id}>{card.name}</option>)}
           </select>
         </label>
@@ -138,12 +142,12 @@ export function TransactionForm({ accounts, categories, debts, cards, statements
 
       {type === "credit_card_payment" ? (
         <label className="grid gap-2 text-sm font-black text-ink">
-          Statement ที่จ่าย
+          {t.form.statement}
           <select name="statement_id" defaultValue={selectedRelated} required className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white">
-            <option value="">เลือก statement</option>
+            <option value="">{t.form.chooseStatement}</option>
             {statements.filter((statement) => statement.status !== "paid" || Number(statement.remaining_payable) > 0).map((statement) => {
               const card = cards.find((item) => item.id === statement.card_id);
-              return <option key={statement.id} value={statement.id}>{card?.name ?? "Credit card"} due {statement.due_date} - ค้าง {formatMoney(statement.remaining_payable)}</option>;
+              return <option key={statement.id} value={statement.id}>{card?.name ?? t.form.creditCard} {t.due} {statement.due_date} - {t.outstandingShort} {formatMoney(statement.remaining_payable)}</option>;
             })}
           </select>
         </label>
@@ -151,9 +155,9 @@ export function TransactionForm({ accounts, categories, debts, cards, statements
 
       {type === "debt_payment" ? (
         <label className="grid gap-2 text-sm font-black text-ink">
-          หนี้ที่จ่าย
+          {t.form.debt}
           <select name="debt_id" defaultValue={selectedRelated} required className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white">
-            <option value="">เลือกหนี้</option>
+            <option value="">{t.form.chooseDebt}</option>
             {debts.filter((debt) => debt.active).map((debt) => <option key={debt.id} value={debt.id}>{debt.name}</option>)}
           </select>
         </label>
@@ -161,21 +165,21 @@ export function TransactionForm({ accounts, categories, debts, cards, statements
 
       {type === "sinking_fund_reserve" ? (
         <label className="grid gap-2 text-sm font-black text-ink">
-          กองเงิน / ค่าใช้จ่ายรายปี
+          {t.form.reserveEntity}
           <select name="reserve_entity_id" defaultValue={selectedRelated} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white">
-            <option value="">กันเงินทั่วไป</option>
+            <option value="">{t.form.generalReserve}</option>
             {reserves.map((reserve) => <option key={reserve.kind + reserve.id} value={reserve.id}>{reserve.label}</option>)}
           </select>
         </label>
       ) : null}
 
       <label className="grid gap-2 text-sm font-black text-ink">
-        หมายเหตุ
-        <textarea name="notes" defaultValue={transaction?.notes ?? ""} rows={2} placeholder="ไม่บังคับ" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white" />
+        {t.form.notes}
+        <textarea name="notes" defaultValue={transaction?.notes ?? ""} rows={2} placeholder={t.form.notesOptional} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white" />
       </label>
 
-      <button type="submit" disabled={isPending} className="rounded-2xl bg-primary px-5 py-3 text-sm font-black text-white shadow-card transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
-        {isPending ? "กำลังบันทึก..." : transaction?.id ? "บันทึกรายการ" : type === "expense" ? "เพิ่มรายจ่าย" : "เพิ่มรายการ"}
+      <button type="submit" disabled={isPending} className="min-h-12 rounded-2xl bg-primary px-5 py-3 text-sm font-black text-white shadow-card transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
+        {isPending ? dictionaries[locale].common.saving : transaction?.id ? t.form.save : type === "expense" ? t.form.addExpense : t.form.add}
       </button>
 
       {state.message ? <p className={"rounded-2xl px-4 py-3 text-sm font-bold " + (state.status === "success" ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800")}>{state.message}</p> : null}
