@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CreditCard, Landmark, LayoutDashboard, LineChart, ListChecks, Settings, Tag, WalletCards } from "lucide-react";
+import { BarChart3, BellRing, CreditCard, Landmark, LayoutDashboard, LineChart, ListChecks, Settings, Tag, WalletCards } from "lucide-react";
 import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/browser";
 
@@ -16,12 +16,13 @@ function getNavItems(locale: Locale) {
     { href: "/planning", label: nav.planning, short: nav.shortPlanning, icon: BarChart3 },
     { href: "/categories", label: nav.categories, short: nav.shortCategories, icon: Tag },
     { href: "/debts-cards", label: nav.debtsCards, short: nav.shortDebtsCards, icon: CreditCard },
+    { href: "/upcoming", label: nav.upcoming, short: nav.shortUpcoming, icon: BellRing },
     { href: "/reports", label: nav.reports, short: nav.shortReports, icon: LineChart },
     { href: "/settings", label: nav.settings, short: nav.shortSettings, icon: Settings }
   ];
 }
 
-export function AppShell({ children, userEmail, locale }: Readonly<{ children: ReactNode; userEmail: string; locale: Locale }>) {
+export function AppShell({ children, userEmail, locale, badges = {} }: Readonly<{ children: ReactNode; userEmail: string; locale: Locale; badges?: Record<string, number> }>) {
   const pathname = usePathname();
   const dictionary = dictionaries[locale];
   const navItems = getNavItems(locale);
@@ -53,10 +54,12 @@ export function AppShell({ children, userEmail, locale }: Readonly<{ children: R
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+              const badge = badges[item.href] ?? 0;
               return (
                 <Link key={item.href} href={item.href} className={"flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold transition " + (active ? "bg-primary text-white" : "text-muted hover:bg-primary/10 hover:text-primary")}>
                   <Icon size={18} aria-hidden="true" />
                   {item.label}
+                  {badge > 0 ? <span className={"ml-auto grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-xs font-black " + (active ? "bg-white text-primary" : "bg-rose-500 text-white")} aria-label={badge + " " + dictionary.upcoming.itemsSuffix}>{badge}</span> : null}
                 </Link>
               );
             })}
@@ -66,12 +69,14 @@ export function AppShell({ children, userEmail, locale }: Readonly<{ children: R
       </div>
 
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/94 px-3 pt-2 shadow-[0_-12px_30px_rgba(23,32,28,0.08)] backdrop-blur-xl lg:hidden">
-        <div className="mx-auto grid max-w-lg grid-cols-8 gap-1">
+        <div className="mx-auto grid max-w-lg grid-cols-9 gap-0.5">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            const badge = badges[item.href] ?? 0;
             return (
-              <Link key={item.href} href={item.href} className={"grid min-h-14 place-items-center rounded-2xl px-1 text-[0.62rem] font-black transition " + (active ? "bg-primary/10 text-primary" : "text-muted")}>
+              <Link key={item.href} href={item.href} className={"relative grid min-h-14 place-items-center rounded-2xl px-0.5 text-[0.58rem] font-black transition " + (active ? "bg-primary/10 text-primary" : "text-muted")}>
+                {badge > 0 ? <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-rose-500 px-1 text-[0.55rem] font-black text-white" aria-label={badge + " " + dictionary.upcoming.itemsSuffix}>{badge}</span> : null}
                 <Icon size={18} aria-hidden="true" />
                 <span>{item.short}</span>
               </Link>

@@ -21,6 +21,7 @@ export const dictionaries = {
       planning: "แผนเงิน",
       categories: "หมวดหมู่",
       debtsCards: "หนี้/บัตร",
+      upcoming: "ครบกำหนด",
       reports: "รายงาน",
       settings: "ตั้งค่า",
       shortDashboard: "หน้าหลัก",
@@ -29,6 +30,7 @@ export const dictionaries = {
       shortPlanning: "แผน",
       shortCategories: "หมวด",
       shortDebtsCards: "หนี้",
+      shortUpcoming: "เตือน",
       shortReports: "รายงาน",
       shortSettings: "ตั้งค่า",
       signOut: "ออกจากระบบ"
@@ -133,6 +135,34 @@ export const dictionaries = {
       remainingBalance: "ยอดหนี้คงเหลือ",
       noDebtData: "ยังไม่มีข้อมูลหนี้",
       noTrendData: "ยังไม่มีข้อมูลแนวโน้ม"
+    },
+    upcoming: {
+      phase: "Phase 11 reminders",
+      title: "ครบกำหนดและสิ่งที่ต้องทำ",
+      subtitle: "รวมรายการที่ต้องจ่ายหรือกันเงินในรอบนี้ เพื่อให้ไม่ต้องจำเอง ทั้งหมดเป็นแบบอ่านอย่างเดียว",
+      panelTitle: "ครบกำหนด / ต้องทำ",
+      readOnly: "อ่านอย่างเดียว",
+      readOnlyNote: "หน้านี้แสดงสิ่งที่ค้างอยู่ในรอบนี้เท่านั้น ไม่ได้ทำรายการจ่ายให้ กดที่รายการเพื่อไปทำในหน้าที่เกี่ยวข้อง",
+      loadError: "โหลดรายการครบกำหนดไม่สำเร็จ",
+      allCaughtUp: "จัดการครบทุกอย่างในรอบนี้แล้ว",
+      allCaughtUpHint: "ไม่มีบิล ค่าสมาชิก เงินกัน หรือหนี้ที่ค้างในรอบนี้",
+      viewAll: "ดูทั้งหมด",
+      itemsSuffix: "รายการ",
+      goToAction: "ไปจัดการ",
+      due: "ครบกำหนด",
+      noDueDate: "ไม่มีกำหนดวันที่",
+      urgency: {
+        overdue: "เลยกำหนด",
+        "due-soon": "ใกล้ครบกำหนด",
+        pending: "ค้างในรอบนี้"
+      },
+      types: {
+        card_statement: "ยอดบัตรเครดิต",
+        annual_bill: "บิลรายปี",
+        subscription: "ค่าสมาชิกรายเดือน",
+        sinking_fund: "เงินกันรายเดือน",
+        debt: "ชำระหนี้"
+      }
     },
     categories: {
       phase: "Phase 8 categories",
@@ -477,6 +507,7 @@ export const dictionaries = {
       planning: "Planning",
       categories: "Categories",
       debtsCards: "Debts/Cards",
+      upcoming: "Upcoming",
       reports: "Reports",
       settings: "Settings",
       shortDashboard: "Home",
@@ -485,6 +516,7 @@ export const dictionaries = {
       shortPlanning: "Plan",
       shortCategories: "Cat",
       shortDebtsCards: "Debt",
+      shortUpcoming: "Due",
       shortReports: "Reports",
       shortSettings: "Settings",
       signOut: "Log out"
@@ -589,6 +621,34 @@ export const dictionaries = {
       remainingBalance: "Remaining balance",
       noDebtData: "No debt data yet",
       noTrendData: "No trend data yet"
+    },
+    upcoming: {
+      phase: "Phase 11 reminders",
+      title: "Due & to-do",
+      subtitle: "Everything you still need to pay or reserve this cycle, so you do not have to remember it. Read-only.",
+      panelTitle: "Due & to-do",
+      readOnly: "Read-only",
+      readOnlyNote: "This page only shows what is outstanding this cycle. It does not make any payments — tap an item to act on the related page.",
+      loadError: "Could not load reminders",
+      allCaughtUp: "All caught up this cycle",
+      allCaughtUpHint: "No bills, subscriptions, reserves, or debt payments are outstanding this cycle.",
+      viewAll: "View all",
+      itemsSuffix: "items",
+      goToAction: "Go to action",
+      due: "Due",
+      noDueDate: "No due date",
+      urgency: {
+        overdue: "Overdue",
+        "due-soon": "Due soon",
+        pending: "Pending this cycle"
+      },
+      types: {
+        card_statement: "Credit card statement",
+        annual_bill: "Annual bill",
+        subscription: "Monthly subscription",
+        sinking_fund: "Monthly reserve",
+        debt: "Debt payment"
+      }
     },
     categories: {
       phase: "Phase 8 categories",
