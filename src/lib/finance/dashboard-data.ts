@@ -57,6 +57,7 @@ type AnnualExpenseRow = {
   name: string;
   annual_amount: number | string | null;
   monthly_reserve: number | string | null;
+  due_date?: string | null;
   active: boolean | null;
 };
 

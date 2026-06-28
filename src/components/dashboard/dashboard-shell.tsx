@@ -3,6 +3,8 @@ import Link from "next/link";
 import { ArrowDownLeft, ArrowUpRight, Banknote, CalendarDays, CircleDollarSign, CreditCard, Landmark, PiggyBank, Plus, ShieldCheck, TrendingUp, WalletCards } from "lucide-react";
 import type { FinancialCycle } from "@/lib/finance/cycle";
 import type { DashboardInput, DashboardSnapshot } from "@/lib/finance/types";
+import type { UpcomingSummary } from "@/lib/finance/upcoming";
+import { UpcomingPanel } from "@/components/upcoming/upcoming-ui";
 import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 
 type DashboardShellProps = {
@@ -10,6 +12,7 @@ type DashboardShellProps = {
   salaryPaymentDate: Date;
   input: DashboardInput;
   snapshot: DashboardSnapshot;
+  upcoming: UpcomingSummary;
   source: "supabase" | "demo";
   status: "ready" | "empty" | "error";
   notices: string[];
@@ -69,7 +72,7 @@ function ProgressRow({ label, used, total, detail, color = "bg-primary" }: { lab
   );
 }
 
-export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, source, status, notices, errorMessage, locale }: DashboardShellProps) {
+export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, upcoming, source, status, notices, errorMessage, locale }: DashboardShellProps) {
   const t = dictionaries[locale].dashboard;
   const dailyAvailable = cycle.daysRemaining > 0 ? snapshot.realAvailableMoney / cycle.daysRemaining : snapshot.realAvailableMoney;
   const sourceLabel = source === "supabase" ? t.sourceSupabase : t.sourceDemo;
@@ -116,6 +119,8 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, sour
         <StatCard label={t.investmentTracking} value={formatMoney(snapshot.investmentTransfersThisCycle)} icon={TrendingUp} tone="neutral" />
         <StatCard label={t.dailyAvailable} value={formatMoney(dailyAvailable)} icon={CircleDollarSign} tone="success" />
       </section>
+
+      <UpcomingPanel summary={upcoming} locale={locale} />
 
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-panel border border-slate-200 bg-white p-4 shadow-card md:p-5">

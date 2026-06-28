@@ -2,6 +2,7 @@ import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { calculateDashboardSnapshot } from "@/lib/finance/dashboard";
 import { getFinancialCycle, getSalaryPaymentForCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
 import { hasRealDashboardRows, loadDashboardRows, mapDashboardRowsToInput, type DashboardDataSource } from "@/lib/finance/dashboard-data";
+import { buildUpcomingItems, emptyUpcomingSummary, type UpcomingSummary } from "@/lib/finance/upcoming";
 import { isLocale } from "@/lib/i18n/dictionaries";
 import { sampleDashboardInput } from "@/lib/finance/sample-data";
 import { createClient } from "@/lib/supabase/server";
@@ -21,9 +22,11 @@ export default async function DashboardPage() {
   let notices: string[] = [];
   let errorMessage: string | undefined;
   let dashboardInput = sampleDashboardInput;
+  let upcoming: UpcomingSummary = emptyUpcomingSummary();
 
   try {
     const rows = await loadDashboardRows(supabase);
+    upcoming = buildUpcomingItems({ rows, cycleStart: cycle.start, cycleEnd: cycle.end, today });
 
     if (hasRealDashboardRows(rows)) {
       dashboardInput = mapDashboardRowsToInput(rows, cycle.start, cycle.end);
@@ -48,6 +51,7 @@ export default async function DashboardPage() {
       salaryPaymentDate={salaryPayment}
       input={dashboardInput}
       snapshot={snapshot}
+      upcoming={upcoming}
       source={source}
       status={status}
       notices={notices}

@@ -1849,3 +1849,101 @@ Then open `http://localhost:3000` and check:
 - Navigation (added Reports item, 8-column mobile grid): `src/components/layout/app-shell.tsx`
 - i18n dictionary (nav + `reports` section, th/en): `src/lib/i18n/dictionaries.ts`
 - Documentation: `README.md`
+
+## 84. Phase 11: Due & To-do Reminders (in-app, read-only)
+
+Phase 11 surfaces what is **due or not-yet-done this cycle** so you stop having to remember it manually. It is **read-only**: it never makes payments or changes balances — it only points you to the page where you can act.
+
+What it surfaces (for the current cycle, respecting your configured start day and locale):
+
+- **Credit card statements** still owed (status unpaid/partial, remaining > 0), classified by due date.
+- **Annual bills** whose `annual_expenses.due_date` is overdue or approaching, not yet handled this cycle.
+- **Active monthly subscriptions** not yet paid this cycle (due date derived from the billing day within the cycle window).
+- **Active sinking funds / yearly subscriptions** not yet reserved this cycle (the monthly reserve to-do).
+- **Active debts** whose monthly payment has not been fully recorded this cycle (shows the remaining planned amount).
+
+Each item has a title, type, amount, optional due date, and an **urgency** computed from today vs the due date:
+
+- `overdue` — due date is before today.
+- `due-soon` — due within the next **`DUE_SOON_DAYS`** days.
+- `pending` — outstanding this cycle but not date-urgent (or has no due date).
+
+Where it appears:
+
+- **Dashboard** — a compact "Due & to-do" panel at the top (above the breakdown) showing the most urgent items with a count, or "All caught up this cycle" when nothing is outstanding.
+- **`/upcoming`** — a dedicated page listing all items grouped by urgency, each linking to Planning or Debts/Cards to act.
+- **Navigation badges** — Upcoming, Planning, and Debts/Cards show a count of urgent (overdue + due-soon) items.
+
+### Tuning the "due soon" window
+
+The window is a single named constant in `src/lib/finance/upcoming.ts`:
+
+```ts
+export const DUE_SOON_DAYS = 7;
+```
+
+Change that one value to make "due soon" wider or narrower.
+
+### Reuse and constraints
+
+- Reuses `getUserCycleStartDay` / `getFinancialCycle` and the same RLS-scoped `loadDashboardRows` the dashboard uses; the "handled this cycle" check mirrors the dashboard's per-cycle linkage so the panel clears in step with the dashboard.
+- Read-only; RLS only; no service-role key in frontend code. **No new database migration** — all needed fields already exist (`credit_card_statements.due_date`/`status`/`remaining_payable`, `annual_expenses.due_date`, `subscriptions.billing_day`, `debts.monthly_payment`, `debt_payments.paid_date`, and the `transactions.related_entity_id` + `cycle_start_date` links).
+
+### Future work (NOT built in Phase 11): real push notifications
+
+This phase is **in-app only**. Real web push / background notifications are intentionally out of scope because they require additional infrastructure:
+
+- a service worker `push` event handler (the current `public/sw.js` only does offline caching),
+- VAPID keys and a `PushSubscription` stored per device,
+- a server endpoint to save subscriptions and a scheduled function (e.g. a cron/Edge Function) to evaluate "due soon" items and send notifications,
+- user permission prompting and per-user notification preferences.
+
+If we enable it later, propose the infra (VAPID keys, a `push_subscriptions` table, a scheduled sender) before implementing — it would be the first feature in this app that needs a background job and a new table.
+
+## 85. Local Verification Commands for Phase 11
+
+```powershell
+cd "D:\AI project\My_budget_project"
+npm test
+npm run typecheck
+npm run lint
+npm run build
+```
+
+All four pass for Phase 11 (47 unit tests, including 10 new `upcoming` tests covering overdue vs due-soon vs pending and "all caught up").
+
+## 86. Browser Checks for Phase 11
+
+Start the app locally:
+
+```powershell
+cd "D:\AI project\My_budget_project"
+npm run dev
+```
+
+Then open `http://localhost:3000` and check:
+
+1. Log in.
+2. On the **Dashboard**, confirm the "Due & to-do" panel appears at the top with a count and the most urgent items.
+3. With everything for the cycle paid/reserved, confirm the panel shows "All caught up this cycle".
+4. Add an unpaid monthly subscription / an unreserved sinking fund / an unpaid debt this cycle and confirm matching items appear; record the payment/reserve and confirm they disappear.
+5. Confirm an unpaid credit card statement with a past due date shows as "Overdue", one due within 7 days as "Due soon", and one due later as "Pending".
+6. Open **Upcoming** from the navigation; confirm items are grouped by urgency and each links to Planning or Debts/Cards.
+7. Confirm the Upcoming / Planning / Debts/Cards nav items show a red badge with the urgent count, and that it clears as you handle items.
+8. Switch language between Thai and English and confirm the panel, page, urgency labels, and type labels are all translated (no hardcoded strings).
+9. Change the financial cycle start day in Settings and confirm the due/to-do items recompute for the new cycle window.
+10. At an Android-sized width, confirm no horizontal scrolling and the bottom navigation (now 9 items) is not clipped.
+
+## 87. Phase 11 Files Created or Modified
+
+- Upcoming logic (pure): `src/lib/finance/upcoming.ts`
+- Upcoming tests: `src/lib/finance/upcoming.test.ts`
+- Upcoming server loader: `src/lib/finance/upcoming-data.ts`
+- Upcoming UI (dashboard panel + full list): `src/components/upcoming/upcoming-ui.tsx`
+- Upcoming route + loading: `src/app/(private)/upcoming/page.tsx`, `src/app/(private)/upcoming/loading.tsx`
+- Dashboard panel wiring: `src/components/dashboard/dashboard-shell.tsx`, `src/app/(private)/dashboard/page.tsx`
+- Navigation badges + Upcoming item (9-column mobile grid): `src/components/layout/app-shell.tsx`
+- Private layout (badge counts): `src/app/(private)/layout.tsx`
+- Annual expense row `due_date` exposed: `src/lib/finance/dashboard-data.ts`
+- i18n dictionary (nav + `upcoming` section, th/en): `src/lib/i18n/dictionaries.ts`
+- Documentation: `README.md`
