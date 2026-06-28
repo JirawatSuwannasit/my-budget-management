@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getFinancialCycle } from "@/lib/finance/cycle";
+import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
 import type { CategoryKind } from "@/lib/finance/types";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/server";
@@ -108,7 +108,8 @@ export async function saveBudget(_previousState: PlanningActionState, formData: 
     const categoryName = textValue(formData, "category_name") ?? label;
     const categoryId = await getOrCreateCategory(supabase, userId, categoryName, "expense");
     const active = formData.get("active") === "on";
-    const cycleStartDate = textValue(formData, "cycle_start_date") ?? toDateInput(getFinancialCycle(todayAtNoon()).start);
+    const startDay = await getUserCycleStartDay(supabase, userId);
+    const cycleStartDate = textValue(formData, "cycle_start_date") ?? toDateInput(getFinancialCycle(todayAtNoon(), startDay).start);
 
     if (!label) throw new Error(messages.budgetNameRequired);
 

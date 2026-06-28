@@ -1,6 +1,6 @@
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { calculateDashboardSnapshot } from "@/lib/finance/dashboard";
-import { getFinancialCycle, getSalaryPaymentForCycle } from "@/lib/finance/cycle";
+import { getFinancialCycle, getSalaryPaymentForCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
 import { hasRealDashboardRows, loadDashboardRows, mapDashboardRowsToInput, type DashboardDataSource } from "@/lib/finance/dashboard-data";
 import { isLocale } from "@/lib/i18n/dictionaries";
 import { sampleDashboardInput } from "@/lib/finance/sample-data";
@@ -8,12 +8,13 @@ import { createClient } from "@/lib/supabase/server";
 
 export default async function DashboardPage() {
   const today = new Date();
-  const cycle = getFinancialCycle(today);
-  const salaryPayment = getSalaryPaymentForCycle(cycle.start);
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = user ? await supabase.from("profiles").select("locale").eq("user_id", user.id).maybeSingle() : { data: null };
   const locale = isLocale(profile?.locale) ? profile.locale : "th";
+  const startDay = user ? await getUserCycleStartDay(supabase, user.id) : undefined;
+  const cycle = getFinancialCycle(today, startDay);
+  const salaryPayment = getSalaryPaymentForCycle(cycle.start);
 
   let source: DashboardDataSource = "demo";
   let status: "ready" | "empty" | "error" = "empty";

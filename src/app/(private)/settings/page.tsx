@@ -53,7 +53,7 @@ export default async function SettingsPage() {
         </div>
       </section>
 
-      {loadError ? <p className="rounded-panel border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-800">Could not load settings: {loadError.message}</p> : null}
+      {loadError ? <p className="rounded-panel border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-800">{t.loadErrorPrefix} {loadError.message}</p> : null}
 
       <section className="grid gap-4 xl:grid-cols-[1fr_0.85fr]">
         <div>
@@ -79,9 +79,9 @@ export default async function SettingsPage() {
             </div>
             <p className="text-sm font-semibold text-muted">{t.pwaText}</p>
             <div className="mt-4 grid gap-2 text-sm font-bold text-muted">
-              <p className="rounded-2xl bg-slate-50 p-3">Manifest: My Budget Management / My Budget</p>
-              <p className="rounded-2xl bg-slate-50 p-3">Theme: #087f8c, portrait mobile, standalone display</p>
-              <p className="rounded-2xl bg-slate-50 p-3">Offline fallback: basic cached page for temporary connection loss</p>
+              <p className="rounded-2xl bg-slate-50 p-3">{t.pwaManifest}</p>
+              <p className="rounded-2xl bg-slate-50 p-3">{t.pwaTheme}</p>
+              <p className="rounded-2xl bg-slate-50 p-3">{t.pwaOffline}</p>
             </div>
           </article>
 
@@ -100,9 +100,9 @@ export default async function SettingsPage() {
           <article className="rounded-panel border border-slate-200 bg-white p-5 shadow-card">
             <div className="mb-3 flex items-center gap-2">
               <ShieldCheck className="text-primary" size={20} aria-hidden="true" />
-              <h2 className="text-xl font-black text-ink">Private access</h2>
+              <h2 className="text-xl font-black text-ink">{t.privateAccessTitle}</h2>
             </div>
-            <p className="mb-4 text-sm font-semibold text-muted">All finance pages stay behind Supabase login. Use logout to confirm protected routes return to the login page.</p>
+            <p className="mb-4 text-sm font-semibold text-muted">{t.privateAccessText}</p>
             <div className="flex items-center gap-3">
               <LogOut className="text-rose-600" size={20} aria-hidden="true" />
               <LogoutButton label={t.logout} />
@@ -112,9 +112,9 @@ export default async function SettingsPage() {
           <article className="rounded-panel border border-slate-200 bg-white p-5 shadow-card">
             <div className="mb-3 flex items-center gap-2">
               <WalletCards className="text-primary" size={20} aria-hidden="true" />
-              <h2 className="text-xl font-black text-ink">Daily-use polish</h2>
+              <h2 className="text-xl font-black text-ink">{t.dailyPolishTitle}</h2>
             </div>
-            <p className="text-sm font-semibold text-muted">Mobile navigation uses large tap targets, cards avoid fixed wide layouts, and THB formatting remains consistent across finance summaries.</p>
+            <p className="text-sm font-semibold text-muted">{t.dailyPolishText}</p>
           </article>
         </div>
       </section>

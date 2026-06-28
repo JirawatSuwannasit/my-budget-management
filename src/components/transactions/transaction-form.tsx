@@ -22,6 +22,7 @@ type Props = {
   reserves: TransactionFormReserve[];
   payables: TransactionFormPayable[];
   transaction?: TransactionFormValue;
+  defaultAccountId?: string | null;
   compact?: boolean;
 };
 
@@ -49,7 +50,7 @@ function formatMoney(value: number | string) {
   return new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(Number(value));
 }
 
-export function TransactionForm({ accounts, categories, debts, cards, statements, reserves, payables, transaction, compact = false }: Props) {
+export function TransactionForm({ accounts, categories, debts, cards, statements, reserves, payables, transaction, defaultAccountId, compact = false }: Props) {
   const [state, formAction, isPending] = useActionState(saveTransaction, initialState);
   const [type, setType] = useState<TransactionType>(transaction?.type ?? "expense");
   const activeAccounts = accounts.filter((account) => account.active);
@@ -61,6 +62,8 @@ export function TransactionForm({ accounts, categories, debts, cards, statements
   const destinationAccounts = type === "investment_transfer" ? investmentAccounts : activeAccounts;
   const categoryOptions = useMemo(() => categories.filter((category) => category.active && (type === "income" ? category.kind === "income" : category.kind === "expense")), [categories, type]);
   const selectedRelated = transaction?.related_entity_id ?? "";
+  // For a new transaction, pre-select the user's default account when it is an available source account.
+  const defaultSourceAccountId = transaction?.account_id ?? (defaultAccountId && sourceAccounts.some((account) => account.id === defaultAccountId) ? defaultAccountId : "");
 
   return (
     <form action={formAction} className="grid gap-4 rounded-panel border border-slate-200 bg-white p-4 shadow-card">
@@ -86,7 +89,7 @@ export function TransactionForm({ accounts, categories, debts, cards, statements
       {needsSourceAccount ? (
         <label className="grid gap-2 text-sm font-black text-ink">
           บัญชีต้นทาง / บัญชีรับเงิน
-          <select name="account_id" defaultValue={transaction?.account_id ?? ""} required className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white">
+          <select name="account_id" defaultValue={defaultSourceAccountId} required className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white">
             <option value="">เลือกบัญชี</option>
             {sourceAccounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
           </select>

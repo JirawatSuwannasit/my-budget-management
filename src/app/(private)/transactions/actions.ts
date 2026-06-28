@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getFinancialCycle } from "@/lib/finance/cycle";
+import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
 import { getAccountBalanceDeltas, getReverseAccountBalanceDeltas } from "@/lib/finance/transaction-effects";
 import type { TransactionType } from "@/lib/finance/types";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
@@ -87,11 +87,11 @@ async function updateDebtRemaining(supabase: SupabaseServer, userId: string, deb
   const { error: updateError } = await supabase.from("debts").update({ remaining_balance: remainingBalance }).eq("id", debtId).eq("user_id", userId);
   if (updateError) throw new Error(updateError.message);
 }
-function buildPayload(formData: FormData, userId: string, messages: TransactionMessages) {
+function buildPayload(formData: FormData, userId: string, messages: TransactionMessages, startDay: number) {
   const type = parseType(formData.get("type"), messages);
   const amount = parseAmount(formData.get("amount"), messages);
   const transactionDate = String(formData.get("transaction_date") ?? "");
-  const cycleStart = getFinancialCycle(parseLocalDate(transactionDate, messages)).start;
+  const cycleStart = getFinancialCycle(parseLocalDate(transactionDate, messages), startDay).start;
   const accountId = textValue(formData, "account_id");
   const rawDestinationAccountId = textValue(formData, "destination_account_id");
   const creditCardId = textValue(formData, "credit_card_id");
@@ -174,8 +174,9 @@ export async function saveTransaction(_previousState: TransactionActionState, fo
   const messages = getMessages(formData);
   try {
     const { supabase, userId } = await getUserId(messages);
+    const startDay = await getUserCycleStartDay(supabase, userId);
     const id = String(formData.get("id") ?? "").trim();
-    const payload = buildPayload(formData, userId, messages);
+    const payload = buildPayload(formData, userId, messages, startDay);
     if (id) {
       const { data: existing, error: existingError } = await supabase.from("transactions").select("*").eq("id", id).eq("user_id", userId).single();
       if (existingError) throw new Error(existingError.message);
