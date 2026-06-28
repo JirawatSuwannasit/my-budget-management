@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CreditCard, Landmark, LayoutDashboard, ListChecks, Settings, Tag, WalletCards } from "lucide-react";
+import { BarChart3, CreditCard, Landmark, LayoutDashboard, LineChart, ListChecks, Settings, Tag, WalletCards } from "lucide-react";
 import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/browser";
 
@@ -16,6 +16,7 @@ function getNavItems(locale: Locale) {
     { href: "/planning", label: nav.planning, short: nav.shortPlanning, icon: BarChart3 },
     { href: "/categories", label: nav.categories, short: nav.shortCategories, icon: Tag },
     { href: "/debts-cards", label: nav.debtsCards, short: nav.shortDebtsCards, icon: CreditCard },
+    { href: "/reports", label: nav.reports, short: nav.shortReports, icon: LineChart },
     { href: "/settings", label: nav.settings, short: nav.shortSettings, icon: Settings }
   ];
 }
@@ -65,7 +66,7 @@ export function AppShell({ children, userEmail, locale }: Readonly<{ children: R
       </div>
 
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/94 px-3 pt-2 shadow-[0_-12px_30px_rgba(23,32,28,0.08)] backdrop-blur-xl lg:hidden">
-        <div className="mx-auto grid max-w-lg grid-cols-7 gap-1">
+        <div className="mx-auto grid max-w-lg grid-cols-8 gap-1">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
