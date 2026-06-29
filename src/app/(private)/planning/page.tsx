@@ -15,6 +15,7 @@ type AnnualExpenseRow = { id: string; category_id: string | null; name: string; 
 type CategoryRow = { id: string; name: string; kind: CategoryKind; active: boolean };
 type TransactionRow = { id: string; category_id: string | null; type: string; amount: number | string; cycle_start_date: string; related_entity_id: string | null };
 type AccountRow = { id: string; name: string; type: string; active: boolean };
+type CardRow = { id: string; name: string; active: boolean };
 
 function toNumber(value: number | string | null | undefined) {
   const numberValue = Number(value ?? 0);
@@ -67,7 +68,7 @@ export default async function PlanningPage() {
   const startDay = user ? await getUserCycleStartDay(supabase, user.id) : undefined;
   const cycle = getFinancialCycle(new Date(), startDay);
   const cycleStartDate = toDateInput(cycle.start);
-  const [profileResult, accountsResult, budgetsResult, subscriptionsResult, annualResult, categoriesResult, transactionsResult, appSettingsResult] = await Promise.all([
+  const [profileResult, accountsResult, budgetsResult, subscriptionsResult, annualResult, categoriesResult, transactionsResult, cardsResult, appSettingsResult] = await Promise.all([
     user ? supabase.from("profiles").select("locale").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
     supabase.from("budgets").select("id,category_id,label,amount,cycle_start_date,active").eq("cycle_start_date", cycleStartDate).order("active", { ascending: false }).order("label"),
@@ -75,6 +76,7 @@ export default async function PlanningPage() {
     supabase.from("annual_expenses").select("id,category_id,name,annual_amount,monthly_reserve,due_date,reserve_account_id,active").order("active", { ascending: false }).order("name"),
     supabase.from("categories").select("id,name,kind,active").order("name"),
     supabase.from("transactions").select("id,category_id,type,amount,cycle_start_date,related_entity_id").eq("cycle_start_date", cycleStartDate),
+    supabase.from("credit_cards").select("id,name,active").order("active", { ascending: false }).order("name"),
     user ? supabase.from("app_settings").select("default_account_id").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null })
   ]);
 
@@ -90,10 +92,11 @@ export default async function PlanningPage() {
   const categoryNameById = new Map(categories.map((category) => [category.id, category.name]));
   const accountNameById = new Map(accounts.map((account) => [account.id, account.name]));
   const defaultAccountId = (appSettingsResult.data as { default_account_id: string | null } | null)?.default_account_id ?? null;
-  const loadError = profileResult.error ?? accountsResult.error ?? budgetsResult.error ?? subscriptionsResult.error ?? annualResult.error ?? categoriesResult.error ?? transactionsResult.error;
+  const loadError = profileResult.error ?? accountsResult.error ?? budgetsResult.error ?? subscriptionsResult.error ?? annualResult.error ?? categoriesResult.error ?? transactionsResult.error ?? cardsResult.error;
   const expenseTransactions = transactions.filter((transaction) => transaction.type === "expense");
   const reserveTransactions = transactions.filter((transaction) => transaction.type === "sinking_fund_reserve");
   const cashLikeAccounts = accounts.filter((account) => account.active && account.type !== "investment");
+  const activeCards = ((cardsResult.data ?? []) as CardRow[]).filter((card) => card.active).map((card) => ({ id: card.id, name: card.name }));
   const linkedThisCycle = (id: string) => transactions.some((transaction) => transaction.related_entity_id === id);
   const paidThisCycle = (id: string) => expenseTransactions.some((transaction) => transaction.related_entity_id === id);
   const reservedThisCycle = (id: string) => reserveTransactions.some((transaction) => transaction.related_entity_id === id);
@@ -235,7 +238,7 @@ export default async function PlanningPage() {
                 {subscription.active ? (
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
                     {subscription.frequency === "yearly" ? <ReserveSubscriptionForm subscriptionId={subscription.id} amount={reserveMonthly} locale={locale} /> : null}
-                    <PaySubscriptionForm subscriptionId={subscription.id} categoryId={subscription.category_id} amount={toNumber(subscription.price)} accounts={cashLikeAccounts} defaultAccountId={defaultAccountId} frequency={subscription.frequency} locale={locale} />
+                    <PaySubscriptionForm subscriptionId={subscription.id} categoryId={subscription.category_id} amount={toNumber(subscription.price)} accounts={cashLikeAccounts} creditCards={activeCards} defaultAccountId={defaultAccountId} frequency={subscription.frequency} locale={locale} />
                   </div>
                 ) : null}
                 {subscription.active && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-warning/10 p-3 text-sm font-bold text-warning">{t.addCashLikeAccountSubscription}</p> : null}

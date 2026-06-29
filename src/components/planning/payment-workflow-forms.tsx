@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { saveTransaction, type TransactionActionState } from "@/app/(private)/transactions/actions";
 import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 
 export type PlanningAccountOption = { id: string; name: string; type: string; active: boolean };
+export type PlanningCardOption = { id: string; name: string };
 
 const initialState: TransactionActionState = { status: "idle", message: "" };
 
@@ -41,6 +42,7 @@ export function PaySubscriptionForm({
   categoryId,
   amount,
   accounts,
+  creditCards,
   defaultAccountId,
   frequency,
   locale
@@ -49,6 +51,7 @@ export function PaySubscriptionForm({
   categoryId: string | null;
   amount: number;
   accounts: PlanningAccountOption[];
+  creditCards: PlanningCardOption[];
   defaultAccountId?: string | null;
   frequency: "monthly" | "yearly";
   locale: Locale;
@@ -57,22 +60,54 @@ export function PaySubscriptionForm({
   const t = dictionaries[locale].planning.payment;
   const common = dictionaries[locale].common;
 
+  // The payment source can be a cash-like account ("account:<id>") or a credit
+  // card ("card:<id>"). Picking an account records an `expense` (deducts the
+  // account); picking a card records a `credit_card_expense` (adds to the card's
+  // statement, no cash deducted).
+  const preferredAccountId = defaultAccountId && accounts.some((account) => account.id === defaultAccountId) ? defaultAccountId : accounts[0]?.id;
+  const defaultSource = preferredAccountId ? "account:" + preferredAccountId : creditCards[0] ? "card:" + creditCards[0].id : "";
+  const [source, setSource] = useState(defaultSource);
+  const [kind, sourceId] = source ? (source.split(":") as ["account" | "card", string]) : ["", ""];
+  const isCard = kind === "card";
+  const noSources = accounts.length === 0 && creditCards.length === 0;
+
+  // KNOWN v1 LIMITATION: paying with a card creates a credit_card_expense whose
+  // related_entity_id is the card id (not the subscription), so the subscription's
+  // "paid this cycle" badge will NOT light up for card payments. Intentionally not
+  // hacked this round.
   return (
     <form action={formAction} className="grid gap-3 rounded-2xl border border-line bg-elevated p-3">
       <input type="hidden" name="locale" value={locale} />
-      <input type="hidden" name="type" value="expense" />
+      <input type="hidden" name="type" value={isCard ? "credit_card_expense" : "expense"} />
       <input type="hidden" name="amount" value={amount} />
       <input type="hidden" name="category_id" value={categoryId ?? ""} />
       <input type="hidden" name="expense_related_entity_id" value={subscriptionId} />
+      {isCard ? <input type="hidden" name="credit_card_id" value={sourceId} /> : <input type="hidden" name="account_id" value={sourceId} />}
       <input type="hidden" name="notes" value={frequency === "yearly" ? "Annual subscription paid from planning page" : "Monthly subscription paid from planning page"} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <AccountSelect accounts={accounts} defaultAccountId={defaultAccountId} locale={locale} />
+        <label className="grid gap-2 text-xs font-black text-ink">
+          {t.paymentSource}
+          <select value={source} onChange={(event) => setSource(event.target.value)} required disabled={noSources} className="rounded-2xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60 disabled:cursor-not-allowed disabled:opacity-60">
+            {noSources ? <option value="" disabled>{t.chooseAccount}</option> : null}
+            {accounts.length > 0 ? (
+              <optgroup label={t.accountGroup}>
+                {accounts.map((account) => <option key={account.id} value={"account:" + account.id}>{account.name}</option>)}
+              </optgroup>
+            ) : null}
+            {creditCards.length > 0 ? (
+              <optgroup label={t.cardGroup}>
+                {creditCards.map((card) => <option key={card.id} value={"card:" + card.id}>{card.name}</option>)}
+              </optgroup>
+            ) : null}
+          </select>
+        </label>
         <label className="grid gap-2 text-xs font-black text-ink">
           {t.paymentDate}
           <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
       </div>
-      <button disabled={isPending || accounts.length === 0} className="rounded-2xl bg-primary px-4 py-2.5 text-xs font-black text-canvas shadow-glow transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
+      {isCard ? <p className="text-xs font-bold text-warning">{t.payWithCard}</p> : null}
+      <button disabled={isPending || noSources || !source} className="rounded-2xl bg-primary px-4 py-2.5 text-xs font-black text-canvas shadow-glow transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
         {isPending ? common.saving : frequency === "yearly" ? t.payAnnualSubscription : t.paySubscription}
       </button>
       <ResultMessage state={state} />

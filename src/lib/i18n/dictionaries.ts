@@ -341,7 +341,11 @@ export const dictionaries = {
         reserveMonthlyAmount: "กันเงินรายเดือน",
         reserveThisMonth: "กันเงินเดือนนี้",
         payAnnualBill: "จ่ายบิลรายปี",
-        reserveAccountFixed: "ใช้บัญชี"
+        reserveAccountFixed: "ใช้บัญชี",
+        paymentSource: "แหล่งที่จ่าย",
+        accountGroup: "บัญชีเงินสด",
+        cardGroup: "บัตรเครดิต",
+        payWithCard: "จะบันทึกเป็นรายการใช้บัตรในรอบบิลของบัตร (ไม่หักเงินสด)"
       },
       form: {
         budgetName: "ชื่องบ",
@@ -955,7 +959,11 @@ export const dictionaries = {
         reserveMonthlyAmount: "Reserve monthly amount",
         reserveThisMonth: "Reserve this month",
         payAnnualBill: "Pay annual bill",
-        reserveAccountFixed: "Using account"
+        reserveAccountFixed: "Using account",
+        paymentSource: "Payment source",
+        accountGroup: "Cash accounts",
+        cardGroup: "Credit cards",
+        payWithCard: "Recorded as a card charge on the card's statement (no cash deducted)."
       },
       form: {
         budgetName: "Budget name",

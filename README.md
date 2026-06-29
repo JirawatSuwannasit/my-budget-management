@@ -2110,3 +2110,15 @@ Each annual expense / sinking fund can now bind to **one account at creation tim
 - **Reserve this month** now also records `account_id` from the fixed account (still `type=sinking_fund_reserve`, still balance-neutral — `transaction-effects` untouched).
 - i18n: `planning.form.reserveAccount / chooseReserveAccount / reserveAccountNeeded`, `planning.payment.reserveAccountFixed` (th + en).
 - Constraints honored: RLS-only access (no service role), no balance/safe-to-spend math changed, subscription/debt/credit-card flows untouched, all strings via i18n.
+
+## 94. Pay Subscription From an Account or a Credit Card
+
+The Pay Subscription form now offers a single **payment source** dropdown (two optgroups: cash accounts and credit cards) instead of an account-only picker.
+
+- **Account selected** → records an `expense` and deducts from that account (unchanged behavior).
+- **Card selected** → records a `credit_card_expense` that adds to the card's statement via `card_transactions` and does **not** deduct from any cash-like account. `category_id` is still passed through (used on the `card_transactions` row).
+- No cards → the dropdown shows accounts only and works as before. Submit is disabled when there are neither accounts nor cards.
+- `planning/page.tsx` queries active `credit_cards (id,name,active)` and passes them as `creditCards` to `PaySubscriptionForm`.
+- i18n: `planning.payment.paymentSource / accountGroup / cardGroup / payWithCard` (th + en).
+- **Known v1 limitation (documented in code):** a card payment's `related_entity_id` is the card id, not the subscription, so the subscription's "paid this cycle" badge will not light up for card payments. Intentionally not worked around this round.
+- Constraints: RLS-only (no service role); sinking-fund / debt / budget flows untouched; no migration; all strings via i18n.
