@@ -38,25 +38,25 @@ export function ReportsView({ locale, data, hasRows, loadError }: ReportsViewPro
 
   return (
     <div className="grid gap-5">
-      <section className="overflow-hidden rounded-[28px] border border-primary/15 bg-gradient-to-br from-white via-teal-50 to-blue-50 p-5 shadow-soft md:p-8">
+      <section className="overflow-hidden rounded-[28px] border border-primary/15 bg-gradient-to-br from-elevated via-surface to-surface p-5 shadow-soft md:p-8">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <p className="w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-normal text-primary">{t.phase}</p>
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-3 py-1 text-xs font-black uppercase tracking-normal text-emerald-800"><ShieldCheck size={13} aria-hidden="true" />{t.readOnly}</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-income/15 px-3 py-1 text-xs font-black uppercase tracking-normal text-income"><ShieldCheck size={13} aria-hidden="true" />{t.readOnly}</span>
             </div>
             <h1 className="mt-4 text-3xl font-black text-ink md:text-5xl">{t.title}</h1>
             <p className="mt-3 max-w-2xl text-sm font-semibold text-muted md:text-base">{t.subtitle}</p>
           </div>
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary text-white shadow-card"><LineChart size={22} aria-hidden="true" /></div>
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary text-canvas shadow-card"><LineChart size={22} aria-hidden="true" /></div>
         </div>
-        <p className="mt-4 rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm font-bold text-muted">{t.readOnlyNote}</p>
+        <p className="mt-4 rounded-2xl border border-line bg-surface/80 px-4 py-3 text-sm font-bold text-muted">{t.readOnlyNote}</p>
       </section>
 
-      {loadError ? <p className="rounded-panel border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-800">{t.loadError}: {loadError}</p> : null}
+      {loadError ? <p className="rounded-panel border border-danger/30 bg-danger/10 p-4 text-sm font-bold text-danger">{t.loadError}: {loadError}</p> : null}
 
       {!loadError && (!data || !hasRows) ? (
-        <section className="rounded-panel border border-dashed border-slate-300 bg-white/80 p-8 text-center shadow-card">
+        <section className="rounded-panel border border-dashed border-line bg-surface/80 p-8 text-center shadow-card">
           <h2 className="text-xl font-black text-ink">{t.emptyTitle}</h2>
           <p className="mx-auto mt-3 max-w-md text-sm font-semibold text-muted">{t.emptyText}</p>
         </section>
@@ -77,7 +77,7 @@ function ReportsBody({ locale, data }: { locale: Locale; data: ReportsData }) {
 
   return (
     <>
-      <section className="rounded-panel border border-slate-200 bg-white p-5 shadow-card">
+      <section className="rounded-panel border border-line bg-surface p-5 shadow-card">
         <SectionHeader icon={LineChart} title={t.incomeVsExpense} />
         {hasTrend ? (
           <>
@@ -98,31 +98,31 @@ function ReportsBody({ locale, data }: { locale: Locale; data: ReportsData }) {
             </div>
           </>
         ) : (
-          <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-bold text-muted">{t.noTrendData}</p>
+          <p className="rounded-2xl border border-dashed border-line bg-elevated p-4 text-sm font-bold text-muted">{t.noTrendData}</p>
         )}
       </section>
 
       <section className="grid gap-3">
         <div className="flex items-center justify-between gap-4">
           <SectionHeader icon={CalendarRange} title={t.cycleHistory} />
-          <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-muted shadow-card">{data.cycles.length} {t.cyclesSuffix}</span>
+          <span className="rounded-full bg-surface px-3 py-1 text-xs font-black text-muted shadow-card">{data.cycles.length} {t.cyclesSuffix}</span>
         </div>
         <div className="grid gap-3">
           {data.cycles.map((cycle) => (
-            <article key={cycle.cycleStartDate} className={"rounded-panel border p-4 shadow-card " + (cycle.isCurrent ? "border-primary/40 bg-primary/5" : "border-slate-200 bg-white")}>
+            <article key={cycle.cycleStartDate} className={"rounded-panel border p-4 shadow-card " + (cycle.isCurrent ? "border-primary/40 bg-primary/5" : "border-line bg-surface")}>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="text-base font-black text-ink">{cycle.label}</h3>
                 <div className="flex items-center gap-2">
                   {cycle.isCurrent ? <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{t.currentCycle}</span> : null}
-                  <span className={"rounded-full px-2.5 py-1 text-xs font-black " + (cycle.net >= 0 ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800")}>{t.net} {formatMoney(cycle.net)}</span>
+                  <span className={"rounded-full px-2.5 py-1 text-xs font-black " + (cycle.net >= 0 ? "bg-income/10 text-income" : "bg-danger/10 text-danger")}>{t.net} {formatMoney(cycle.net)}</span>
                 </div>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3 text-sm font-bold sm:grid-cols-3 lg:grid-cols-5">
-                <Metric label={t.income} value={formatMoney(cycle.income)} tone="text-emerald-700" />
-                <Metric label={t.expenses} value={formatMoney(cycle.expenses)} tone="text-rose-700" />
-                <Metric label={t.investmentTransfers} value={formatMoney(cycle.investmentTransfers)} tone="text-blue-700" />
-                <Metric label={t.debtPaid} value={formatMoney(cycle.debtPaid)} tone="text-indigo-700" />
-                <Metric label={t.sinkingReserved} value={formatMoney(cycle.sinkingReserved)} tone="text-amber-700" />
+                <Metric label={t.income} value={formatMoney(cycle.income)} tone="text-income" />
+                <Metric label={t.expenses} value={formatMoney(cycle.expenses)} tone="text-danger" />
+                <Metric label={t.investmentTransfers} value={formatMoney(cycle.investmentTransfers)} tone="text-investment" />
+                <Metric label={t.debtPaid} value={formatMoney(cycle.debtPaid)} tone="text-debt" />
+                <Metric label={t.sinkingReserved} value={formatMoney(cycle.sinkingReserved)} tone="text-warning" />
               </div>
             </article>
           ))}
@@ -130,7 +130,7 @@ function ReportsBody({ locale, data }: { locale: Locale; data: ReportsData }) {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <div className="rounded-panel border border-slate-200 bg-white p-5 shadow-card">
+        <div className="rounded-panel border border-line bg-surface p-5 shadow-card">
           <SectionHeader icon={PieChart} title={t.spendingByCategory} />
           <div className="mb-4 flex flex-col gap-2">
             <span className="text-xs font-black uppercase tracking-normal text-muted">{t.selectCycle}</span>
@@ -142,7 +142,7 @@ function ReportsBody({ locale, data }: { locale: Locale; data: ReportsData }) {
                     key={cycle.cycleStartDate}
                     href={"/reports?cycle=" + cycle.cycleStartDate}
                     scroll={false}
-                    className={"rounded-full px-3 py-1.5 text-xs font-black transition " + (selected ? "bg-primary text-white shadow-card" : "border border-slate-200 bg-white text-muted hover:border-primary/40 hover:text-primary")}
+                    className={"rounded-full px-3 py-1.5 text-xs font-black transition " + (selected ? "bg-primary text-canvas shadow-card" : "border border-line bg-surface text-muted hover:border-primary/40 hover:text-primary")}
                   >
                     {formatCycleChip(cycle.start)}
                   </Link>
@@ -152,7 +152,7 @@ function ReportsBody({ locale, data }: { locale: Locale; data: ReportsData }) {
           </div>
           <p className="mb-3 text-sm font-black text-ink">{t.totalExpenses}: {formatMoney(data.categoryBreakdown.total)}</p>
           {data.categoryBreakdown.slices.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-bold text-muted">{t.noCategoryData}</p>
+            <p className="rounded-2xl border border-dashed border-line bg-elevated p-4 text-sm font-bold text-muted">{t.noCategoryData}</p>
           ) : (
             <div className="grid gap-3">
               {data.categoryBreakdown.slices.map((slice, index) => (
@@ -161,7 +161,7 @@ function ReportsBody({ locale, data }: { locale: Locale; data: ReportsData }) {
                     <span className="min-w-0 truncate">{slice.label}</span>
                     <span className="shrink-0 text-muted">{formatMoney(slice.amount)} · {formatPercent(slice.share)}</span>
                   </div>
-                  <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-2.5 overflow-hidden rounded-full bg-elevated">
                     <div className={"h-full rounded-full " + BAR_COLORS[index % BAR_COLORS.length]} style={{ width: Math.max(2, Math.round(slice.share * 100)) + "%" }} aria-hidden="true" />
                   </div>
                 </div>
@@ -170,14 +170,14 @@ function ReportsBody({ locale, data }: { locale: Locale; data: ReportsData }) {
           )}
         </div>
 
-        <div className="rounded-panel border border-slate-200 bg-white p-5 shadow-card">
+        <div className="rounded-panel border border-line bg-surface p-5 shadow-card">
           <SectionHeader icon={TrendingDown} title={t.debtTrajectory} />
           {hasDebt && data.debtTrajectory.length >= 2 ? (
             <DebtChart points={data.debtTrajectory} max={debtMax} />
           ) : hasDebt ? (
             <p className="text-2xl font-black text-ink">{formatMoney(data.debtTrajectory[data.debtTrajectory.length - 1]?.remaining ?? 0)}</p>
           ) : (
-            <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm font-bold text-muted">{t.noDebtData}</p>
+            <p className="rounded-2xl border border-dashed border-line bg-elevated p-4 text-sm font-bold text-muted">{t.noDebtData}</p>
           )}
           {hasDebt ? (
             <div className="mt-3 flex items-center justify-between text-xs font-bold text-muted">

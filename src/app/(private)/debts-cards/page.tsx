@@ -47,7 +47,7 @@ function toDateInput(date: Date) {
 function ProgressBar({ percent, color = "bg-primary" }: { percent: number; color?: string }) {
   const capped = Math.max(0, Math.min(100, percent));
   return (
-    <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+    <div className="h-2.5 overflow-hidden rounded-full bg-elevated">
       <div className={"h-full rounded-full " + color} style={{ width: capped + "%" }} />
     </div>
   );
@@ -55,12 +55,12 @@ function ProgressBar({ percent, color = "bg-primary" }: { percent: number; color
 
 function StatusPill({ active, locale }: { active: boolean; locale: Locale }) {
   const common = dictionaries[locale].common;
-  return <span className={"rounded-full px-2.5 py-1 text-xs font-black " + (active ? "bg-emerald-50 text-emerald-800" : "bg-slate-100 text-muted")}>{active ? common.active : common.inactive}</span>;
+  return <span className={"rounded-full px-2.5 py-1 text-xs font-black " + (active ? "bg-income/10 text-income" : "bg-elevated text-muted")}>{active ? common.active : common.inactive}</span>;
 }
 
 function StatementStatusPill({ status, locale }: { status: StatementRow["status"]; locale: Locale }) {
   const common = dictionaries[locale].common;
-  const className = status === "paid" ? "bg-emerald-50 text-emerald-800" : status === "partial" ? "bg-amber-50 text-amber-800" : "bg-rose-50 text-rose-800";
+  const className = status === "paid" ? "bg-income/10 text-income" : status === "partial" ? "bg-warning/10 text-warning" : "bg-danger/10 text-danger";
   const label = status === "paid" ? common.paid : status === "partial" ? common.partial : common.unpaid;
   return <span className={"rounded-full px-2.5 py-1 text-xs font-black " + className}>{label}</span>;
 }
@@ -72,13 +72,13 @@ function ToggleActiveForm({ id, active, kind, locale }: { id: string; active: bo
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="active" value={active ? "false" : "true"} />
-      <button className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary">{active ? common.deactivate : common.activate}</button>
+      <button className="rounded-full border border-line bg-surface px-4 py-2 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary">{active ? common.deactivate : common.activate}</button>
     </form>
   );
 }
 
 function EmptyState({ children }: { children: ReactNode }) {
-  return <p className="rounded-panel border border-dashed border-slate-300 bg-white/80 p-5 text-sm font-bold text-muted">{children}</p>;
+  return <p className="rounded-panel border border-dashed border-line bg-surface/80 p-5 text-sm font-bold text-muted">{children}</p>;
 }
 
 export default async function DebtsCardsPage() {
@@ -143,24 +143,24 @@ export default async function DebtsCardsPage() {
 
   return (
     <div className="grid gap-5">
-      <section className="rounded-[28px] border border-primary/15 bg-gradient-to-br from-white via-blue-50 to-emerald-50 p-5 shadow-soft md:p-8">
+      <section className="rounded-[28px] border border-primary/15 bg-gradient-to-br from-elevated via-surface to-surface p-5 shadow-soft md:p-8">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-normal text-primary">{t.phase}</p>
             <h1 className="mt-4 text-3xl font-black text-ink md:text-5xl">{t.title}</h1>
             <p className="mt-3 max-w-2xl text-sm font-semibold text-muted md:text-base">{t.subtitle}</p>
           </div>
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-white shadow-card"><CreditCard size={22} aria-hidden="true" /></div>
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-canvas shadow-card"><CreditCard size={22} aria-hidden="true" /></div>
         </div>
       </section>
 
-      {loadError ? <p className="rounded-panel border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-800">{t.loadError}: {loadError.message}</p> : null}
+      {loadError ? <p className="rounded-panel border border-danger/30 bg-danger/10 p-4 text-sm font-bold text-danger">{t.loadError}: {loadError.message}</p> : null}
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-panel border border-slate-200 bg-white p-4 shadow-card"><p className="text-xs font-black uppercase tracking-normal text-muted">{t.debtRemaining}</p><p className="mt-3 text-3xl font-black text-ink">{formatMoney(totalDebtRemaining)}</p></div>
-        <div className="rounded-panel border border-emerald-100 bg-emerald-50 p-4 text-emerald-900 shadow-card"><p className="text-xs font-black uppercase tracking-normal opacity-70">{t.plannedDebtLeft}</p><p className="mt-3 text-3xl font-black">{formatMoney(plannedDebtThisCycle)}</p></div>
-        <div className="rounded-panel border border-amber-100 bg-amber-50 p-4 text-amber-900 shadow-card"><p className="text-xs font-black uppercase tracking-normal opacity-70">{t.currentCardSpending}</p><p className="mt-3 text-3xl font-black">{formatMoney(currentCardSpending)}</p></div>
-        <div className="rounded-panel border border-blue-100 bg-blue-50 p-4 text-blue-900 shadow-card"><p className="text-xs font-black uppercase tracking-normal opacity-70">{t.cardPayableLeft}</p><p className="mt-3 text-3xl font-black">{formatMoney(remainingCardPayable)}</p></div>
+        <div className="rounded-panel border border-line bg-surface p-4 shadow-card"><p className="text-xs font-black uppercase tracking-normal text-muted">{t.debtRemaining}</p><p className="mt-3 text-3xl font-black text-ink">{formatMoney(totalDebtRemaining)}</p></div>
+        <div className="rounded-panel border border-income/20 bg-income/10 p-4 text-income shadow-card"><p className="text-xs font-black uppercase tracking-normal opacity-70">{t.plannedDebtLeft}</p><p className="mt-3 text-3xl font-black">{formatMoney(plannedDebtThisCycle)}</p></div>
+        <div className="rounded-panel border border-warning/30 bg-warning/10 p-4 text-warning shadow-card"><p className="text-xs font-black uppercase tracking-normal opacity-70">{t.currentCardSpending}</p><p className="mt-3 text-3xl font-black">{formatMoney(currentCardSpending)}</p></div>
+        <div className="rounded-panel border border-investment/30 bg-investment/10 p-4 text-investment shadow-card"><p className="text-xs font-black uppercase tracking-normal opacity-70">{t.cardPayableLeft}</p><p className="mt-3 text-3xl font-black">{formatMoney(remainingCardPayable)}</p></div>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[0.82fr_1.18fr]">
@@ -170,14 +170,14 @@ export default async function DebtsCardsPage() {
             <DebtForm locale={locale} />
           </div>
           <div>
-            <div className="mb-3 flex items-center gap-2"><Banknote className="text-emerald-600" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.recordDebtPayment}</h2></div>
+            <div className="mb-3 flex items-center gap-2"><Banknote className="text-income" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.recordDebtPayment}</h2></div>
             <DebtPaymentForm debts={activeDebts} accounts={cashLikeAccounts} defaultAccountId={defaultAccountId} locale={locale} />
-            {activeDebts.length === 0 || cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-amber-50 p-4 text-sm font-bold text-amber-800">{t.debtPaymentRequirement}</p> : null}
+            {activeDebts.length === 0 || cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-warning/10 p-4 text-sm font-bold text-warning">{t.debtPaymentRequirement}</p> : null}
           </div>
         </div>
 
         <div className="grid gap-3">
-          <div className="flex items-center justify-between gap-4"><h2 className="text-xl font-black text-ink">{t.debtProgress}</h2><span className="rounded-full bg-white px-3 py-1 text-xs font-black text-muted shadow-card">{debts.length} {t.debtsSuffix}</span></div>
+          <div className="flex items-center justify-between gap-4"><h2 className="text-xl font-black text-ink">{t.debtProgress}</h2><span className="rounded-full bg-surface px-3 py-1 text-xs font-black text-muted shadow-card">{debts.length} {t.debtsSuffix}</span></div>
           {debts.length === 0 ? <EmptyState>{t.noDebts}</EmptyState> : null}
           {debts.map((debt) => {
             const original = toNumber(debt.original_amount);
@@ -192,7 +192,7 @@ export default async function DebtsCardsPage() {
             const paidThisCycle = debtPayments.filter((payment) => payment.debt_id === debt.id && payment.paid_date >= cycleStartDate && payment.paid_date <= cycleEndDate).reduce((total, payment) => total + toNumber(payment.amount), 0);
             const plannedLeft = Math.max(0, monthly - paidThisCycle);
             return (
-              <article key={debt.id} className="rounded-panel border border-slate-200 bg-white p-4 shadow-card">
+              <article key={debt.id} className="rounded-panel border border-line bg-surface p-4 shadow-card">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-black text-ink">{debt.name}</h3><StatusPill active={debt.active} locale={locale} /><span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{t.debtTypes[debt.type]}</span></div>
@@ -203,7 +203,7 @@ export default async function DebtsCardsPage() {
                       </div>
                       <p className="text-sm font-semibold text-muted">{estimatedMonths ? t.aboutMonthsRemainingPrefix + " " + estimatedMonths + " " + t.aboutMonthsRemainingSuffix : t.cannotEstimateMonths} {debt.target_payoff_date ? "- " + t.target + " " + debt.target_payoff_date : ""}</p>
                     </div>
-                    <div className="mt-4 rounded-2xl bg-slate-50 p-3">
+                    <div className="mt-4 rounded-2xl bg-elevated p-3">
                       <p className="mb-2 text-xs font-black uppercase tracking-normal text-muted">{t.paymentHistory}</p>
                       {history.length === 0 ? <p className="text-sm font-bold text-muted">{t.noPayments}</p> : null}
                       <div className="grid gap-2">{history.map((payment) => <p key={payment.id} className="flex items-center justify-between gap-3 text-sm font-bold text-ink"><span>{payment.paid_date}</span><span>{formatMoney(payment.amount)}</span></p>)}</div>
@@ -225,7 +225,7 @@ export default async function DebtsCardsPage() {
         </div>
 
         <div className="grid gap-3">
-          <div className="flex items-center justify-between gap-4"><h2 className="text-xl font-black text-ink">{t.creditCards}</h2><span className="rounded-full bg-white px-3 py-1 text-xs font-black text-muted shadow-card">{cards.length} {t.cardsSuffix}</span></div>
+          <div className="flex items-center justify-between gap-4"><h2 className="text-xl font-black text-ink">{t.creditCards}</h2><span className="rounded-full bg-surface px-3 py-1 text-xs font-black text-muted shadow-card">{cards.length} {t.cardsSuffix}</span></div>
           {cards.length === 0 ? <EmptyState>{t.noCards}</EmptyState> : null}
           {cards.map((card) => {
             const cardStatements = statements.filter((statement) => statement.card_id === card.id);
@@ -236,27 +236,27 @@ export default async function DebtsCardsPage() {
             const recentCardTransactions = cardTransactions.filter((transaction) => transaction.card_id === card.id).slice(0, 5);
             const recentPayments = cardPayments.filter((payment) => payment.card_id === card.id).slice(0, 5);
             return (
-              <article key={card.id} className="rounded-panel border border-slate-200 bg-white p-4 shadow-card">
+              <article key={card.id} className="rounded-panel border border-line bg-surface p-4 shadow-card">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-black text-ink">{card.name}</h3><StatusPill active={card.active} locale={locale} /><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-muted">{t.cutDay} {card.billing_cut_day}</span><span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-muted">{t.dueDay} {card.payment_due_day}</span></div>
+                    <div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-black text-ink">{card.name}</h3><StatusPill active={card.active} locale={locale} /><span className="rounded-full bg-elevated px-2.5 py-1 text-xs font-black text-muted">{t.cutDay} {card.billing_cut_day}</span><span className="rounded-full bg-elevated px-2.5 py-1 text-xs font-black text-muted">{t.dueDay} {card.payment_due_day}</span></div>
                     <div className="mt-4 grid gap-3 sm:grid-cols-4">
-                      <div className="rounded-2xl bg-amber-50 p-3 text-amber-900"><p className="text-xs font-black opacity-70">{t.currentSpending}</p><p className="mt-1 text-lg font-black">{formatMoney(cardCycleSpending)}</p></div>
-                      <div className="rounded-2xl bg-slate-50 p-3"><p className="text-xs font-black text-muted">{t.statementDue}</p><p className="mt-1 text-lg font-black text-ink">{formatMoney(cardDue)}</p></div>
-                      <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-900"><p className="text-xs font-black opacity-70">{t.paid}</p><p className="mt-1 text-lg font-black">{formatMoney(cardPaid)}</p></div>
-                      <div className="rounded-2xl bg-blue-50 p-3 text-blue-900"><p className="text-xs font-black opacity-70">{t.remaining}</p><p className="mt-1 text-lg font-black">{formatMoney(cardOpenPayable)}</p></div>
+                      <div className="rounded-2xl bg-warning/10 p-3 text-warning"><p className="text-xs font-black opacity-70">{t.currentSpending}</p><p className="mt-1 text-lg font-black">{formatMoney(cardCycleSpending)}</p></div>
+                      <div className="rounded-2xl bg-elevated p-3"><p className="text-xs font-black text-muted">{t.statementDue}</p><p className="mt-1 text-lg font-black text-ink">{formatMoney(cardDue)}</p></div>
+                      <div className="rounded-2xl bg-income/10 p-3 text-income"><p className="text-xs font-black opacity-70">{t.paid}</p><p className="mt-1 text-lg font-black">{formatMoney(cardPaid)}</p></div>
+                      <div className="rounded-2xl bg-investment/10 p-3 text-investment"><p className="text-xs font-black opacity-70">{t.remaining}</p><p className="mt-1 text-lg font-black">{formatMoney(cardOpenPayable)}</p></div>
                     </div>
                   </div>
                   <ToggleActiveForm id={card.id} active={card.active} kind="card" locale={locale} />
                 </div>
 
                 <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                  <div className="rounded-2xl bg-slate-50 p-3">
+                  <div className="rounded-2xl bg-elevated p-3">
                     <p className="mb-2 text-xs font-black uppercase tracking-normal text-muted">{t.statements}</p>
                     {cardStatements.length === 0 ? <p className="text-sm font-bold text-muted">{t.noStatements}</p> : null}
                     <div className="grid gap-2">
                       {cardStatements.slice(0, 4).map((statement) => (
-                        <div key={statement.id} className="rounded-2xl bg-white p-3 text-sm font-bold text-ink">
+                        <div key={statement.id} className="rounded-2xl bg-surface p-3 text-sm font-bold text-ink">
                           <div className="flex flex-wrap items-center justify-between gap-2"><span>{statement.cycle_start} - {statement.cycle_end}</span><StatementStatusPill status={statement.status} locale={locale} /></div>
                           <p className="mt-2 text-muted">{t.dueLabel} {statement.due_date} - {t.remaining} {formatMoney(statement.remaining_payable)}</p>
                           <details className="mt-2"><summary className="cursor-pointer text-xs font-black text-primary">{t.editStatement}</summary><div className="mt-3"><CreditCardStatementForm cards={activeCards} statement={statement} defaultCycleStart={cycleStartDate} defaultCycleEnd={cycleEndDate} locale={locale} /></div></details>
@@ -264,12 +264,12 @@ export default async function DebtsCardsPage() {
                       ))}
                     </div>
                   </div>
-                  <div className="rounded-2xl bg-slate-50 p-3">
+                  <div className="rounded-2xl bg-elevated p-3">
                     <p className="mb-2 text-xs font-black uppercase tracking-normal text-muted">{t.recentCardActivity}</p>
                     {recentCardTransactions.length === 0 && recentPayments.length === 0 ? <p className="text-sm font-bold text-muted">{t.noCardActivity}</p> : null}
                     <div className="grid gap-2">
                       {recentCardTransactions.map((transaction) => <p key={transaction.id} className="flex items-center justify-between gap-3 text-sm font-bold text-ink"><span>{transaction.transaction_date}</span><span>{t.expense} {formatMoney(transaction.amount)}</span></p>)}
-                      {recentPayments.map((payment) => <p key={payment.id} className="flex items-center justify-between gap-3 text-sm font-bold text-emerald-800"><span>{payment.payment_date}</span><span>{t.payment} {formatMoney(payment.amount)}</span></p>)}
+                      {recentPayments.map((payment) => <p key={payment.id} className="flex items-center justify-between gap-3 text-sm font-bold text-income"><span>{payment.payment_date}</span><span>{t.payment} {formatMoney(payment.amount)}</span></p>)}
                     </div>
                   </div>
                 </div>
@@ -283,18 +283,18 @@ export default async function DebtsCardsPage() {
 
       <section className="grid gap-4 xl:grid-cols-2">
         <div>
-          <div className="mb-3 flex items-center gap-2"><CreditCard className="text-amber-600" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.addCreditCardExpense}</h2></div>
+          <div className="mb-3 flex items-center gap-2"><CreditCard className="text-warning" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.addCreditCardExpense}</h2></div>
           <CardExpenseForm cards={activeCards} locale={locale} />
-          <p className="mt-3 rounded-2xl bg-white p-4 text-sm font-bold text-muted shadow-card">{t.cardExpenseHelp}</p>
+          <p className="mt-3 rounded-2xl bg-surface p-4 text-sm font-bold text-muted shadow-card">{t.cardExpenseHelp}</p>
         </div>
         <div>
-          <div className="mb-3 flex items-center gap-2"><Landmark className="text-blue-600" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.payCreditCardStatement}</h2></div>
+          <div className="mb-3 flex items-center gap-2"><Landmark className="text-investment" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.payCreditCardStatement}</h2></div>
           <CardPaymentForm statements={openStatementOptions} accounts={cashLikeAccounts} defaultAccountId={defaultAccountId} locale={locale} />
-          {openStatementOptions.length === 0 ? <p className="mt-3 rounded-2xl bg-amber-50 p-4 text-sm font-bold text-amber-800">{t.statementPaymentRequirement}</p> : null}
+          {openStatementOptions.length === 0 ? <p className="mt-3 rounded-2xl bg-warning/10 p-4 text-sm font-bold text-warning">{t.statementPaymentRequirement}</p> : null}
         </div>
       </section>
 
-      <section className="rounded-panel border border-slate-200 bg-white p-5 text-sm font-semibold text-muted shadow-card">
+      <section className="rounded-panel border border-line bg-surface p-5 text-sm font-semibold text-muted shadow-card">
         <div className="mb-2 flex items-center gap-2 text-ink"><ReceiptText size={18} className="text-primary" aria-hidden="true" /><h2 className="text-lg font-black">{t.dashboardLogic}</h2></div>
         <p>{t.dashboardLogicText}</p>
       </section>

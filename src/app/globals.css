@@ -2,10 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Phase 9.5 dark-first theme.
+ * The :root values are the dark palette (default). A `.light` class on <html>
+ * opts into the light palette. Theme is chosen server-side from a cookie so SSR
+ * renders the right surface with no flash.
+ */
 :root {
+  color-scheme: dark;
+  --background: #0a0e16;
+  --foreground: #e7ecf4;
+  --glow: rgba(45, 212, 191, 0.1);
+}
+
+:root.light {
   color-scheme: light;
   --background: #f6f8f7;
   --foreground: #17201c;
+  --glow: rgba(8, 127, 140, 0.12);
 }
 
 * {
@@ -21,8 +35,18 @@ body {
   min-height: 100%;
   margin: 0;
   color: var(--foreground);
+  /* Numerics line up everywhere (money, dates, percentages). */
+  font-variant-numeric: tabular-nums;
   background:
-    radial-gradient(circle at top left, rgba(8, 127, 140, 0.12), transparent 30rem),
+    radial-gradient(60rem 40rem at 100% -10%, var(--glow), transparent 55%),
+    radial-gradient(50rem 36rem at -10% 0%, rgba(96, 165, 250, 0.06), transparent 55%),
+    var(--background);
+  background-attachment: fixed;
+}
+
+:root.light body {
+  background:
+    radial-gradient(circle at top left, var(--glow), transparent 30rem),
     linear-gradient(180deg, #f8fbfa 0%, #f6f8f7 52%, #f4f7f5 100%);
 }
 
@@ -41,9 +65,16 @@ select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid #087f8c;
+  outline: 2px solid #2dd4bf;
   outline-offset: 2px;
   border-radius: 0.5rem;
+}
+
+/* Native form controls inherit the dark surface so date/select popups match. */
+input,
+select,
+textarea {
+  color-scheme: inherit;
 }
 
 .safe-bottom {
@@ -52,7 +83,7 @@ summary:focus-visible,
 
 .fine-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(8, 127, 140, 0.28) transparent;
+  scrollbar-color: rgba(45, 212, 191, 0.32) transparent;
 }
 
 .fine-scrollbar::-webkit-scrollbar {
@@ -61,6 +92,6 @@ summary:focus-visible,
 }
 
 .fine-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(8, 127, 140, 0.28);
+  background: rgba(45, 212, 191, 0.32);
   border-radius: 999px;
 }

@@ -17,7 +17,7 @@ export function DeleteTransactionForm({ id, locale }: { id: string; locale: Loca
     >
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="locale" value={locale} />
-      <button className="inline-flex min-h-11 items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-xs font-black text-rose-700 transition hover:bg-rose-100">
+      <button className="inline-flex min-h-11 items-center gap-2 rounded-full border border-danger/30 bg-danger/10 px-4 py-2 text-xs font-black text-danger transition hover:bg-danger/15">
         <Trash2 size={14} aria-hidden="true" /> {t.deleteLabel}
       </button>
     </form>

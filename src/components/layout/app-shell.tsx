@@ -35,31 +35,31 @@ export function AppShell({ children, userEmail, locale, badges = {} }: Readonly<
 
   return (
     <div className="min-h-dvh pb-24 text-ink md:pb-0">
-      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-canvas/86 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-line/80 bg-canvas/86 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
           <Link href="/dashboard" className="flex items-center gap-3">
-            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary text-white shadow-card"><Landmark size={20} aria-hidden="true" /></span>
+            <span className="grid h-10 w-10 place-items-center rounded-2xl bg-primary text-canvas shadow-card"><Landmark size={20} aria-hidden="true" /></span>
             <span>
               <span className="block text-sm font-black leading-tight">Finance Control</span>
               <span className="block text-xs font-semibold text-muted">{userEmail}</span>
             </span>
           </Link>
-          <button onClick={signOut} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary">{dictionary.nav.signOut}</button>
+          <button onClick={signOut} className="rounded-full border border-line bg-surface px-4 py-2 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary">{dictionary.nav.signOut}</button>
         </div>
       </header>
 
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-5 sm:px-6 lg:grid-cols-[240px_1fr] lg:px-8">
         <aside className="hidden lg:block">
-          <nav className="sticky top-24 grid gap-2 rounded-panel border border-slate-200 bg-white/82 p-3 shadow-card backdrop-blur">
+          <nav className="sticky top-24 grid gap-2 rounded-panel border border-line bg-surface/82 p-3 shadow-card backdrop-blur">
             {navItems.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
               const badge = badges[item.href] ?? 0;
               return (
-                <Link key={item.href} href={item.href} className={"flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold transition " + (active ? "bg-primary text-white" : "text-muted hover:bg-primary/10 hover:text-primary")}>
+                <Link key={item.href} href={item.href} className={"flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold transition " + (active ? "bg-primary text-canvas" : "text-muted hover:bg-primary/10 hover:text-primary")}>
                   <Icon size={18} aria-hidden="true" />
                   {item.label}
-                  {badge > 0 ? <span className={"ml-auto grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-xs font-black " + (active ? "bg-white text-primary" : "bg-rose-500 text-white")} aria-label={badge + " " + dictionary.upcoming.itemsSuffix}>{badge}</span> : null}
+                  {badge > 0 ? <span className={"ml-auto grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-xs font-black " + (active ? "bg-surface text-primary" : "bg-rose-500 text-white")} aria-label={badge + " " + dictionary.upcoming.itemsSuffix}>{badge}</span> : null}
                 </Link>
               );
             })}
@@ -68,14 +68,14 @@ export function AppShell({ children, userEmail, locale, badges = {} }: Readonly<
         <main>{children}</main>
       </div>
 
-      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/94 px-3 pt-2 shadow-[0_-12px_30px_rgba(23,32,28,0.08)] backdrop-blur-xl lg:hidden">
+      <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/94 px-3 pt-2 shadow-[0_-12px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl lg:hidden">
         <div className="mx-auto grid max-w-lg grid-cols-9 gap-0.5">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
             const badge = badges[item.href] ?? 0;
             return (
-              <Link key={item.href} href={item.href} className={"relative grid min-h-14 place-items-center rounded-2xl px-0.5 text-[0.58rem] font-black transition " + (active ? "bg-primary/10 text-primary" : "text-muted")}>
+              <Link key={item.href} href={item.href} className={"relative grid min-h-14 place-items-center gap-0.5 rounded-2xl px-0.5 text-[0.58rem] font-black transition " + (active ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/25" : "text-muted hover:text-ink")}>
                 {badge > 0 ? <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-rose-500 px-1 text-[0.55rem] font-black text-white" aria-label={badge + " " + dictionary.upcoming.itemsSuffix}>{badge}</span> : null}
                 <Icon size={18} aria-hidden="true" />
                 <span>{item.short}</span>

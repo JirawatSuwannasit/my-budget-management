@@ -18,7 +18,7 @@ function todayInput() {
 
 function ResultMessage({ state }: { state: TransactionActionState }) {
   if (!state.message) return null;
-  return <p className={"rounded-2xl px-4 py-3 text-sm font-bold " + (state.status === "success" ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800")}>{state.message}</p>;
+  return <p className={"rounded-2xl px-4 py-3 text-sm font-bold " + (state.status === "success" ? "bg-income/10 text-income" : "bg-danger/10 text-danger")}>{state.message}</p>;
 }
 
 function AccountSelect({ accounts, defaultAccountId, locale }: { accounts: PlanningAccountOption[]; defaultAccountId?: string | null; locale: Locale }) {
@@ -28,7 +28,7 @@ function AccountSelect({ accounts, defaultAccountId, locale }: { accounts: Plann
   return (
     <label className="grid gap-2 text-xs font-black text-ink">
       {t.payFrom}
-      <select name="account_id" required defaultValue={preferredAccountId} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60">
+      <select name="account_id" required defaultValue={preferredAccountId} className="rounded-2xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60">
         <option value="" disabled>{t.chooseAccount}</option>
         {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
       </select>
@@ -58,7 +58,7 @@ export function PaySubscriptionForm({
   const common = dictionaries[locale].common;
 
   return (
-    <form action={formAction} className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+    <form action={formAction} className="grid gap-3 rounded-2xl border border-line bg-elevated p-3">
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="type" value="expense" />
       <input type="hidden" name="amount" value={amount} />
@@ -69,10 +69,10 @@ export function PaySubscriptionForm({
         <AccountSelect accounts={accounts} defaultAccountId={defaultAccountId} locale={locale} />
         <label className="grid gap-2 text-xs font-black text-ink">
           {t.paymentDate}
-          <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
+          <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
       </div>
-      <button disabled={isPending || accounts.length === 0} className="rounded-2xl bg-primary px-4 py-2.5 text-xs font-black text-white shadow-card transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
+      <button disabled={isPending || accounts.length === 0} className="rounded-2xl bg-primary px-4 py-2.5 text-xs font-black text-canvas shadow-glow transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
         {isPending ? common.saving : frequency === "yearly" ? t.payAnnualSubscription : t.paySubscription}
       </button>
       <ResultMessage state={state} />
@@ -86,7 +86,7 @@ export function ReserveSubscriptionForm({ subscriptionId, amount, locale }: { su
   const common = dictionaries[locale].common;
 
   return (
-    <form action={formAction} className="grid gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3">
+    <form action={formAction} className="grid gap-3 rounded-2xl border border-income/20 bg-income/10 p-3">
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="type" value="sinking_fund_reserve" />
       <input type="hidden" name="amount" value={amount} />
@@ -94,7 +94,7 @@ export function ReserveSubscriptionForm({ subscriptionId, amount, locale }: { su
       <input type="hidden" name="notes" value="Monthly reserve for annual subscription from planning page" />
       <label className="grid gap-2 text-xs font-black text-ink">
         {t.reserveDate}
-        <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-emerald-100 bg-white px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
+        <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-income/20 bg-surface px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
       </label>
       <button disabled={isPending} className="rounded-2xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-card transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
         {isPending ? common.saving : t.reserveMonthlyAmount}
@@ -110,7 +110,7 @@ export function ReserveAnnualExpenseForm({ annualExpenseId, amount, locale }: { 
   const common = dictionaries[locale].common;
 
   return (
-    <form action={formAction} className="grid gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3">
+    <form action={formAction} className="grid gap-3 rounded-2xl border border-income/20 bg-income/10 p-3">
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="type" value="sinking_fund_reserve" />
       <input type="hidden" name="amount" value={amount} />
@@ -118,7 +118,7 @@ export function ReserveAnnualExpenseForm({ annualExpenseId, amount, locale }: { 
       <input type="hidden" name="notes" value="Monthly reserve for annual expense from planning page" />
       <label className="grid gap-2 text-xs font-black text-ink">
         {t.reserveDate}
-        <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-emerald-100 bg-white px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
+        <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-income/20 bg-surface px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
       </label>
       <button disabled={isPending} className="rounded-2xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-card transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
         {isPending ? common.saving : t.reserveThisMonth}
@@ -148,7 +148,7 @@ export function PayAnnualBillForm({
   const common = dictionaries[locale].common;
 
   return (
-    <form action={formAction} className="grid gap-3 rounded-2xl border border-amber-100 bg-amber-50 p-3">
+    <form action={formAction} className="grid gap-3 rounded-2xl border border-warning/30 bg-warning/10 p-3">
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="type" value="expense" />
       <input type="hidden" name="amount" value={amount} />
@@ -159,7 +159,7 @@ export function PayAnnualBillForm({
         <AccountSelect accounts={accounts} defaultAccountId={defaultAccountId} locale={locale} />
         <label className="grid gap-2 text-xs font-black text-ink">
           {t.paymentDate}
-          <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-amber-100 bg-white px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
+          <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-warning/30 bg-surface px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
       </div>
       <button disabled={isPending || accounts.length === 0} className="rounded-2xl bg-amber-600 px-4 py-2.5 text-xs font-black text-white shadow-card transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60">

@@ -2022,3 +2022,52 @@ The final v1 pass added no new finance features. It focused on data safety, robu
 - **Multi-currency** — the app is THB-only; the currency control is fixed/read-only. Multi-currency storage + formatting is future work.
 - **Multi-user / sharing** — the app assumes one private user; no roles or shared budgets.
 - **Inline error UI for the small active/inactive toggle actions** (currently surfaced via the error boundary).
+
+## 91. Phase 9.5: Dark-Mode Fintech Redesign (Design System)
+
+Phase 9.5 is a **visual-only** reskin: a dark-first, modern-fintech look (Mercury/Revolut clarity). No data flow, finance calculations, server actions, RLS, or i18n keys/behavior changed — all money figures and flows are byte-for-byte identical. The dashboard "real available money" figure is the deliberate hero of the app (largest, most confident type).
+
+### Design tokens (single source of truth — `tailwind.config.ts`)
+
+`darkMode: "class"`. Dark is the default (no class on `<html>`); a `light` class opts into the light palette. Token **names are stable**, so existing utilities flip to dark automatically.
+
+- **Layered backgrounds:** `canvas` `#0a0e16` (app), `surface` `#121826` (cards), `elevated` `#1b2333` (insets/inputs/tracks), `line` `#283449` (borders).
+- **Text:** `ink` `#e7ecf4` (primary), `muted` `#94a3b8`, `faint` `#64748b`.
+- **Brand:** `primary` `#2dd4bf` (bright teal — used for text/icons/borders/fills; fills pair with dark `text-canvas`), `primary-strong` `#14b8a6`.
+- **Semantic finance:** `income` `#34d399`, `expense`/`danger` `#fb7185`, `debt` `#a5b4fc`, `warning`/`cardpay` `#fbbf24`, `investment` `#60a5fa`, `neutral`/`success`. Tints use the `token/10`–`/15` background + solid token text pattern. All foreground tokens clear **WCAG AA** on `surface`/`elevated`.
+- **Type scale:** `caption`, `stat`, `display`, `display-lg` (hero numbers) layered on Tailwind defaults; money/numerics use `tabular-nums` (set globally on `body`).
+- **Elevation/radius:** `shadow-card`, `shadow-soft`, and `shadow-glow` (accent glow for the hero); `rounded-panel` (20px).
+
+### Reusable primitives (`src/components/ui/index.tsx`)
+
+Presentational, server-safe (no hooks), so usable from server and client components: `Card`, `Surface`, `StatBlock` (label + big tabular number + tone + optional delta), `Button` (`primary`/`ghost`/`danger` + `buttonClass()` helper), `Input`, `Select`, `Badge`, `StatusPill` (paid/partial/unpaid/reserved/active/inactive/overdue/due-soon/pending → semantic colors), `SectionHeader`, `EmptyState`, plus the shared `fieldClass` constant. The dashboard hero stats use `StatBlock`; `account-form` is the reference form built entirely on `Input`/`Select`/`Button`.
+
+### Theme toggle (cookie, no DB migration)
+
+Dark by default. Settings → **Appearance** offers a Light/Dark switch. The choice is stored in a `theme` cookie; the root layout reads it server-side (`src/lib/theme.ts`) and applies the `light` class during SSR, so the correct palette paints with **no flash**. The switch is a plain server-action form (`setTheme`) — no client JS — preserving the server-component structure. Light mode reuses the same token names via `:root.light` overrides in `globals.css`.
+
+### Manual visual checks per page
+
+Verify on a narrow viewport (360–414px) for no horizontal scroll, ≥44px tap targets, and AA contrast:
+
+- **Login** — dark card, teal gradient brand panel, readable form, error pill in `danger`.
+- **Dashboard** — hero "real available money" is the largest figure (glowing elevated card); stat tiles use semantic tones (cash=primary, income, investment, expense, debt, warning); budget/sinking progress bars; upcoming panel.
+- **Accounts** — cash-like vs investment totals; account cards; add/edit form (primitives); active/inactive pills.
+- **Transactions** — type-driven form fields; recent list; delete confirm; empty state.
+- **Planning** — budgets/subscriptions/sinking funds; reserve/pay action forms; over-budget pill.
+- **Categories** — colored icon chips; kind/usage badges; edit form.
+- **Debts & cards** — debt progress + payment history; card statements with paid/partial/unpaid pills; card-expense/payment/statement forms.
+- **Upcoming** — overdue/due-soon/pending groups with semantic urgency pills; all-caught-up state; nav badges.
+- **Reports** — income-vs-expense bars, cycle history, spending-by-category, debt trajectory chart.
+- **Settings** — Appearance toggle (dark↔light persists, no flash), preferences, PWA/backup/version cards, logout.
+- **States** — loading skeletons, empty states, and error banners on every page read dark and cohesive.
+
+### Changelog
+
+- `darkMode: "class"`; dark-first palette + semantic finance tokens + type/elevation scale in `tailwind.config.ts`.
+- Dark base, glow background, tabular numerics, dark scrollbar/focus ring, and `:root.light` overrides in `globals.css`.
+- New `src/components/ui/index.tsx` primitives; `src/lib/theme.ts`; `src/components/settings/theme-toggle.tsx`; `setTheme` server action.
+- Root layout renders the cookie-selected theme (no flash); manifest/viewport theme color set to `#0a0e16`.
+- App-wide className migration from hardcoded light utilities (`bg-white`, `bg-slate-*`, light tint pairs, hero gradients) to dark tokens across all pages, forms, nav, loading/empty/error states.
+- Dashboard hero refactored to the `StatBlock` primitive with semantic tones; `account-form` refactored to `Input`/`Select`/`Button`.
+- Added `settings.appearance/themeDark/themeLight/themeHint` i18n keys (th + en).

@@ -32,14 +32,14 @@ export function SubscriptionForm({ subscription, compact = false, locale }: { su
   const common = dictionaries[locale].common;
 
   return (
-    <form action={formAction} className="grid gap-4 rounded-panel border border-slate-200 bg-white p-4 shadow-card">
+    <form action={formAction} className="grid gap-4 rounded-panel border border-line bg-surface p-4 shadow-card">
       {subscription?.id ? <input type="hidden" name="id" value={subscription.id} /> : null}
       <input type="hidden" name="locale" value={locale} />
 
       <div className={compact ? "grid gap-4" : "grid gap-4 sm:grid-cols-[1fr_0.8fr]"}>
         <label className="grid gap-2 text-sm font-black text-ink" htmlFor={"subscription-name-" + idPrefix}>
           {t.form.subscriptionName}
-          <input id={"subscription-name-" + idPrefix} name="name" list="subscription-examples" defaultValue={subscription?.name ?? ""} placeholder={t.form.subscriptionPlaceholder} required className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white" />
+          <input id={"subscription-name-" + idPrefix} name="name" list="subscription-examples" defaultValue={subscription?.name ?? ""} placeholder={t.form.subscriptionPlaceholder} required className="rounded-2xl border border-line bg-elevated px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-surface" />
           <datalist id="subscription-examples">
             {subscriptionExamples[locale].map((example) => <option key={example} value={example} />)}
           </datalist>
@@ -47,7 +47,7 @@ export function SubscriptionForm({ subscription, compact = false, locale }: { su
 
         <label className="grid gap-2 text-sm font-black text-ink" htmlFor={"subscription-category-" + idPrefix}>
           {t.form.category}
-          <select id={"subscription-category-" + idPrefix} name="category_name" defaultValue={subscription?.category_name ?? "AI"} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white">
+          <select id={"subscription-category-" + idPrefix} name="category_name" defaultValue={subscription?.category_name ?? "AI"} className="rounded-2xl border border-line bg-elevated px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-surface">
             {subscriptionCategories[locale].map((category) => <option key={category} value={category}>{category}</option>)}
           </select>
         </label>
@@ -56,7 +56,7 @@ export function SubscriptionForm({ subscription, compact = false, locale }: { su
       <div className={compact ? "grid gap-4" : "grid gap-4 sm:grid-cols-3"}>
         <label className="grid gap-2 text-sm font-black text-ink">
           {t.form.billingCycle}
-          <select name="frequency" defaultValue={subscription?.frequency ?? "monthly"} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white">
+          <select name="frequency" defaultValue={subscription?.frequency ?? "monthly"} className="rounded-2xl border border-line bg-elevated px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-surface">
             <option value="monthly">{t.form.monthlyOption}</option>
             <option value="yearly">{t.form.yearlyOption}</option>
           </select>
@@ -64,30 +64,30 @@ export function SubscriptionForm({ subscription, compact = false, locale }: { su
 
         <label className="grid gap-2 text-sm font-black text-ink">
           {t.form.price}
-          <input name="price" type="number" min="0" step="0.01" defaultValue={subscription?.price ?? ""} placeholder="0.00" required className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white" />
+          <input name="price" type="number" min="0" step="0.01" defaultValue={subscription?.price ?? ""} placeholder="0.00" required className="rounded-2xl border border-line bg-elevated px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-surface" />
         </label>
 
         <label className="grid gap-2 text-sm font-black text-ink">
           {t.billingDay}
-          <input name="billing_day" type="number" min="1" max="31" step="1" defaultValue={subscription?.billing_day ?? 1} required className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white" />
+          <input name="billing_day" type="number" min="1" max="31" step="1" defaultValue={subscription?.billing_day ?? 1} required className="rounded-2xl border border-line bg-elevated px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-surface" />
         </label>
       </div>
 
       <label className="grid gap-2 text-sm font-black text-ink">
         {t.form.paymentMethod}
-        <input name="payment_method" defaultValue={subscription?.payment_method ?? ""} placeholder={t.form.paymentMethodPlaceholder} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-white" />
+        <input name="payment_method" defaultValue={subscription?.payment_method ?? ""} placeholder={t.form.paymentMethodPlaceholder} className="rounded-2xl border border-line bg-elevated px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-surface" />
       </label>
 
-      <label className="flex items-center gap-3 rounded-2xl bg-slate-50 px-4 py-3 text-sm font-bold text-muted">
+      <label className="flex items-center gap-3 rounded-2xl bg-elevated px-4 py-3 text-sm font-bold text-muted">
         <input name="active" type="checkbox" defaultChecked={subscription?.active ?? true} className="h-5 w-5 accent-primary" />
         {t.form.activeSubscription}
       </label>
 
-      <button type="submit" disabled={isPending} className="rounded-2xl bg-primary px-5 py-3 text-sm font-black text-white shadow-card transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
+      <button type="submit" disabled={isPending} className="rounded-2xl bg-primary px-5 py-3 text-sm font-black text-canvas shadow-glow transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
         {isPending ? common.saving : subscription?.id ? t.form.saveSubscription : t.form.addSubscription}
       </button>
 
-      {state.message ? <p className={"rounded-2xl px-4 py-3 text-sm font-bold " + (state.status === "success" ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800")}>{state.message}</p> : null}
+      {state.message ? <p className={"rounded-2xl px-4 py-3 text-sm font-bold " + (state.status === "success" ? "bg-income/10 text-income" : "bg-danger/10 text-danger")}>{state.message}</p> : null}
     </form>
   );
 }

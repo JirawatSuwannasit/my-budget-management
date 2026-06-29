@@ -1,8 +1,25 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { isLocale, type Locale } from "@/lib/i18n/dictionaries";
+import { THEME_COOKIE, resolveTheme } from "@/lib/theme";
+
+/**
+ * Persist the visual theme (dark default) in a cookie so SSR renders the right
+ * palette with no flash. Visual-only: no DB migration, no finance data touched.
+ */
+export async function setTheme(formData: FormData): Promise<void> {
+  const theme = resolveTheme(String(formData.get("theme") ?? ""));
+  const cookieStore = await cookies();
+  cookieStore.set(THEME_COOKIE, theme, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax"
+  });
+  revalidatePath("/", "layout");
+}
 
 export type SettingsActionState = { status: "idle" | "success" | "error"; message: string };
 

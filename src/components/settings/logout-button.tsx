@@ -10,7 +10,7 @@ export function LogoutButton({ label }: { label: string }) {
   }
 
   return (
-    <button onClick={signOut} className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-black text-rose-700 shadow-card transition hover:bg-rose-100">
+    <button onClick={signOut} className="rounded-2xl border border-danger/30 bg-danger/10 px-5 py-3 text-sm font-black text-danger shadow-card transition hover:bg-danger/15">
       {label}
     </button>
   );

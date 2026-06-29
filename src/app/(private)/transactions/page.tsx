@@ -62,19 +62,19 @@ export default async function TransactionsPage() {
 
   return (
     <div className="grid gap-5">
-      <section className="rounded-[28px] border border-primary/15 bg-gradient-to-br from-white via-teal-50 to-blue-50 p-5 shadow-soft md:p-8">
+      <section className="rounded-[28px] border border-primary/15 bg-gradient-to-br from-elevated via-surface to-surface p-5 shadow-soft md:p-8">
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="w-fit rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-normal text-primary">{t.eyebrow}</p>
             <h1 className="mt-4 text-3xl font-black text-ink md:text-5xl">{t.title}</h1>
             <p className="mt-3 max-w-2xl text-sm font-semibold text-muted md:text-base">{t.subtitle}</p>
           </div>
-          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-white shadow-card"><ListChecks size={22} aria-hidden="true" /></div>
+          <div className="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-canvas shadow-card"><ListChecks size={22} aria-hidden="true" /></div>
         </div>
       </section>
 
-      {loadError ? <p className="rounded-panel border border-rose-200 bg-rose-50 p-4 text-sm font-bold text-rose-800">{t.loadError}: {loadError.message}</p> : null}
-      {accounts.length === 0 ? <p className="rounded-panel border border-amber-200 bg-amber-50 p-4 text-sm font-bold text-amber-900">{t.needAccount}</p> : null}
+      {loadError ? <p className="rounded-panel border border-danger/30 bg-danger/10 p-4 text-sm font-bold text-danger">{t.loadError}: {loadError.message}</p> : null}
+      {accounts.length === 0 ? <p className="rounded-panel border border-warning/30 bg-warning/10 p-4 text-sm font-bold text-warning">{t.needAccount}</p> : null}
 
       <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
         <div>
@@ -85,16 +85,16 @@ export default async function TransactionsPage() {
         <div className="grid gap-3">
           <div className="flex items-center justify-between gap-4">
             <h2 className="text-xl font-black text-ink">{t.recent}</h2>
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-muted shadow-card">{t.recentPrefix} {transactions.length}</span>
+            <span className="rounded-full bg-surface px-3 py-1 text-xs font-black text-muted shadow-card">{t.recentPrefix} {transactions.length}</span>
           </div>
-          {transactions.length === 0 ? <p className="rounded-panel border border-dashed border-slate-300 bg-white/80 p-5 text-sm font-bold text-muted">{t.empty}</p> : null}
+          {transactions.length === 0 ? <p className="rounded-panel border border-dashed border-line bg-surface/80 p-5 text-sm font-bold text-muted">{t.empty}</p> : null}
           {transactions.map((transaction) => (
-            <article key={transaction.id} className="rounded-panel border border-slate-200 bg-white p-4 shadow-card">
+            <article key={transaction.id} className="rounded-panel border border-line bg-surface p-4 shadow-card">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{t.types[transaction.type]}</span>
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-black text-muted">{transaction.transaction_date}</span>
+                    <span className="rounded-full bg-elevated px-2.5 py-1 text-xs font-black text-muted">{transaction.transaction_date}</span>
                   </div>
                   <p className="mt-2 text-2xl font-black text-ink">{formatMoney(transaction.amount)}</p>
                   <p className="mt-1 text-sm font-semibold text-muted">{transaction.account_id ? accountName.get(transaction.account_id) ?? t.accountFallback : t.noCashAccount}{transaction.destination_account_id ? " -> " + (accountName.get(transaction.destination_account_id) ?? t.destinationFallback) : ""}</p>

@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import "./globals.css";
 import { RegisterServiceWorker } from "@/components/register-service-worker";
+import { THEME_COOKIE, resolveTheme } from "@/lib/theme";
 
 export const metadata: Metadata = {
   title: "My Budget Management",
@@ -13,15 +15,19 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#087f8c",
+  themeColor: "#0a0e16",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  // Resolve the theme server-side so the correct palette renders with no flash.
+  const cookieStore = await cookies();
+  const theme = resolveTheme(cookieStore.get(THEME_COOKIE)?.value);
+
   return (
-    <html lang="th">
+    <html lang="th" className={theme === "light" ? "light" : ""}>
       <body>
         {children}
         <RegisterServiceWorker />

@@ -21,7 +21,7 @@ function todayInput() {
 
 function ResultMessage({ state }: { state: TransactionActionState }) {
   if (!state.message) return null;
-  return <p className={"rounded-2xl px-4 py-3 text-sm font-bold " + (state.status === "success" ? "bg-emerald-50 text-emerald-800" : "bg-rose-50 text-rose-800")}>{state.message}</p>;
+  return <p className={"rounded-2xl px-4 py-3 text-sm font-bold " + (state.status === "success" ? "bg-income/10 text-income" : "bg-danger/10 text-danger")}>{state.message}</p>;
 }
 
 function AccountSelect({ accounts, defaultAccountId, locale }: { accounts: AccountOption[]; defaultAccountId?: string | null; locale: Locale }) {
@@ -31,7 +31,7 @@ function AccountSelect({ accounts, defaultAccountId, locale }: { accounts: Accou
   return (
     <label className="grid gap-2 text-sm font-black text-ink">
       {t.payFromAccount}
-      <select name="account_id" required defaultValue={preferredAccountId} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60">
+      <select name="account_id" required defaultValue={preferredAccountId} className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60">
         <option value="" disabled>{t.chooseAccount}</option>
         {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
       </select>
@@ -45,13 +45,13 @@ export function DebtPaymentForm({ debts, accounts, defaultAccountId, locale }: {
   const common = dictionaries[locale].common;
 
   return (
-    <form action={formAction} className="grid gap-4 rounded-panel border border-emerald-100 bg-emerald-50/70 p-4 shadow-card">
+    <form action={formAction} className="grid gap-4 rounded-panel border border-income/20 bg-income/10 p-4 shadow-card">
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="type" value="debt_payment" />
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-black text-ink">
           {t.debt}
-          <select name="debt_id" required defaultValue={debts[0]?.id ?? ""} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60">
+          <select name="debt_id" required defaultValue={debts[0]?.id ?? ""} className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60">
             <option value="" disabled>{t.chooseDebt}</option>
             {debts.map((debt) => <option key={debt.id} value={debt.id}>{debt.name}</option>)}
           </select>
@@ -61,11 +61,11 @@ export function DebtPaymentForm({ debts, accounts, defaultAccountId, locale }: {
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-black text-ink">
           {t.amount}
-          <input name="amount" type="number" min="0.01" step="0.01" required className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
+          <input name="amount" type="number" min="0.01" step="0.01" required className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
         <label className="grid gap-2 text-sm font-black text-ink">
           {t.paymentDate}
-          <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
+          <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
       </div>
       <input type="hidden" name="notes" value="Debt payment from debts and cards page" />
@@ -83,12 +83,12 @@ export function CardExpenseForm({ cards, locale }: { cards: CardOption[]; locale
   const common = dictionaries[locale].common;
 
   return (
-    <form action={formAction} className="grid gap-4 rounded-panel border border-amber-100 bg-amber-50/70 p-4 shadow-card">
+    <form action={formAction} className="grid gap-4 rounded-panel border border-warning/30 bg-warning/10 p-4 shadow-card">
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="type" value="credit_card_expense" />
       <label className="grid gap-2 text-sm font-black text-ink">
         {t.creditCard}
-        <select name="credit_card_id" required defaultValue={cards[0]?.id ?? ""} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60">
+        <select name="credit_card_id" required defaultValue={cards[0]?.id ?? ""} className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60">
           <option value="" disabled>{t.chooseCard}</option>
           {cards.map((card) => <option key={card.id} value={card.id}>{card.name}</option>)}
         </select>
@@ -96,16 +96,16 @@ export function CardExpenseForm({ cards, locale }: { cards: CardOption[]; locale
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-black text-ink">
           {t.amount}
-          <input name="amount" type="number" min="0.01" step="0.01" required className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
+          <input name="amount" type="number" min="0.01" step="0.01" required className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
         <label className="grid gap-2 text-sm font-black text-ink">
           {t.expenseDate}
-          <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
+          <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
       </div>
       <label className="grid gap-2 text-sm font-black text-ink">
         {t.notes}
-        <input name="notes" placeholder={t.notesPlaceholder} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
+        <input name="notes" placeholder={t.notesPlaceholder} className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
       </label>
       <button disabled={isPending || cards.length === 0} className="rounded-2xl bg-amber-600 px-5 py-3 text-sm font-black text-white shadow-card transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60">
         {isPending ? common.saving : t.addCardExpense}
@@ -121,13 +121,13 @@ export function CardPaymentForm({ statements, accounts, defaultAccountId, locale
   const common = dictionaries[locale].common;
 
   return (
-    <form action={formAction} className="grid gap-4 rounded-panel border border-blue-100 bg-blue-50/70 p-4 shadow-card">
+    <form action={formAction} className="grid gap-4 rounded-panel border border-investment/30 bg-investment/10 p-4 shadow-card">
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="type" value="credit_card_payment" />
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-black text-ink">
           {t.statement}
-          <select name="statement_id" required defaultValue={statements[0]?.id ?? ""} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60">
+          <select name="statement_id" required defaultValue={statements[0]?.id ?? ""} className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60">
             <option value="" disabled>{t.chooseStatement}</option>
             {statements.map((statement) => <option key={statement.id} value={statement.id}>{statement.label}</option>)}
           </select>
@@ -137,11 +137,11 @@ export function CardPaymentForm({ statements, accounts, defaultAccountId, locale
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="grid gap-2 text-sm font-black text-ink">
           {t.amount}
-          <input name="amount" type="number" min="0.01" step="0.01" required className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
+          <input name="amount" type="number" min="0.01" step="0.01" required className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
         <label className="grid gap-2 text-sm font-black text-ink">
           {t.paymentDate}
-          <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
+          <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
       </div>
       <input type="hidden" name="notes" value="Credit card payment from debts and cards page" />

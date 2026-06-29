@@ -1,10 +1,10 @@
-import type { ComponentType } from "react";
 import Link from "next/link";
 import { ArrowDownLeft, ArrowUpRight, Banknote, CalendarDays, CircleDollarSign, CreditCard, Landmark, PiggyBank, Plus, ShieldCheck, TrendingUp, WalletCards } from "lucide-react";
 import type { FinancialCycle } from "@/lib/finance/cycle";
 import type { DashboardInput, DashboardSnapshot } from "@/lib/finance/types";
 import type { UpcomingSummary } from "@/lib/finance/upcoming";
 import { UpcomingPanel } from "@/components/upcoming/upcoming-ui";
+import { StatBlock } from "@/components/ui";
 import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 
 type DashboardShellProps = {
@@ -32,25 +32,6 @@ function formatDate(date: Date) {
   return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(date);
 }
 
-function StatCard({ label, value, tone = "neutral", icon: Icon }: { label: string; value: string; tone?: "neutral" | "income" | "warning" | "danger" | "success"; icon: ComponentType<{ size?: number; className?: string }> }) {
-  const toneClass = {
-    neutral: "bg-white text-ink border-slate-200",
-    income: "bg-emerald-50 text-emerald-800 border-emerald-100",
-    warning: "bg-amber-50 text-amber-800 border-amber-100",
-    danger: "bg-rose-50 text-rose-800 border-rose-100",
-    success: "bg-teal-50 text-teal-800 border-teal-100"
-  }[tone];
-
-  return (
-    <div className={"rounded-panel border p-4 shadow-card " + toneClass}>
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <p className="text-xs font-black uppercase tracking-normal opacity-70">{label}</p>
-        <Icon size={18} className="opacity-75" aria-hidden="true" />
-      </div>
-      <p className="break-words text-2xl font-black leading-none">{value}</p>
-    </div>
-  );
-}
 
 function ProgressRow({ label, used, total, detail, color = "bg-primary" }: { label: string; used: number; total: number; detail?: string; color?: string }) {
   const rawPercent = total <= 0 ? 0 : Math.round((used / total) * 100);
@@ -62,12 +43,12 @@ function ProgressRow({ label, used, total, detail, color = "bg-primary" }: { lab
     <div className="grid gap-2">
       <div className="flex items-center justify-between gap-4 text-sm font-bold text-ink">
         <span>{label}</span>
-        <span className={overspent ? "text-rose-700" : undefined}>{rawPercent}%</span>
+        <span className={overspent ? "text-danger" : undefined}>{rawPercent}%</span>
       </div>
-      <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+      <div className="h-2.5 overflow-hidden rounded-full bg-elevated">
         <div className={"h-full rounded-full " + barColor} style={{ width: percent + "%" }} />
       </div>
-      {detail ? <p className={"text-xs font-bold " + (overspent ? "text-rose-700" : "text-muted")}>{detail}</p> : null}
+      {detail ? <p className={"text-xs font-bold " + (overspent ? "text-danger" : "text-muted")}>{detail}</p> : null}
     </div>
   );
 }
@@ -83,47 +64,47 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, upco
 
   return (
     <div className="grid gap-5">
-      <section className="overflow-hidden rounded-[28px] border border-primary/15 bg-gradient-to-br from-white via-teal-50 to-blue-50 p-5 shadow-soft md:p-8">
+      <section className="overflow-hidden rounded-[28px] border border-primary/15 bg-gradient-to-br from-elevated via-surface to-surface p-5 shadow-soft md:p-8">
         <div className="mb-4 grid gap-2">
-          <div className={"w-fit rounded-full px-3 py-1 text-xs font-black uppercase tracking-normal " + (source === "supabase" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800")}>{sourceLabel}</div>
+          <div className={"w-fit rounded-full px-3 py-1 text-xs font-black uppercase tracking-normal " + (source === "supabase" ? "bg-income/15 text-income" : "bg-warning/15 text-warning")}>{sourceLabel}</div>
           {notices.map((notice) => (
-            <p key={notice} className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm font-bold text-muted">{notice}</p>
+            <p key={notice} className="rounded-2xl border border-line bg-surface/80 px-4 py-3 text-sm font-bold text-muted">{notice}</p>
           ))}
           {status === "error" && errorMessage ? (
-            <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">Supabase error: {errorMessage}</p>
+            <p className="rounded-2xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm font-bold text-danger">Supabase error: {errorMessage}</p>
           ) : null}
           {status === "empty" ? (
-            <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">{locale === "th" ? "เพิ่มบัญชี subscription งบ หนี้ statement บัตร หรือรายการเงิน เพื่อใช้ข้อมูลจริงแทนข้อมูลตัวอย่าง" : "Add accounts, subscriptions, budgets, debts, card statements, or transactions to replace this demo dashboard with real private data."}</p>
+            <p className="rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm font-bold text-warning">{locale === "th" ? "เพิ่มบัญชี subscription งบ หนี้ statement บัตร หรือรายการเงิน เพื่อใช้ข้อมูลจริงแทนข้อมูลตัวอย่าง" : "Add accounts, subscriptions, budgets, debts, card statements, or transactions to replace this demo dashboard with real private data."}</p>
           ) : null}
         </div>
         <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="mb-4 flex flex-wrap gap-2">
               <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-black uppercase tracking-normal text-primary">{t.cycleBadge}</span>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-muted shadow-card">{cycle.label}</span>
+              <span className="rounded-full bg-surface px-3 py-1 text-xs font-black text-muted shadow-card">{cycle.label}</span>
             </div>
             <h1 className="max-w-3xl text-3xl font-black leading-tight text-ink md:text-5xl">{t.realAvailable}</h1>
             <p className="mt-3 max-w-2xl text-sm font-semibold text-muted md:text-base">{t.subtitle}</p>
           </div>
-          <div className="rounded-3xl bg-ink p-5 text-white shadow-soft md:min-w-80">
-            <p className="text-sm font-bold text-white/65">{t.realAvailableCard}</p>
-            <p className="mt-2 text-4xl font-black leading-none md:text-5xl">{formatMoney(snapshot.realAvailableMoney)}</p>
-            <p className="mt-4 text-sm text-white/70">{t.dailySafeAmount}: <strong className="text-white">{formatMoney(dailyAvailable)}</strong></p>
+          <div className="rounded-3xl border border-primary/25 bg-gradient-to-br from-elevated to-surface p-6 shadow-glow md:min-w-80">
+            <p className="text-caption font-black uppercase text-primary">{t.realAvailableCard}</p>
+            <p className="mt-2 font-display text-display font-black leading-none tabular-nums text-ink md:text-display-lg">{formatMoney(snapshot.realAvailableMoney)}</p>
+            <p className="mt-4 text-sm font-semibold text-muted">{t.dailySafeAmount}: <strong className="tabular-nums text-income">{formatMoney(dailyAvailable)}</strong></p>
           </div>
         </div>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label={t.cashLike} value={formatMoney(snapshot.cashLikeBalance)} icon={WalletCards} tone="success" />
-        <StatCard label={t.cycleIncome} value={formatMoney(snapshot.cycleIncome)} icon={ArrowDownLeft} tone="income" />
-        <StatCard label={t.investmentTracking} value={formatMoney(snapshot.investmentTransfersThisCycle)} icon={TrendingUp} tone="neutral" />
-        <StatCard label={t.dailyAvailable} value={formatMoney(dailyAvailable)} icon={CircleDollarSign} tone="success" />
+        <StatBlock label={t.cashLike} value={formatMoney(snapshot.cashLikeBalance)} icon={WalletCards} tone="primary" />
+        <StatBlock label={t.cycleIncome} value={formatMoney(snapshot.cycleIncome)} icon={ArrowDownLeft} tone="income" />
+        <StatBlock label={t.investmentTracking} value={formatMoney(snapshot.investmentTransfersThisCycle)} icon={TrendingUp} tone="investment" />
+        <StatBlock label={t.dailyAvailable} value={formatMoney(dailyAvailable)} icon={CircleDollarSign} tone="primary" />
       </section>
 
       <UpcomingPanel summary={upcoming} locale={locale} />
 
       <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
-        <div className="rounded-panel border border-slate-200 bg-white p-4 shadow-card md:p-5">
+        <div className="rounded-panel border border-line bg-surface p-4 shadow-card md:p-5">
           <div className="mb-5 flex items-center justify-between gap-4">
             <div>
               <p className="text-xs font-black uppercase tracking-normal text-muted">{t.reservedBeforeSpending}</p>
@@ -132,17 +113,17 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, upco
             <ShieldCheck className="text-primary" size={24} aria-hidden="true" />
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <StatCard label={t.unpaidObligations} value={formatMoney(snapshot.unpaidObligations)} icon={ArrowUpRight} tone="warning" />
-            <StatCard label={t.cardPayable} value={formatMoney(snapshot.remainingCreditCardPayable)} icon={CreditCard} tone="danger" />
-            <StatCard label={t.plannedDebt} value={formatMoney(snapshot.plannedDebtPayments)} icon={Landmark} tone="danger" />
-            <StatCard label={t.sinkingFunds} value={formatMoney(snapshot.monthlySinkingFundReserves)} icon={PiggyBank} tone="warning" />
-            <StatCard label={t.reservedBudgets} value={formatMoney(snapshot.unspentReservedBudgets)} icon={Banknote} tone="neutral" />
-            <StatCard label={t.investmentAccountBalance} value={formatMoney(snapshot.investmentBalance)} icon={TrendingUp} tone="neutral" />
+            <StatBlock label={t.unpaidObligations} value={formatMoney(snapshot.unpaidObligations)} icon={ArrowUpRight} tone="warning" />
+            <StatBlock label={t.cardPayable} value={formatMoney(snapshot.remainingCreditCardPayable)} icon={CreditCard} tone="expense" />
+            <StatBlock label={t.plannedDebt} value={formatMoney(snapshot.plannedDebtPayments)} icon={Landmark} tone="debt" />
+            <StatBlock label={t.sinkingFunds} value={formatMoney(snapshot.monthlySinkingFundReserves)} icon={PiggyBank} tone="warning" />
+            <StatBlock label={t.reservedBudgets} value={formatMoney(snapshot.unspentReservedBudgets)} icon={Banknote} tone="neutral" />
+            <StatBlock label={t.investmentAccountBalance} value={formatMoney(snapshot.investmentBalance)} icon={TrendingUp} tone="investment" />
           </div>
         </div>
 
         <div className="grid gap-4">
-          <div id="cards" className="rounded-panel border border-slate-200 bg-white p-4 shadow-card md:p-5">
+          <div id="cards" className="rounded-panel border border-line bg-surface p-4 shadow-card md:p-5">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <p className="text-xs font-black uppercase tracking-normal text-muted">{t.cardLifecycle}</p>
@@ -153,14 +134,14 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, upco
             <div className="grid gap-3 text-sm font-semibold text-muted">
               <p>{t.cardLifecycleText1}</p>
               <p>{t.cardLifecycleText2}</p>
-              <div className="rounded-2xl bg-amber-50 p-4 text-amber-900">
+              <div className="rounded-2xl bg-warning/10 p-4 text-warning">
                 {t.currentCardSpending}: <strong>{formatMoney(snapshot.currentCardCycleSpending)}</strong><br />
                 {t.remainingStatementPayable}: <strong>{formatMoney(snapshot.remainingCreditCardPayable)}</strong>
               </div>
             </div>
           </div>
 
-          <div className="rounded-panel border border-slate-200 bg-white p-4 shadow-card md:p-5">
+          <div className="rounded-panel border border-line bg-surface p-4 shadow-card md:p-5">
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <p className="text-xs font-black uppercase tracking-normal text-muted">{t.financialCycle}</p>
@@ -173,16 +154,16 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, upco
         </div>
       </section>
 
-      <section id="budgets" className="grid gap-4 rounded-panel border border-slate-200 bg-white p-4 shadow-card md:p-5">
+      <section id="budgets" className="grid gap-4 rounded-panel border border-line bg-surface p-4 shadow-card md:p-5">
         <div className="flex items-center justify-between gap-4">
           <div>
             <p className="text-xs font-black uppercase tracking-normal text-muted">{t.budgetReservePacing}</p>
             <h2 className="mt-1 text-xl font-black text-ink">{t.budgetSinkingTitle}</h2>
           </div>
-          <Link href="/planning" className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-white shadow-card" aria-label={t.budgetSinkingTitle}><Plus size={20} aria-hidden="true" /></Link>
+          <Link href="/planning" className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-canvas shadow-card" aria-label={t.budgetSinkingTitle}><Plus size={20} aria-hidden="true" /></Link>
         </div>
         {input.reservedBudgets.length === 0 && sinkingFunds.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-bold text-muted">{t.noBudgets}</p>
+          <p className="rounded-2xl border border-dashed border-line bg-elevated p-4 text-sm font-bold text-muted">{t.noBudgets}</p>
         ) : null}
         {input.reservedBudgets.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -217,11 +198,11 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, upco
         ) : null}
       </section>
 
-      <section id="transactions" className="rounded-panel border border-dashed border-slate-300 bg-white/72 p-5 text-sm font-semibold text-muted">
+      <section id="transactions" className="rounded-panel border border-dashed border-line bg-surface/72 p-5 text-sm font-semibold text-muted">
         {source === "supabase" ? t.dashboardSourceLive : t.dashboardSourceDemo}
       </section>
 
-      <section id="settings" className="rounded-panel border border-slate-200 bg-white p-5 shadow-card">
+      <section id="settings" className="rounded-panel border border-line bg-surface p-5 shadow-card">
         <h2 className="text-xl font-black text-ink">{t.settingsFoundation}</h2>
         <p className="mt-2 text-sm font-semibold text-muted">{t.settingsFoundationText}</p>
       </section>
