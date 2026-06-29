@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { CalendarDays, Database, Download, Languages, LogOut, Palette, Settings, ShieldCheck, Smartphone, WalletCards } from "lucide-react";
+import { DangerZone } from "@/components/settings/danger-zone";
 import { LogoutButton } from "@/components/settings/logout-button";
 import { SettingsForm } from "@/components/settings/settings-form";
 import { ThemeToggle } from "@/components/settings/theme-toggle";
@@ -146,6 +147,10 @@ export default async function SettingsPage() {
             <p className="text-sm font-semibold text-muted">{t.dailyPolishText}</p>
           </article>
         </div>
+      </section>
+
+      <section>
+        <DangerZone locale={locale} />
       </section>
     </div>
   );

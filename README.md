@@ -2071,3 +2071,31 @@ Verify on a narrow viewport (360–414px) for no horizontal scroll, ≥44px tap 
 - App-wide className migration from hardcoded light utilities (`bg-white`, `bg-slate-*`, light tint pairs, hero gradients) to dark tokens across all pages, forms, nav, loading/empty/error states.
 - Dashboard hero refactored to the `StatBlock` primitive with semantic tones; `account-form` refactored to `Input`/`Select`/`Button`.
 - Added `settings.appearance/themeDark/themeLight/themeHint` i18n keys (th + en).
+
+## 92. Reset All My Data (Settings → Danger Zone)
+
+A self-service way for the logged-in user to wipe **their own** finance data, scoped by RLS. Lives in Settings under a red **Danger zone** card, separated from everything else.
+
+### What it does
+
+- Deletes the current user's rows in FK-safe (child → parent) order: `card_payments`, `card_transactions`, `credit_card_statements`, `credit_cards`, `debt_payments`, `debts`, `transactions`, `budgets`, `subscriptions`, `annual_expenses`, `categories`, `accounts`.
+- **Keeps** `profiles` and `app_settings`, so language, currency, financial-cycle start day, and bonus months survive. `app_settings.default_account_id` nulls out automatically once accounts are gone.
+- Every delete is filtered by the authenticated `user_id` and relies on **RLS** — the service role key is never used, and no other user's data can be touched.
+- After success, the dashboard, accounts, transactions, planning, categories, debts/cards, reports, upcoming, and settings routes are revalidated, so the app returns to its empty/demo state.
+
+### Safety / UX
+
+- A confirmation input requires the user to type the exact word **`RESET`**; the delete button stays disabled until it matches, and the server action re-validates the word before deleting anything.
+- Localized (th + en) with clear success/error states.
+- **This is destructive and irreversible in v1.** The card says so and recommends downloading a backup first. It pairs with the read-only **export/backup** (JSON + transactions CSV) in Settings (Phase 12 covers backup/restore more fully); export before you reset if you might need the data.
+
+### Implementation
+
+- `resetAllData` server action in `src/app/(private)/settings/actions.ts` (RLS-scoped deletes, no migration, no service role).
+- `src/lib/reset.ts` — shared `RESET_CONFIRM_WORD` and `RESET_TABLE_ORDER` (used by both the action and the UI).
+- `src/components/settings/danger-zone.tsx` — the Danger zone card and confirm flow.
+- i18n keys `settings.dangerZone/resetTitle/resetDescription/resetIrreversible/resetConfirmLabel/resetConfirmPlaceholder/resetButton/resetting` (th + en).
+
+### Changelog
+
+- Add "Reset all my data" (Danger zone) — RLS-scoped, FK-safe deletion of the current user's finance data with a type-`RESET` confirm step; preserves settings; revalidates all finance views; th + en. No DB migration, no service role key.
