@@ -508,7 +508,18 @@ export const dictionaries = {
         addCardExpense: "เพิ่มรายการใช้บัตร",
         statement: "Statement",
         chooseStatement: "เลือก statement",
-        payStatement: "จ่าย statement"
+        payStatement: "จ่าย statement",
+        modeGeneral: "ใช้จ่ายทั่วไป",
+        modeInstallment: "ผ่อนสินค้า",
+        installmentName: "ชื่อสินค้า",
+        installmentNamePlaceholder: "ตัวอย่าง: iPhone, ตู้เย็น",
+        installmentTotal: "ยอดรวม",
+        installmentMonths: "จำนวนงวด (เดือน)",
+        installmentInterest: "ดอกเบี้ย % (ถ้ามี)",
+        installmentPurchaseDate: "วันที่ซื้อ",
+        addInstallment: "เพิ่มรายการผ่อน",
+        installmentHelp: "การผ่อนจะถูกบันทึกเป็นหนี้ผูกกับบัตร และจ่ายผ่านฟอร์มจ่ายหนี้ ไม่สร้าง statement หรือรายการใช้บัตร",
+        installmentTerm: "ผ่อน {n} เดือน"
       },
       messages: {
         loginAgain: "กรุณาเข้าสู่ระบบอีกครั้ง",
@@ -529,7 +540,12 @@ export const dictionaries = {
         statementDatesRequired: "กรุณาระบุรอบ statement และวันครบกำหนด",
         statementUpdated: "บันทึก statement แล้ว",
         statementAdded: "เพิ่ม statement แล้ว",
-        saveStatementFailed: "บันทึก statement ไม่สำเร็จ"
+        saveStatementFailed: "บันทึก statement ไม่สำเร็จ",
+        installmentNameRequired: "กรุณากรอกชื่อสินค้า",
+        installmentTotalPositive: "ยอดรวมต้องมากกว่าศูนย์",
+        installmentMonthsRange: "จำนวนงวดต้องอย่างน้อย 1 เดือน",
+        installmentAdded: "เพิ่มรายการผ่อนแล้ว",
+        saveInstallmentFailed: "บันทึกรายการผ่อนไม่สำเร็จ"
       }
     },
     transactions: {
@@ -1132,7 +1148,18 @@ export const dictionaries = {
         addCardExpense: "Add card expense",
         statement: "Statement",
         chooseStatement: "Choose statement",
-        payStatement: "Pay statement"
+        payStatement: "Pay statement",
+        modeGeneral: "General spending",
+        modeInstallment: "Installment",
+        installmentName: "Item name",
+        installmentNamePlaceholder: "Example: iPhone, fridge",
+        installmentTotal: "Total amount",
+        installmentMonths: "Term (months)",
+        installmentInterest: "Interest % (optional)",
+        installmentPurchaseDate: "Purchase date",
+        addInstallment: "Add installment",
+        installmentHelp: "An installment is recorded as a card-linked debt and paid via the debt-payment form. No statement or card transaction is created.",
+        installmentTerm: "{n}-month installment"
       },
       messages: {
         loginAgain: "Please log in again.",
@@ -1153,7 +1180,12 @@ export const dictionaries = {
         statementDatesRequired: "Statement cycle and due date are required.",
         statementUpdated: "Statement updated.",
         statementAdded: "Statement added.",
-        saveStatementFailed: "Could not save statement."
+        saveStatementFailed: "Could not save statement.",
+        installmentNameRequired: "Item name is required.",
+        installmentTotalPositive: "Total amount must be greater than zero.",
+        installmentMonthsRange: "Term must be at least 1 month.",
+        installmentAdded: "Installment added.",
+        saveInstallmentFailed: "Could not save installment."
       }
     },
     transactions: {

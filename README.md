@@ -2143,3 +2143,19 @@ Paying a subscription by credit card now updates status exactly like paying from
 - Planning `paidThisCycle` now counts a subscription/bill as paid when an `expense` **or** `credit_card_expense` is linked to it this cycle (so the "monthly subscriptions still owed" total and the paid badge stay consistent). Budget `used` still counts cash expenses only (unchanged).
 - Upcoming's `linkedThisCycle` is type-agnostic, so a card-linked charge clears the subscription from the ครบกำหนด page and prevents the overdue flag — no change needed there.
 - Constraints: RLS only; the debts-cards standalone card-expense flow still falls back to the card id (sends no `expense_related_entity_id`); sinking-fund/debt/budget flows untouched; all UI text via i18n.
+
+## 97. Installments as Card-Linked Debts (separate rail from general spending)
+
+General card spending and installments now live on separate rails:
+
+- **General spending** (unchanged): `credit_card_expense` → statement → paid via the statement-payment flow.
+- **Installment**: a card-linked **debt** (`type=installment`) shown in "debt progress" and paid via the existing debt-payment flow. No `card_transaction` or statement is created (avoids double-counting in the dashboard). Payment/reconciliation logic is unchanged.
+
+Changes (migration `008` required):
+- Migration `008_add_debt_card_link_and_term.sql`: adds nullable `debts.card_id` (FK → `credit_cards(id) on delete set null`) and `debts.installment_months` (check ≥ 1), plus an index. `installment` is already in the `debt_type` enum.
+- `debt-form.tsx`: "Add Debt" now offers only `interest_free / personal_loan / other`. The TS union and all i18n debtType labels are preserved so legacy `installment` / `credit_card_debt` rows still render; editing such a row keeps its current type as an extra option.
+- Card section has a **General spending / Installment** toggle (`CardActivityForms`). `CardExpenseForm` is unchanged; `CardInstallmentForm` collects card, item name, total, term (months), optional interest %, and purchase date.
+- `saveCardInstallment` action: validates card/name/total/months/interest; flat-rate `totalRepayable = round(total*(1+interest/100),2)`, `monthly_payment = round(totalRepayable/months,2)`; inserts a `type=installment` debt. No statement/card transaction.
+- Debts page shows installments in "debt progress" with the linked card name and term (e.g. "12-month installment"); reuses existing progress/remaining logic.
+- i18n th+en for mode labels, installment fields, term display, and validation messages.
+- Constraints: RLS only; statement-payment, debt-payment, and `dashboard.ts` math untouched; all UI text via i18n.

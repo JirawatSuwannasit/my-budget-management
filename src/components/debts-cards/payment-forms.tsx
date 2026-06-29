@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { saveTransaction, type TransactionActionState } from "@/app/(private)/transactions/actions";
+import { saveCardInstallment, type DebtCardActionState } from "@/app/(private)/debts-cards/actions";
 import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 
 export type AccountOption = { id: string; name: string; type: string; active?: boolean };
@@ -10,6 +11,7 @@ export type CardOption = { id: string; name: string; active?: boolean };
 export type StatementOption = { id: string; card_id: string; label: string; remaining_payable: number; due_date: string; status: string };
 
 const initialState: TransactionActionState = { status: "idle", message: "" };
+const installmentInitialState: DebtCardActionState = { status: "idle", message: "" };
 
 function todayInput() {
   const date = new Date();
@@ -150,5 +152,84 @@ export function CardPaymentForm({ statements, accounts, defaultAccountId, locale
       </button>
       <ResultMessage state={state} />
     </form>
+  );
+}
+
+// Installment mode: records a card-linked debt (type=installment) via
+// saveCardInstallment. It does NOT create a card_transaction or statement —
+// installments live entirely on the debt rail and are paid via the debt-payment
+// form. Purchase date is collected for the user's reference only.
+function CardInstallmentForm({ cards, locale }: { cards: CardOption[]; locale: Locale }) {
+  const [state, formAction, isPending] = useActionState(saveCardInstallment, installmentInitialState);
+  const t = dictionaries[locale].debtsCards.form;
+  const common = dictionaries[locale].common;
+
+  return (
+    <form action={formAction} className="grid gap-4 rounded-panel border border-debt/30 bg-debt/10 p-4 shadow-card">
+      <input type="hidden" name="locale" value={locale} />
+      <label className="grid gap-2 text-sm font-black text-ink">
+        {t.creditCard}
+        <select name="card_id" required defaultValue={cards[0]?.id ?? ""} className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60">
+          <option value="" disabled>{t.chooseCard}</option>
+          {cards.map((card) => <option key={card.id} value={card.id}>{card.name}</option>)}
+        </select>
+      </label>
+      <label className="grid gap-2 text-sm font-black text-ink">
+        {t.installmentName}
+        <input name="name" required placeholder={t.installmentNamePlaceholder} className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
+      </label>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <label className="grid gap-2 text-sm font-black text-ink">
+          {t.installmentTotal}
+          <input name="total" type="number" min="0.01" step="0.01" required className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold tabular-nums outline-none transition focus:border-primary/60" />
+        </label>
+        <label className="grid gap-2 text-sm font-black text-ink">
+          {t.installmentMonths}
+          <input name="months" type="number" min="1" step="1" required className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold tabular-nums outline-none transition focus:border-primary/60" />
+        </label>
+        <label className="grid gap-2 text-sm font-black text-ink">
+          {t.installmentInterest}
+          <input name="interest_rate" type="number" min="0" step="0.01" defaultValue={0} className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold tabular-nums outline-none transition focus:border-primary/60" />
+        </label>
+      </div>
+      <label className="grid gap-2 text-sm font-black text-ink">
+        {t.installmentPurchaseDate}
+        <input name="purchase_date" type="date" defaultValue={todayInput()} className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
+      </label>
+      <button disabled={isPending || cards.length === 0} className="rounded-2xl bg-debt px-5 py-3 text-sm font-black text-canvas shadow-card transition hover:bg-debt/90 disabled:cursor-not-allowed disabled:opacity-60">
+        {isPending ? common.saving : t.addInstallment}
+      </button>
+      <p className="text-xs font-bold text-muted">{t.installmentHelp}</p>
+      {state.message ? <p className={"rounded-2xl px-4 py-3 text-sm font-bold " + (state.status === "success" ? "bg-income/10 text-income" : "bg-danger/10 text-danger")}>{state.message}</p> : null}
+    </form>
+  );
+}
+
+// Mode toggle for the card section: general spending (statement rail) vs
+// installment (debt rail). General spending is unchanged.
+export function CardActivityForms({ cards, locale }: { cards: CardOption[]; locale: Locale }) {
+  const t = dictionaries[locale].debtsCards.form;
+  const [mode, setMode] = useState<"general" | "installment">("general");
+
+  return (
+    <div className="grid gap-3">
+      <div className="grid grid-cols-2 gap-2 rounded-2xl border border-line bg-elevated p-1.5">
+        {(["general", "installment"] as const).map((value) => {
+          const active = mode === value;
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setMode(value)}
+              aria-pressed={active}
+              className={"inline-flex min-h-11 items-center justify-center rounded-xl px-4 py-2.5 text-sm font-black transition " + (active ? "bg-primary text-canvas shadow-glow" : "text-muted hover:text-ink")}
+            >
+              {value === "general" ? t.modeGeneral : t.modeInstallment}
+            </button>
+          );
+        })}
+      </div>
+      {mode === "general" ? <CardExpenseForm cards={cards} locale={locale} /> : <CardInstallmentForm cards={cards} locale={locale} />}
+    </div>
   );
 }

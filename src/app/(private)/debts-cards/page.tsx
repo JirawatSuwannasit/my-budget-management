@@ -2,7 +2,7 @@ import { Banknote, CreditCard, Landmark, ReceiptText, TrendingDown } from "lucid
 import type { ReactNode } from "react";
 import { CreditCardForm } from "@/components/debts-cards/card-form";
 import { DebtForm } from "@/components/debts-cards/debt-form";
-import { CardExpenseForm, CardPaymentForm, DebtPaymentForm } from "@/components/debts-cards/payment-forms";
+import { CardActivityForms, CardPaymentForm, DebtPaymentForm } from "@/components/debts-cards/payment-forms";
 import { CreditCardStatementForm } from "@/components/debts-cards/statement-form";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
@@ -20,6 +20,8 @@ type DebtRow = {
   monthly_payment: number | string;
   bonus_payment_amount: number | string | null;
   target_payoff_date: string | null;
+  card_id: string | null;
+  installment_months: number | null;
   active: boolean;
 };
 type DebtPaymentRow = { id: string; debt_id: string; account_id: string | null; amount: number | string; paid_date: string; source: string | null; notes: string | null; created_at: string };
@@ -94,7 +96,7 @@ export default async function DebtsCardsPage() {
   const [profileResult, accountsResult, debtsResult, debtPaymentsResult, cardsResult, statementsResult, cardTransactionsResult, cardPaymentsResult, appSettingsResult] = await Promise.all([
     user ? supabase.from("profiles").select("locale").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
-    supabase.from("debts").select("id,name,type,original_amount,remaining_balance,interest_rate,monthly_payment,bonus_payment_amount,target_payoff_date,active").order("active", { ascending: false }).order("name"),
+    supabase.from("debts").select("id,name,type,original_amount,remaining_balance,interest_rate,monthly_payment,bonus_payment_amount,target_payoff_date,card_id,installment_months,active").order("active", { ascending: false }).order("name"),
     supabase.from("debt_payments").select("id,debt_id,account_id,amount,paid_date,source,notes,created_at").order("paid_date", { ascending: false }).limit(80),
     supabase.from("credit_cards").select("id,name,billing_cut_day,payment_due_day,active").order("active", { ascending: false }).order("name"),
     supabase.from("credit_card_statements").select("id,card_id,cycle_start,cycle_end,statement_amount_due,paid_amount,remaining_payable,due_date,status").order("due_date", { ascending: false }).limit(80),
@@ -195,7 +197,7 @@ export default async function DebtsCardsPage() {
               <article key={debt.id} className="rounded-panel border border-line bg-surface p-4 shadow-card">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-black text-ink">{debt.name}</h3><StatusPill active={debt.active} locale={locale} /><span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{t.debtTypes[debt.type]}</span></div>
+                    <div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-black text-ink">{debt.name}</h3><StatusPill active={debt.active} locale={locale} /><span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{t.debtTypes[debt.type]}</span>{debt.type === "installment" ? <span className="rounded-full bg-debt/15 px-2.5 py-1 text-xs font-black text-debt">{(debt.card_id ? cardNameById.get(debt.card_id) : null) ?? t.form.creditCard}{debt.installment_months ? " · " + t.form.installmentTerm.replace("{n}", String(debt.installment_months)) : ""}</span> : null}</div>
                     <div className="mt-4 grid gap-3">
                       <ProgressBar percent={progress} color="bg-emerald-500" />
                       <div className="grid gap-2 text-sm font-bold text-muted sm:grid-cols-3">
@@ -284,7 +286,7 @@ export default async function DebtsCardsPage() {
       <section className="grid gap-4 xl:grid-cols-2">
         <div>
           <div className="mb-3 flex items-center gap-2"><CreditCard className="text-warning" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.addCreditCardExpense}</h2></div>
-          <CardExpenseForm cards={activeCards} locale={locale} />
+          <CardActivityForms cards={activeCards} locale={locale} />
           <p className="mt-3 rounded-2xl bg-surface p-4 text-sm font-bold text-muted shadow-card">{t.cardExpenseHelp}</p>
         </div>
         <div>

@@ -18,13 +18,18 @@ export type DebtFormValue = {
 };
 
 const initialState: DebtCardActionState = { status: "idle", message: "" };
-const debtTypes: Array<NonNullable<DebtFormValue["type"]>> = ["interest_free", "personal_loan", "installment", "credit_card_debt", "other"];
+// Installments are created from the card section (debt-linked); credit_card_debt
+// is legacy. Both keep their TS union + i18n labels so old rows still render.
+const debtTypes: Array<NonNullable<DebtFormValue["type"]>> = ["interest_free", "personal_loan", "other"];
 
 export function DebtForm({ debt, compact = false, locale }: { debt?: DebtFormValue; compact?: boolean; locale: Locale }) {
   const [state, formAction, isPending] = useActionState(saveDebt, initialState);
   const defaultDebt = !debt;
   const t = dictionaries[locale].debtsCards;
   const common = dictionaries[locale].common;
+  // When editing a debt whose type isn't in the offered list (e.g. a legacy
+  // installment / credit_card_debt), include it so editing doesn't change it.
+  const offeredTypes = debt?.type && !debtTypes.includes(debt.type) ? [...debtTypes, debt.type] : debtTypes;
 
   return (
     <form action={formAction} className="grid gap-4 rounded-panel border border-line bg-surface p-4 shadow-card">
@@ -39,7 +44,7 @@ export function DebtForm({ debt, compact = false, locale }: { debt?: DebtFormVal
         <label className="grid gap-2 text-sm font-black text-ink">
           {t.form.debtType}
           <select name="type" defaultValue={debt?.type ?? "interest_free"} className="rounded-2xl border border-line bg-elevated px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-surface">
-            {debtTypes.map((type) => <option key={type} value={type}>{t.debtTypes[type]}</option>)}
+            {offeredTypes.map((type) => <option key={type} value={type}>{t.debtTypes[type]}</option>)}
           </select>
         </label>
       </div>

@@ -109,6 +109,51 @@ export async function saveDebt(_previousState: DebtCardActionState, formData: Fo
   }
 }
 
+export async function saveCardInstallment(_previousState: DebtCardActionState, formData: FormData): Promise<DebtCardActionState> {
+  const messages = getMessages(formData);
+  try {
+    const { supabase, userId } = await getUserContext(messages);
+    const cardId = textValue(formData, "card_id");
+    const name = textValue(formData, "name");
+    const total = parseAmount(formData.get("total"), messages);
+    const months = Number(formData.get("months") ?? 0);
+    const interestRate = parseAmount(formData.get("interest_rate"), messages);
+
+    if (!cardId) throw new Error(messages.chooseCard);
+    if (!name) throw new Error(messages.installmentNameRequired);
+    if (!(total > 0)) throw new Error(messages.installmentTotalPositive);
+    if (!Number.isInteger(months) || months < 1) throw new Error(messages.installmentMonthsRange);
+
+    // Flat-rate add-on interest; for 0% this equals the total. Keep it simple —
+    // no amortization. The installment lives entirely on the debt rail.
+    const totalRepayable = Math.round(total * (1 + interestRate / 100) * 100) / 100;
+    const monthlyPayment = Math.round((totalRepayable / months) * 100) / 100;
+
+    const payload = {
+      user_id: userId,
+      type: "installment" as DebtType,
+      name,
+      card_id: cardId,
+      original_amount: totalRepayable,
+      remaining_balance: totalRepayable,
+      interest_rate: interestRate,
+      monthly_payment: monthlyPayment,
+      installment_months: months,
+      bonus_payment_amount: 0,
+      target_payoff_date: null,
+      active: true
+    };
+
+    // Installments do NOT create a card_transaction or statement (would double-count).
+    const { error } = await supabase.from("debts").insert(payload);
+    if (error) throw new Error(error.message);
+    revalidateDebtCardViews();
+    return { status: "success", message: messages.installmentAdded };
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : messages.saveInstallmentFailed };
+  }
+}
+
 export async function setDebtActive(formData: FormData) {
   const messages = getMessages(formData);
   const { supabase, userId } = await getUserContext(messages);
