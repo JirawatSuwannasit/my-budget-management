@@ -139,10 +139,37 @@ export function ReserveSubscriptionForm({ subscriptionId, amount, locale }: { su
   );
 }
 
-export function ReserveAnnualExpenseForm({ annualExpenseId, amount, reserveAccountId, locale }: { annualExpenseId: string; amount: number; reserveAccountId?: string | null; locale: Locale }) {
+export function ReserveAnnualExpenseForm({
+  annualExpenseId,
+  amount,
+  accounts,
+  defaultAccountId,
+  reserveAccountId,
+  reserveAccountName,
+  locale
+}: {
+  annualExpenseId: string;
+  amount: number;
+  accounts: PlanningAccountOption[];
+  defaultAccountId?: string | null;
+  reserveAccountId?: string | null;
+  reserveAccountName?: string | null;
+  locale: Locale;
+}) {
   const [state, formAction, isPending] = useActionState(saveTransaction, initialState);
   const t = dictionaries[locale].planning.payment;
   const common = dictionaries[locale].common;
+
+  // Reserving moves money from a chosen source account into the fund's bound
+  // reserve account. Legacy funds without a reserve account can't reserve yet.
+  if (!reserveAccountId) {
+    return <p className="rounded-2xl border border-warning/30 bg-warning/10 p-3 text-xs font-bold text-warning">{t.setReserveAccountFirst}</p>;
+  }
+
+  // The source can't be the reserve account itself (no same-account transfer).
+  const sourceOptions = accounts.filter((account) => account.id !== reserveAccountId);
+  const preferredSourceId = defaultAccountId && sourceOptions.some((account) => account.id === defaultAccountId) ? defaultAccountId : sourceOptions[0]?.id ?? "";
+  const noSource = sourceOptions.length === 0;
 
   return (
     <form action={formAction} className="grid gap-3 rounded-2xl border border-income/20 bg-income/10 p-3">
@@ -150,13 +177,23 @@ export function ReserveAnnualExpenseForm({ annualExpenseId, amount, reserveAccou
       <input type="hidden" name="type" value="sinking_fund_reserve" />
       <input type="hidden" name="amount" value={amount} />
       <input type="hidden" name="reserve_entity_id" value={annualExpenseId} />
-      {reserveAccountId ? <input type="hidden" name="account_id" value={reserveAccountId} /> : null}
+      <input type="hidden" name="destination_account_id" value={reserveAccountId} />
       <input type="hidden" name="notes" value="Monthly reserve for annual expense from planning page" />
-      <label className="grid gap-2 text-xs font-black text-ink">
-        {t.reserveDate}
-        <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-income/20 bg-surface px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
-      </label>
-      <button disabled={isPending} className="rounded-2xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-card transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="grid gap-2 text-xs font-black text-ink">
+          {t.sourceAccount}
+          <select name="account_id" required defaultValue={preferredSourceId} disabled={noSource} className="rounded-2xl border border-income/20 bg-surface px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60 disabled:cursor-not-allowed disabled:opacity-60">
+            <option value="" disabled>{t.chooseSourceAccount}</option>
+            {sourceOptions.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+          </select>
+        </label>
+        <label className="grid gap-2 text-xs font-black text-ink">
+          {t.reserveDate}
+          <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-income/20 bg-surface px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
+        </label>
+      </div>
+      <p className="text-xs font-bold text-income">{t.transfersToReserve} {reserveAccountName ?? ""}</p>
+      <button disabled={isPending || noSource} className="rounded-2xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white shadow-card transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60">
         {isPending ? common.saving : t.reserveThisMonth}
       </button>
       <ResultMessage state={state} />

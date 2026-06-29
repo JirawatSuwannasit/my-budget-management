@@ -2122,3 +2122,15 @@ The Pay Subscription form now offers a single **payment source** dropdown (two o
 - i18n: `planning.payment.paymentSource / accountGroup / cardGroup / payWithCard` (th + en).
 - **Known v1 limitation (documented in code):** a card payment's `related_entity_id` is the card id, not the subscription, so the subscription's "paid this cycle" badge will not light up for card payments. Intentionally not worked around this round.
 - Constraints: RLS-only (no service role); sinking-fund / debt / budget flows untouched; no migration; all strings via i18n.
+
+## 95. "Reserve This Month" Is Now a Real Transfer
+
+Building on §93 (sinking funds bound to a reserve account), the monthly reserve action now actually moves money instead of being a balance-neutral marker.
+
+- **Reserve this month** (annual expense / sinking fund): pick a **source** account (cash-like only — never a credit card); pressing it records a `sinking_fund_reserve` that debits the source and credits the fund's bound reserve account. The type and `related_entity_id` are unchanged, so "reserved this cycle", Upcoming, and dashboard detection all still work, and editing/deleting the reserve reverses **both** balances via the generic revert path.
+- Legacy funds with no reserve account: the reserve action is disabled with an i18n note to set a reserve account first (edit the fund). The source dropdown excludes the reserve account itself (no same-account transfer).
+- **Pay annual bill** continues to use the fixed reserve account as source (§93), with the legacy picker fallback.
+- `getAccountBalanceDeltas` now treats `sinking_fund_reserve` like a transfer (debit source / credit destination). Because both accounts are cash-like, total safe-to-spend is unchanged — dashboard math (`dashboard.ts`) is untouched and net behavior matches today.
+- `buildPayload` enforces the transfer rules (source required, source ≠ reserve) **only when a destination is present**, so the subscription yearly-reserve flow (which sends no accounts) stays balance-neutral and unbroken.
+- i18n th+en: `planning.payment.sourceAccount / chooseSourceAccount / transfersToReserve / setReserveAccountFirst`; `transactions.messages.chooseReserveSource / reserveSameAccount`.
+- Migration `007` (already added) provides `annual_expenses.reserve_account_id`. Constraints honored: RLS only, no service role, debt/credit-card flows untouched, all strings via i18n.

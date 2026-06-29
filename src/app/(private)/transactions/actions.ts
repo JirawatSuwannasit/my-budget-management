@@ -107,8 +107,16 @@ function buildPayload(formData: FormData, userId: string, messages: TransactionM
   if (type === "credit_card_expense" && !creditCardId) throw new Error(messages.chooseCreditCard);
   if (type === "credit_card_payment" && !statementId) throw new Error(messages.chooseStatement);
   if (type === "debt_payment" && !debtId) throw new Error(messages.chooseDebt);
+  if (type === "sinking_fund_reserve" && rawDestinationAccountId) {
+    // Annual-expense reserves are real transfers (source cash-like -> bound
+    // reserve account). Subscription reserves send no accounts and stay
+    // balance-neutral markers, so only enforce transfer rules when a reserve
+    // (destination) account is present.
+    if (!accountId) throw new Error(messages.chooseReserveSource);
+    if (accountId === rawDestinationAccountId) throw new Error(messages.reserveSameAccount);
+  }
   const relatedEntityId = type === "expense" ? expenseRelatedEntityId : type === "credit_card_expense" ? creditCardId : type === "credit_card_payment" ? statementId : type === "debt_payment" ? debtId : type === "sinking_fund_reserve" ? reserveEntityId : null;
-  const destinationAccountId = type === "transfer" || type === "investment_transfer" ? rawDestinationAccountId : null;
+  const destinationAccountId = type === "transfer" || type === "investment_transfer" || type === "sinking_fund_reserve" ? rawDestinationAccountId : null;
   return { transaction: { user_id: userId, account_id: accountId, destination_account_id: destinationAccountId, category_id: categoryId, type, amount, transaction_date: transactionDate, cycle_start_date: toDateInput(cycleStart), related_entity_id: relatedEntityId, notes }, extras: { creditCardId, statementId, debtId } };
 }
 async function applyTransactionSideEffects(supabase: SupabaseServer, userId: string, transactionId: string, payload: ReturnType<typeof buildPayload>, messages: TransactionMessages) {

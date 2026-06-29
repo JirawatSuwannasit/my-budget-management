@@ -36,11 +36,14 @@ export function getAccountBalanceDeltas(input: BalanceEffectInput): AccountBalan
       break;
     case "transfer":
     case "investment_transfer":
+    case "sinking_fund_reserve":
+      // A sinking fund reserve is a real transfer from the source (cash-like)
+      // account into the bound reserve account. Both are cash-like, so total
+      // safe-to-spend is unchanged; the generic revert path reverses it.
       addDelta(deltas, input.accountId, -input.amount);
       addDelta(deltas, input.destinationAccountId, input.amount);
       break;
     case "credit_card_expense":
-    case "sinking_fund_reserve":
       break;
   }
 

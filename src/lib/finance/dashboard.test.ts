@@ -406,7 +406,10 @@ describe("transaction account balance effects", () => {
     ]);
   });
 
-  it("keeps virtual sinking fund reserves out of account balances", () => {
-    expect(getAccountBalanceDeltas({ type: "sinking_fund_reserve", amount: 1000, accountId: "main" })).toEqual([]);
+  it("moves money from source to reserve account for sinking fund reserves", () => {
+    expect(getAccountBalanceDeltas({ type: "sinking_fund_reserve", amount: 1000, accountId: "main", destinationAccountId: "reserve" })).toEqual([
+      { accountId: "main", delta: -1000 },
+      { accountId: "reserve", delta: 1000 }
+    ]);
   });
 });

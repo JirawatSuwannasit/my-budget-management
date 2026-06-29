@@ -345,7 +345,11 @@ export const dictionaries = {
         paymentSource: "แหล่งที่จ่าย",
         accountGroup: "บัญชีเงินสด",
         cardGroup: "บัตรเครดิต",
-        payWithCard: "จะบันทึกเป็นรายการใช้บัตรในรอบบิลของบัตร (ไม่หักเงินสด)"
+        payWithCard: "จะบันทึกเป็นรายการใช้บัตรในรอบบิลของบัตร (ไม่หักเงินสด)",
+        sourceAccount: "บัญชีต้นทาง",
+        chooseSourceAccount: "เลือกบัญชีต้นทาง",
+        transfersToReserve: "โอนเข้า",
+        setReserveAccountFirst: "ตั้งบัญชีกันเงินก่อน (แก้ไขกองทุนนี้)"
       },
       form: {
         budgetName: "ชื่องบ",
@@ -600,6 +604,8 @@ export const dictionaries = {
         chooseCashAccount: "เลือกบัญชีเงินสด/ธนาคารสำหรับรายการนี้",
         chooseTransferDestination: "เลือกบัญชีปลายทางสำหรับการโอนเงิน",
         chooseInvestmentDestination: "เลือกบัญชีลงทุนปลายทาง",
+        chooseReserveSource: "เลือกบัญชีต้นทางสำหรับกันเงิน",
+        reserveSameAccount: "บัญชีต้นทางและบัญชีกันเงินต้องไม่เป็นบัญชีเดียวกัน",
         chooseCreditCard: "เลือกบัตรเครดิต",
         chooseStatement: "เลือก statement บัตรเครดิตที่กำลังจ่าย",
         chooseDebt: "เลือกหนี้ที่กำลังจ่าย",
@@ -963,7 +969,11 @@ export const dictionaries = {
         paymentSource: "Payment source",
         accountGroup: "Cash accounts",
         cardGroup: "Credit cards",
-        payWithCard: "Recorded as a card charge on the card's statement (no cash deducted)."
+        payWithCard: "Recorded as a card charge on the card's statement (no cash deducted).",
+        sourceAccount: "Source account",
+        chooseSourceAccount: "Choose source account",
+        transfersToReserve: "Transfers to",
+        setReserveAccountFirst: "Set a reserve account first (edit this fund)."
       },
       form: {
         budgetName: "Budget name",
@@ -1218,6 +1228,8 @@ export const dictionaries = {
         chooseCashAccount: "Choose the cash/bank account for this transaction.",
         chooseTransferDestination: "Choose the destination account for the transfer.",
         chooseInvestmentDestination: "Choose the investment destination account.",
+        chooseReserveSource: "Choose a source account to reserve from.",
+        reserveSameAccount: "Source and reserve account must be different.",
         chooseCreditCard: "Choose a credit card.",
         chooseStatement: "Choose the credit card statement being paid.",
         chooseDebt: "Choose the debt being paid.",

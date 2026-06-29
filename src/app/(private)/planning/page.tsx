@@ -293,7 +293,7 @@ export default async function PlanningPage() {
                 </div>
                 {expense.active ? (
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                    <ReserveAnnualExpenseForm annualExpenseId={expense.id} amount={monthlyReserve} reserveAccountId={expense.reserve_account_id} locale={locale} />
+                    <ReserveAnnualExpenseForm annualExpenseId={expense.id} amount={monthlyReserve} accounts={cashLikeAccounts} defaultAccountId={defaultAccountId} reserveAccountId={expense.reserve_account_id} reserveAccountName={expense.reserve_account_id ? accountNameById.get(expense.reserve_account_id) ?? null : null} locale={locale} />
                     <PayAnnualBillForm annualExpenseId={expense.id} categoryId={expense.category_id} amount={toNumber(expense.annual_amount)} accounts={cashLikeAccounts} defaultAccountId={defaultAccountId} reserveAccountId={expense.reserve_account_id} reserveAccountName={expense.reserve_account_id ? accountNameById.get(expense.reserve_account_id) ?? null : null} locale={locale} />
                   </div>
                 ) : null}
