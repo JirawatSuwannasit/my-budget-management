@@ -115,7 +115,11 @@ function buildPayload(formData: FormData, userId: string, messages: TransactionM
     if (!accountId) throw new Error(messages.chooseReserveSource);
     if (accountId === rawDestinationAccountId) throw new Error(messages.reserveSameAccount);
   }
-  const relatedEntityId = type === "expense" ? expenseRelatedEntityId : type === "credit_card_expense" ? creditCardId : type === "credit_card_payment" ? statementId : type === "debt_payment" ? debtId : type === "sinking_fund_reserve" ? reserveEntityId : null;
+  // For credit_card_expense, prefer an explicit linked entity (e.g. a subscription
+  // paid by card) so cycle "paid/handled" detection works; fall back to the card
+  // id for the standalone card-expense flow. Card linkage lives in
+  // card_transactions.card_id regardless, and revert keys off transaction_id.
+  const relatedEntityId = type === "expense" ? expenseRelatedEntityId : type === "credit_card_expense" ? (expenseRelatedEntityId ?? creditCardId) : type === "credit_card_payment" ? statementId : type === "debt_payment" ? debtId : type === "sinking_fund_reserve" ? reserveEntityId : null;
   const destinationAccountId = type === "transfer" || type === "investment_transfer" || type === "sinking_fund_reserve" ? rawDestinationAccountId : null;
   return { transaction: { user_id: userId, account_id: accountId, destination_account_id: destinationAccountId, category_id: categoryId, type, amount, transaction_date: transactionDate, cycle_start_date: toDateInput(cycleStart), related_entity_id: relatedEntityId, notes }, extras: { creditCardId, statementId, debtId } };
 }

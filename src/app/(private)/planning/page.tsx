@@ -98,7 +98,10 @@ export default async function PlanningPage() {
   const cashLikeAccounts = accounts.filter((account) => account.active && account.type !== "investment");
   const activeCards = ((cardsResult.data ?? []) as CardRow[]).filter((card) => card.active).map((card) => ({ id: card.id, name: card.name }));
   const linkedThisCycle = (id: string) => transactions.some((transaction) => transaction.related_entity_id === id);
-  const paidThisCycle = (id: string) => expenseTransactions.some((transaction) => transaction.related_entity_id === id);
+  // A subscription/bill counts as paid whether it was paid from a cash account
+  // (expense) or charged to a credit card (credit_card_expense).
+  const paidTransactions = transactions.filter((transaction) => transaction.type === "expense" || transaction.type === "credit_card_expense");
+  const paidThisCycle = (id: string) => paidTransactions.some((transaction) => transaction.related_entity_id === id);
   const reservedThisCycle = (id: string) => reserveTransactions.some((transaction) => transaction.related_entity_id === id);
 
   const budgetCards = budgets.map((budget) => {

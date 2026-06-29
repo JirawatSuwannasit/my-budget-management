@@ -2134,3 +2134,12 @@ Building on §93 (sinking funds bound to a reserve account), the monthly reserve
 - `buildPayload` enforces the transfer rules (source required, source ≠ reserve) **only when a destination is present**, so the subscription yearly-reserve flow (which sends no accounts) stays balance-neutral and unbroken.
 - i18n th+en: `planning.payment.sourceAccount / chooseSourceAccount / transfersToReserve / setReserveAccountFirst`; `transactions.messages.chooseReserveSource / reserveSameAccount`.
 - Migration `007` (already added) provides `annual_expenses.reserve_account_id`. Constraints honored: RLS only, no service role, debt/credit-card flows untouched, all strings via i18n.
+
+## 96. Card-Paid Subscriptions Clear Upcoming + Mark Paid (resolves §94 limitation)
+
+Paying a subscription by credit card now updates status exactly like paying from an account, removing the v1 limitation noted in §94 — no migration.
+
+- `buildPayload`: for `credit_card_expense`, `related_entity_id` now prefers `expense_related_entity_id` (the subscription id sent by `PaySubscriptionForm`) and falls back to the card id for the standalone debts-cards card-expense flow. Card linkage still lives in `card_transactions.card_id`, and revert keys off `transaction_id`, so edit/delete still reverses cleanly.
+- Planning `paidThisCycle` now counts a subscription/bill as paid when an `expense` **or** `credit_card_expense` is linked to it this cycle (so the "monthly subscriptions still owed" total and the paid badge stay consistent). Budget `used` still counts cash expenses only (unchanged).
+- Upcoming's `linkedThisCycle` is type-agnostic, so a card-linked charge clears the subscription from the ครบกำหนด page and prevents the overdue flag — no change needed there.
+- Constraints: RLS only; the debts-cards standalone card-expense flow still falls back to the card id (sends no `expense_related_entity_id`); sinking-fund/debt/budget flows untouched; all UI text via i18n.
