@@ -11,7 +11,7 @@ import { setAnnualExpenseActive, setBudgetActive, setSubscriptionActive } from "
 
 type BudgetRow = { id: string; category_id: string | null; label: string; amount: number | string; cycle_start_date: string; active: boolean };
 type SubscriptionRow = { id: string; category_id: string | null; name: string; frequency: "monthly" | "yearly"; price: number | string; billing_day: number; payment_method: string | null; active: boolean };
-type AnnualExpenseRow = { id: string; category_id: string | null; name: string; annual_amount: number | string; monthly_reserve: number | string | null; due_date: string | null; active: boolean };
+type AnnualExpenseRow = { id: string; category_id: string | null; name: string; annual_amount: number | string; monthly_reserve: number | string | null; due_date: string | null; reserve_account_id: string | null; active: boolean };
 type CategoryRow = { id: string; name: string; kind: CategoryKind; active: boolean };
 type TransactionRow = { id: string; category_id: string | null; type: string; amount: number | string; cycle_start_date: string; related_entity_id: string | null };
 type AccountRow = { id: string; name: string; type: string; active: boolean };
@@ -72,7 +72,7 @@ export default async function PlanningPage() {
     supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
     supabase.from("budgets").select("id,category_id,label,amount,cycle_start_date,active").eq("cycle_start_date", cycleStartDate).order("active", { ascending: false }).order("label"),
     supabase.from("subscriptions").select("id,category_id,name,frequency,price,billing_day,payment_method,active").order("active", { ascending: false }).order("name"),
-    supabase.from("annual_expenses").select("id,category_id,name,annual_amount,monthly_reserve,due_date,active").order("active", { ascending: false }).order("name"),
+    supabase.from("annual_expenses").select("id,category_id,name,annual_amount,monthly_reserve,due_date,reserve_account_id,active").order("active", { ascending: false }).order("name"),
     supabase.from("categories").select("id,name,kind,active").order("name"),
     supabase.from("transactions").select("id,category_id,type,amount,cycle_start_date,related_entity_id").eq("cycle_start_date", cycleStartDate),
     user ? supabase.from("app_settings").select("default_account_id").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null })
@@ -88,6 +88,7 @@ export default async function PlanningPage() {
   const categories = (categoriesResult.data ?? []) as CategoryRow[];
   const transactions = (transactionsResult.data ?? []) as TransactionRow[];
   const categoryNameById = new Map(categories.map((category) => [category.id, category.name]));
+  const accountNameById = new Map(accounts.map((account) => [account.id, account.name]));
   const defaultAccountId = (appSettingsResult.data as { default_account_id: string | null } | null)?.default_account_id ?? null;
   const loadError = profileResult.error ?? accountsResult.error ?? budgetsResult.error ?? subscriptionsResult.error ?? annualResult.error ?? categoriesResult.error ?? transactionsResult.error;
   const expenseTransactions = transactions.filter((transaction) => transaction.type === "expense");
@@ -254,7 +255,7 @@ export default async function PlanningPage() {
             <PiggyBank className="text-primary" size={20} aria-hidden="true" />
             <h2 className="text-xl font-black text-ink">{t.addSinkingFund}</h2>
           </div>
-          <AnnualExpenseForm locale={locale} />
+          <AnnualExpenseForm accounts={cashLikeAccounts} locale={locale} />
         </div>
 
         <div className="grid gap-3">
@@ -289,14 +290,14 @@ export default async function PlanningPage() {
                 </div>
                 {expense.active ? (
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                    <ReserveAnnualExpenseForm annualExpenseId={expense.id} amount={monthlyReserve} locale={locale} />
-                    <PayAnnualBillForm annualExpenseId={expense.id} categoryId={expense.category_id} amount={toNumber(expense.annual_amount)} accounts={cashLikeAccounts} defaultAccountId={defaultAccountId} locale={locale} />
+                    <ReserveAnnualExpenseForm annualExpenseId={expense.id} amount={monthlyReserve} reserveAccountId={expense.reserve_account_id} locale={locale} />
+                    <PayAnnualBillForm annualExpenseId={expense.id} categoryId={expense.category_id} amount={toNumber(expense.annual_amount)} accounts={cashLikeAccounts} defaultAccountId={defaultAccountId} reserveAccountId={expense.reserve_account_id} reserveAccountName={expense.reserve_account_id ? accountNameById.get(expense.reserve_account_id) ?? null : null} locale={locale} />
                   </div>
                 ) : null}
                 {expense.active && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-warning/10 p-3 text-sm font-bold text-warning">{t.addCashLikeAccountAnnual}</p> : null}
                 <details className="mt-4">
                   <summary className="cursor-pointer text-sm font-black text-primary">{t.editSinkingFund}</summary>
-                  <div className="mt-3"><AnnualExpenseForm annualExpense={{ ...expense, category_name: categoryName }} compact locale={locale} /></div>
+                  <div className="mt-3"><AnnualExpenseForm annualExpense={{ ...expense, category_name: categoryName }} accounts={cashLikeAccounts} compact locale={locale} /></div>
                 </details>
               </article>
             );

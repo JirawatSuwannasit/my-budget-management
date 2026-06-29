@@ -195,11 +195,12 @@ export async function saveAnnualExpense(_previousState: PlanningActionState, for
     const categoryId = await getOrCreateCategory(supabase, userId, categoryName, "sinking_fund");
     const annualAmount = parseAmount(formData.get("annual_amount"), messages);
     const dueDate = textValue(formData, "due_date");
+    const reserveAccountId = textValue(formData, "reserve_account_id");
     const active = formData.get("active") === "on";
 
     if (!name) throw new Error(messages.annualExpenseNameRequired);
 
-    const payload = { user_id: userId, name, category_id: categoryId, annual_amount: annualAmount, due_date: dueDate, active };
+    const payload = { user_id: userId, name, category_id: categoryId, annual_amount: annualAmount, due_date: dueDate, reserve_account_id: reserveAccountId, active };
     if (id) {
       const { error } = await supabase.from("annual_expenses").update(payload).eq("id", id).eq("user_id", userId);
       if (error) throw new Error(error.message);

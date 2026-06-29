@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { saveAnnualExpense, type PlanningActionState } from "@/app/(private)/planning/actions";
+import type { PlanningAccountOption } from "@/components/planning/payment-workflow-forms";
 import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 
 export type AnnualExpenseFormValue = {
@@ -10,6 +11,7 @@ export type AnnualExpenseFormValue = {
   category_name?: string;
   annual_amount?: number | string;
   due_date?: string | null;
+  reserve_account_id?: string | null;
   active?: boolean;
 };
 
@@ -23,11 +25,12 @@ const annualCategories = {
   en: ["Housing", "Insurance", "Sports / football", "Other"]
 };
 
-export function AnnualExpenseForm({ annualExpense, compact = false, locale }: { annualExpense?: AnnualExpenseFormValue; compact?: boolean; locale: Locale }) {
+export function AnnualExpenseForm({ annualExpense, accounts = [], compact = false, locale }: { annualExpense?: AnnualExpenseFormValue; accounts?: PlanningAccountOption[]; compact?: boolean; locale: Locale }) {
   const [state, formAction, isPending] = useActionState(saveAnnualExpense, initialState);
   const idPrefix = annualExpense?.id ?? "new";
   const t = dictionaries[locale].planning;
   const common = dictionaries[locale].common;
+  const hasAccounts = accounts.length > 0;
 
   return (
     <form action={formAction} className="grid gap-4 rounded-panel border border-line bg-surface p-4 shadow-card">
@@ -62,6 +65,15 @@ export function AnnualExpenseForm({ annualExpense, compact = false, locale }: { 
           <input name="due_date" type="date" defaultValue={annualExpense?.due_date ?? ""} className="rounded-2xl border border-line bg-elevated px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-surface" />
         </label>
       </div>
+
+      <label className="grid gap-2 text-sm font-black text-ink" htmlFor={"annual-reserve-account-" + idPrefix}>
+        {t.form.reserveAccount}
+        <select id={"annual-reserve-account-" + idPrefix} name="reserve_account_id" defaultValue={annualExpense?.reserve_account_id ?? ""} disabled={!hasAccounts} className="rounded-2xl border border-line bg-elevated px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-surface disabled:cursor-not-allowed disabled:opacity-60">
+          <option value="">{t.form.chooseReserveAccount}</option>
+          {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+        </select>
+        {!hasAccounts ? <span className="rounded-2xl bg-warning/10 px-4 py-3 text-sm font-bold text-warning">{t.form.reserveAccountNeeded}</span> : null}
+      </label>
 
       <label className="flex items-center gap-3 rounded-2xl bg-elevated px-4 py-3 text-sm font-bold text-muted">
         <input name="active" type="checkbox" defaultChecked={annualExpense?.active ?? true} className="h-5 w-5 accent-primary" />

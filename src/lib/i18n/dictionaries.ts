@@ -340,7 +340,8 @@ export const dictionaries = {
         payAnnualSubscription: "จ่ายค่าสมาชิกรายปี",
         reserveMonthlyAmount: "กันเงินรายเดือน",
         reserveThisMonth: "กันเงินเดือนนี้",
-        payAnnualBill: "จ่ายบิลรายปี"
+        payAnnualBill: "จ่ายบิลรายปี",
+        reserveAccountFixed: "ใช้บัญชี"
       },
       form: {
         budgetName: "ชื่องบ",
@@ -368,6 +369,9 @@ export const dictionaries = {
         annualAmount: "จำนวนเงินต่อปี",
         dueDate: "วันครบกำหนด",
         activeSinkingFund: "ใช้งานเงินกันนี้",
+        reserveAccount: "บัญชีสำหรับกันเงิน/จ่าย",
+        chooseReserveAccount: "เลือกบัญชี",
+        reserveAccountNeeded: "เพิ่มบัญชีเงินสด/ธนาคารก่อน จึงจะผูกบัญชีสำหรับกันเงินได้",
         saveAnnualExpense: "บันทึกค่าใช้จ่ายรายปี",
         addAnnualExpense: "เพิ่มค่าใช้จ่ายรายปี"
       },
@@ -950,7 +954,8 @@ export const dictionaries = {
         payAnnualSubscription: "Pay annual subscription",
         reserveMonthlyAmount: "Reserve monthly amount",
         reserveThisMonth: "Reserve this month",
-        payAnnualBill: "Pay annual bill"
+        payAnnualBill: "Pay annual bill",
+        reserveAccountFixed: "Using account"
       },
       form: {
         budgetName: "Budget name",
@@ -978,6 +983,9 @@ export const dictionaries = {
         annualAmount: "Annual amount",
         dueDate: "Due date",
         activeSinkingFund: "Active sinking fund",
+        reserveAccount: "Reserve / payment account",
+        chooseReserveAccount: "Choose account",
+        reserveAccountNeeded: "Add a cash-like account first to bind a reserve account.",
         saveAnnualExpense: "Save annual expense",
         addAnnualExpense: "Add annual expense"
       },

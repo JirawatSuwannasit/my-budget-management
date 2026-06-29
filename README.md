@@ -2099,3 +2099,14 @@ A self-service way for the logged-in user to wipe **their own** finance data, sc
 ### Changelog
 
 - Add "Reset all my data" (Danger zone) — RLS-scoped, FK-safe deletion of the current user's finance data with a type-`RESET` confirm step; preserves settings; revalidates all finance views; th + en. No DB migration, no service role key.
+
+## 93. Sinking Fund Fixed Reserve Account
+
+Each annual expense / sinking fund can now bind to **one account at creation time**; both "Reserve this month" and "Pay annual bill" then use that account as a fixed source — the user never re-picks it.
+
+- **Migration** `supabase/migrations/007_add_annual_expense_reserve_account.sql` — adds nullable `annual_expenses.reserve_account_id` with an FK to `accounts(id) on delete set null` (guarded via `pg_constraint`), an index, and `notify pgrst`. Idempotent; run it in Supabase before deploying. Existing rows keep `null`.
+- **Form** (`annual-expense-form.tsx`): a `Reserve / payment account` select listing the user's cash-like accounts; disabled with a warning when none exist. Saved via `saveAnnualExpense` (insert + update).
+- **Pay annual bill** uses the fixed account (hidden `account_id` + read-only name, no dropdown). **Legacy rows** with `reserve_account_id = null` fall back to the existing account picker, so nothing breaks.
+- **Reserve this month** now also records `account_id` from the fixed account (still `type=sinking_fund_reserve`, still balance-neutral — `transaction-effects` untouched).
+- i18n: `planning.form.reserveAccount / chooseReserveAccount / reserveAccountNeeded`, `planning.payment.reserveAccountFixed` (th + en).
+- Constraints honored: RLS-only access (no service role), no balance/safe-to-spend math changed, subscription/debt/credit-card flows untouched, all strings via i18n.

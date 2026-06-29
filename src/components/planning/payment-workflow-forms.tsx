@@ -104,7 +104,7 @@ export function ReserveSubscriptionForm({ subscriptionId, amount, locale }: { su
   );
 }
 
-export function ReserveAnnualExpenseForm({ annualExpenseId, amount, locale }: { annualExpenseId: string; amount: number; locale: Locale }) {
+export function ReserveAnnualExpenseForm({ annualExpenseId, amount, reserveAccountId, locale }: { annualExpenseId: string; amount: number; reserveAccountId?: string | null; locale: Locale }) {
   const [state, formAction, isPending] = useActionState(saveTransaction, initialState);
   const t = dictionaries[locale].planning.payment;
   const common = dictionaries[locale].common;
@@ -115,6 +115,7 @@ export function ReserveAnnualExpenseForm({ annualExpenseId, amount, locale }: { 
       <input type="hidden" name="type" value="sinking_fund_reserve" />
       <input type="hidden" name="amount" value={amount} />
       <input type="hidden" name="reserve_entity_id" value={annualExpenseId} />
+      {reserveAccountId ? <input type="hidden" name="account_id" value={reserveAccountId} /> : null}
       <input type="hidden" name="notes" value="Monthly reserve for annual expense from planning page" />
       <label className="grid gap-2 text-xs font-black text-ink">
         {t.reserveDate}
@@ -134,6 +135,8 @@ export function PayAnnualBillForm({
   amount,
   accounts,
   defaultAccountId,
+  reserveAccountId,
+  reserveAccountName,
   locale
 }: {
   annualExpenseId: string;
@@ -141,11 +144,16 @@ export function PayAnnualBillForm({
   amount: number;
   accounts: PlanningAccountOption[];
   defaultAccountId?: string | null;
+  reserveAccountId?: string | null;
+  reserveAccountName?: string | null;
   locale: Locale;
 }) {
   const [state, formAction, isPending] = useActionState(saveTransaction, initialState);
   const t = dictionaries[locale].planning.payment;
   const common = dictionaries[locale].common;
+  // Bound rows pay from their fixed account (no picker); legacy rows (no
+  // reserve_account_id yet) keep the account dropdown so they still work.
+  const hasFixedAccount = Boolean(reserveAccountId);
 
   return (
     <form action={formAction} className="grid gap-3 rounded-2xl border border-warning/30 bg-warning/10 p-3">
@@ -155,14 +163,22 @@ export function PayAnnualBillForm({
       <input type="hidden" name="category_id" value={categoryId ?? ""} />
       <input type="hidden" name="expense_related_entity_id" value={annualExpenseId} />
       <input type="hidden" name="notes" value="Annual bill paid from planning page" />
+      {hasFixedAccount ? <input type="hidden" name="account_id" value={reserveAccountId as string} /> : null}
       <div className="grid gap-3 sm:grid-cols-2">
-        <AccountSelect accounts={accounts} defaultAccountId={defaultAccountId} locale={locale} />
+        {hasFixedAccount ? (
+          <div className="grid gap-2 text-xs font-black text-ink">
+            {t.reserveAccountFixed}
+            <span className="rounded-2xl border border-warning/30 bg-surface px-3 py-2.5 text-sm font-bold text-ink">{reserveAccountName ?? ""}</span>
+          </div>
+        ) : (
+          <AccountSelect accounts={accounts} defaultAccountId={defaultAccountId} locale={locale} />
+        )}
         <label className="grid gap-2 text-xs font-black text-ink">
           {t.paymentDate}
           <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-warning/30 bg-surface px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
       </div>
-      <button disabled={isPending || accounts.length === 0} className="rounded-2xl bg-amber-600 px-4 py-2.5 text-xs font-black text-white shadow-card transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60">
+      <button disabled={isPending || (!hasFixedAccount && accounts.length === 0)} className="rounded-2xl bg-amber-600 px-4 py-2.5 text-xs font-black text-white shadow-card transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-60">
         {isPending ? common.saving : t.payAnnualBill}
       </button>
       <ResultMessage state={state} />
