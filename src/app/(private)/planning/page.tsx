@@ -1,4 +1,4 @@
-import { Banknote, CalendarClock, PiggyBank, Repeat, WalletCards } from "lucide-react";
+import { Banknote, CalendarClock, PiggyBank, Plus, Repeat, WalletCards } from "lucide-react";
 import { AnnualExpenseForm } from "@/components/planning/annual-expense-form";
 import { BudgetForm } from "@/components/planning/budget-form";
 import { PayAnnualBillForm, PaySubscriptionForm, ReserveAnnualExpenseForm, ReserveSubscriptionForm } from "@/components/planning/payment-workflow-forms";
@@ -159,14 +159,17 @@ export default async function PlanningPage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-        <div>
-          <div className="mb-3 flex items-center gap-2">
+        <details className="rounded-panel border border-line bg-surface p-4 shadow-card">
+          <summary className="flex cursor-pointer items-center gap-2 text-xl font-black text-ink list-none [&::-webkit-details-marker]:hidden">
             <Banknote className="text-primary" size={20} aria-hidden="true" />
-            <h2 className="text-xl font-black text-ink">{t.addMonthlyBudget}</h2>
+            <span>{t.addMonthlyBudget}</span>
+            <Plus size={18} className="ml-auto text-primary" aria-hidden="true" />
+          </summary>
+          <div className="mt-4">
+            <BudgetForm cycleStartDate={cycleStartDate} locale={locale} />
+            <p className="mt-3 rounded-2xl border border-line bg-surface/80 p-4 text-sm font-bold text-muted">{t.budgetCycleHelpPrefix}: {cycle.label}. {t.budgetCycleHelpSuffix}</p>
           </div>
-          <BudgetForm cycleStartDate={cycleStartDate} locale={locale} />
-          <p className="mt-3 rounded-2xl border border-line bg-surface/80 p-4 text-sm font-bold text-muted">{t.budgetCycleHelpPrefix}: {cycle.label}. {t.budgetCycleHelpSuffix}</p>
-        </div>
+        </details>
 
         <div className="grid gap-3">
           <div className="flex items-center justify-between gap-4">
@@ -206,13 +209,16 @@ export default async function PlanningPage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-        <div>
-          <div className="mb-3 flex items-center gap-2">
+        <details className="rounded-panel border border-line bg-surface p-4 shadow-card">
+          <summary className="flex cursor-pointer items-center gap-2 text-xl font-black text-ink list-none [&::-webkit-details-marker]:hidden">
             <Repeat className="text-primary" size={20} aria-hidden="true" />
-            <h2 className="text-xl font-black text-ink">{t.addSubscription}</h2>
+            <span>{t.addSubscription}</span>
+            <Plus size={18} className="ml-auto text-primary" aria-hidden="true" />
+          </summary>
+          <div className="mt-4">
+            <SubscriptionForm locale={locale} />
           </div>
-          <SubscriptionForm locale={locale} />
-        </div>
+        </details>
 
         <div className="grid gap-3">
           <h2 className="text-xl font-black text-ink">{t.subscriptions}</h2>
@@ -257,13 +263,16 @@ export default async function PlanningPage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-        <div>
-          <div className="mb-3 flex items-center gap-2">
+        <details className="rounded-panel border border-line bg-surface p-4 shadow-card">
+          <summary className="flex cursor-pointer items-center gap-2 text-xl font-black text-ink list-none [&::-webkit-details-marker]:hidden">
             <PiggyBank className="text-primary" size={20} aria-hidden="true" />
-            <h2 className="text-xl font-black text-ink">{t.addSinkingFund}</h2>
+            <span>{t.addSinkingFund}</span>
+            <Plus size={18} className="ml-auto text-primary" aria-hidden="true" />
+          </summary>
+          <div className="mt-4">
+            <AnnualExpenseForm accounts={cashLikeAccounts} locale={locale} />
           </div>
-          <AnnualExpenseForm accounts={cashLikeAccounts} locale={locale} />
-        </div>
+        </details>
 
         <div className="grid gap-3">
           <h2 className="text-xl font-black text-ink">{t.annualExpenses}</h2>
