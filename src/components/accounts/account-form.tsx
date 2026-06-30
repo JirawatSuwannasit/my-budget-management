@@ -8,7 +8,7 @@ import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 
 type AccountFormValue = { id?: string; name?: string; type?: AccountType; balance?: number | string; active?: boolean };
 
-const accountTypeOrder: AccountType[] = ["main_bank", "other_bank", "cash", "wallet", "investment"];
+const accountTypeOrder: AccountType[] = ["main_bank", "other_bank", "cash", "wallet", "savings", "investment"];
 
 const initialState: AccountActionState = { status: "idle", message: "" };
 
@@ -33,7 +33,7 @@ export function AccountForm({ account, compact = false, locale }: { account?: Ac
           {t.form.type}
           <Select id={typeId} name="type" defaultValue={account?.type ?? "main_bank"}>
             {accountTypeOrder.map((type) => (
-              <option key={type} value={type}>{t.types[type]} - {type === "investment" ? t.form.investmentHint : t.form.cashLikeHint}</option>
+              <option key={type} value={type}>{t.types[type]} - {type === "savings" ? t.form.savingsHint : type === "investment" ? t.form.investmentHint : t.form.cashLikeHint}</option>
             ))}
           </Select>
         </label>

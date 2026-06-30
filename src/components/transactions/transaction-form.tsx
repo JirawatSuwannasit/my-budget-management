@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { saveTransaction, type TransactionActionState } from "@/app/(private)/transactions/actions";
 import type { AccountType, CategoryKind, TransactionType } from "@/lib/finance/types";
+import { isCashLikeType } from "@/lib/finance/types";
 import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 
 export type TransactionFormAccount = { id: string; name: string; type: AccountType; active: boolean };
@@ -57,7 +58,7 @@ export function TransactionForm({ accounts, categories, debts, cards, statements
   const t = dictionaries[locale].transactions;
   const [type, setType] = useState<TransactionType>(transaction?.type ?? "expense");
   const activeAccounts = accounts.filter((account) => account.active);
-  const cashLikeAccounts = activeAccounts.filter((account) => account.type !== "investment");
+  const cashLikeAccounts = activeAccounts.filter((account) => isCashLikeType(account.type));
   const investmentAccounts = activeAccounts.filter((account) => account.type === "investment");
   const needsSourceAccount = ["income", "expense", "transfer", "investment_transfer", "credit_card_payment", "debt_payment"].includes(type);
   const needsDestination = type === "transfer" || type === "investment_transfer";
