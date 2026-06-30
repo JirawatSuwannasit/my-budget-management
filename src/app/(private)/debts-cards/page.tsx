@@ -1,4 +1,4 @@
-import { Banknote, CreditCard, Landmark, ReceiptText, TrendingDown } from "lucide-react";
+import { Banknote, CreditCard, Landmark, Plus, ReceiptText, TrendingDown } from "lucide-react";
 import type { ReactNode } from "react";
 import { CreditCardForm } from "@/components/debts-cards/card-form";
 import { DebtForm } from "@/components/debts-cards/debt-form";
@@ -169,10 +169,16 @@ export default async function DebtsCardsPage() {
 
       <section className="grid gap-4 xl:grid-cols-[0.82fr_1.18fr]">
         <div className="grid gap-4">
-          <div>
-            <div className="mb-3 flex items-center gap-2"><TrendingDown className="text-primary" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.addDebt}</h2></div>
-            <DebtForm locale={locale} />
-          </div>
+          <details className="rounded-panel border border-line bg-surface p-4 shadow-card">
+            <summary className="flex cursor-pointer items-center gap-2 text-xl font-black text-ink list-none [&::-webkit-details-marker]:hidden">
+              <TrendingDown className="text-primary" size={20} aria-hidden="true" />
+              <span>{t.addDebt}</span>
+              <Plus size={18} className="ml-auto text-primary" aria-hidden="true" />
+            </summary>
+            <div className="mt-4">
+              <DebtForm locale={locale} />
+            </div>
+          </details>
           <div>
             <div className="mb-3 flex items-center gap-2"><Banknote className="text-income" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.recordDebtPayment}</h2></div>
             <DebtPaymentForm debts={activeDebts} accounts={cashLikeAccounts} defaultAccountId={defaultAccountId} locale={locale} />
@@ -224,8 +230,22 @@ export default async function DebtsCardsPage() {
 
       <section className="grid gap-4 xl:grid-cols-[0.82fr_1.18fr]">
         <div className="grid gap-4">
-          <div><div className="mb-3 flex items-center gap-2"><CreditCard className="text-primary" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.addCreditCard}</h2></div><CreditCardForm locale={locale} /></div>
-          <div><div className="mb-3 flex items-center gap-2"><ReceiptText className="text-primary" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.addStatement}</h2></div><CreditCardStatementForm cards={activeCards} defaultCycleStart={cycleStartDate} defaultCycleEnd={cycleEndDate} locale={locale} /></div>
+          <details className="rounded-panel border border-line bg-surface p-4 shadow-card">
+            <summary className="flex cursor-pointer items-center gap-2 text-xl font-black text-ink list-none [&::-webkit-details-marker]:hidden">
+              <CreditCard className="text-primary" size={20} aria-hidden="true" />
+              <span>{t.addCreditCard}</span>
+              <Plus size={18} className="ml-auto text-primary" aria-hidden="true" />
+            </summary>
+            <div className="mt-4"><CreditCardForm locale={locale} /></div>
+          </details>
+          <details className="rounded-panel border border-line bg-surface p-4 shadow-card">
+            <summary className="flex cursor-pointer items-center gap-2 text-xl font-black text-ink list-none [&::-webkit-details-marker]:hidden">
+              <ReceiptText className="text-primary" size={20} aria-hidden="true" />
+              <span>{t.addStatement}</span>
+              <Plus size={18} className="ml-auto text-primary" aria-hidden="true" />
+            </summary>
+            <div className="mt-4"><CreditCardStatementForm cards={activeCards} defaultCycleStart={cycleStartDate} defaultCycleEnd={cycleEndDate} locale={locale} /></div>
+          </details>
         </div>
 
         <div className="grid gap-3">
@@ -286,11 +306,17 @@ export default async function DebtsCardsPage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <div>
-          <div className="mb-3 flex items-center gap-2"><CreditCard className="text-warning" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.addCreditCardExpense}</h2></div>
-          <CardActivityForms cards={activeCards} locale={locale} />
-          <p className="mt-3 rounded-2xl bg-surface p-4 text-sm font-bold text-muted shadow-card">{t.cardExpenseHelp}</p>
-        </div>
+        <details className="rounded-panel border border-line bg-surface p-4 shadow-card">
+          <summary className="flex cursor-pointer items-center gap-2 text-xl font-black text-ink list-none [&::-webkit-details-marker]:hidden">
+            <CreditCard className="text-warning" size={20} aria-hidden="true" />
+            <span>{t.addCreditCardExpense}</span>
+            <Plus size={18} className="ml-auto text-primary" aria-hidden="true" />
+          </summary>
+          <div className="mt-4">
+            <CardActivityForms cards={activeCards} locale={locale} />
+            <p className="mt-3 rounded-2xl bg-surface p-4 text-sm font-bold text-muted shadow-card">{t.cardExpenseHelp}</p>
+          </div>
+        </details>
         <div>
           <div className="mb-3 flex items-center gap-2"><Landmark className="text-investment" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.payCreditCardStatement}</h2></div>
           <CardPaymentForm statements={openStatementOptions} accounts={cashLikeAccounts} defaultAccountId={defaultAccountId} locale={locale} />
