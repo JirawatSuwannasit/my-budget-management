@@ -8,7 +8,7 @@ import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 export type AccountActionState = { status: "idle" | "success" | "error"; message: string };
 type AccountMessages = Record<keyof typeof dictionaries.en.accounts.messages, string>;
 
-const ACCOUNT_TYPES: AccountType[] = ["main_bank", "other_bank", "cash", "wallet", "investment"];
+const ACCOUNT_TYPES: AccountType[] = ["main_bank", "other_bank", "cash", "wallet", "savings", "investment"];
 
 function localeFromForm(formData: FormData): Locale {
   const locale = formData.get("locale");

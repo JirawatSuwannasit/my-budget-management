@@ -94,8 +94,9 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, upco
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <StatBlock label={t.cashLike} value={formatMoney(snapshot.cashLikeBalance)} icon={WalletCards} tone="primary" />
+        <StatBlock label={t.savingsBalance} value={formatMoney(snapshot.savingsBalance)} icon={PiggyBank} tone="neutral" />
         <StatBlock label={t.cycleIncome} value={formatMoney(snapshot.cycleIncome)} icon={ArrowDownLeft} tone="income" />
         <StatBlock label={t.investmentTracking} value={formatMoney(snapshot.investmentTransfersThisCycle)} icon={TrendingUp} tone="investment" />
         <StatBlock label={t.dailyAvailable} value={formatMoney(dailyAvailable)} icon={CircleDollarSign} tone="primary" />
@@ -118,6 +119,7 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, upco
             <StatBlock label={t.plannedDebt} value={formatMoney(snapshot.plannedDebtPayments)} icon={Landmark} tone="debt" />
             <StatBlock label={t.sinkingFunds} value={formatMoney(snapshot.monthlySinkingFundReserves)} icon={PiggyBank} tone="warning" />
             <StatBlock label={t.reservedBudgets} value={formatMoney(snapshot.unspentReservedBudgets)} icon={Banknote} tone="neutral" />
+            <StatBlock label={t.savingsAccountBalance} value={formatMoney(snapshot.savingsBalance)} icon={PiggyBank} tone="neutral" />
             <StatBlock label={t.investmentAccountBalance} value={formatMoney(snapshot.investmentBalance)} icon={TrendingUp} tone="investment" />
           </div>
         </div>

@@ -1,4 +1,10 @@
-export type AccountType = "main_bank" | "other_bank" | "cash" | "wallet" | "investment";
+export type AccountType = "main_bank" | "other_bank" | "cash" | "wallet" | "investment" | "savings";
+
+export const CASH_LIKE_TYPES = ["main_bank", "other_bank", "cash", "wallet"] as const;
+
+export function isCashLikeType(type: AccountType): boolean {
+  return (CASH_LIKE_TYPES as readonly string[]).includes(type);
+}
 export type CategoryKind = "income" | "expense" | "transfer" | "debt" | "subscription" | "sinking_fund" | "investment" | "other";
 
 export type TransactionType =
@@ -70,6 +76,7 @@ export type DashboardInput = {
 export type DashboardSnapshot = {
   cashLikeBalance: number;
   investmentBalance: number;
+  savingsBalance: number;
   unpaidObligations: number;
   unspentReservedBudgets: number;
   remainingCreditCardPayable: number;

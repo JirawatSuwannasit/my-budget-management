@@ -4,7 +4,8 @@ import { BudgetForm } from "@/components/planning/budget-form";
 import { PayAnnualBillForm, PaySubscriptionForm, ReserveAnnualExpenseForm, ReserveSubscriptionForm } from "@/components/planning/payment-workflow-forms";
 import { SubscriptionForm } from "@/components/planning/subscription-form";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
-import type { CategoryKind } from "@/lib/finance/types";
+import type { AccountType, CategoryKind } from "@/lib/finance/types";
+import { isCashLikeType } from "@/lib/finance/types";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/server";
 import { setAnnualExpenseActive, setBudgetActive, setSubscriptionActive } from "./actions";
@@ -95,7 +96,7 @@ export default async function PlanningPage() {
   const loadError = profileResult.error ?? accountsResult.error ?? budgetsResult.error ?? subscriptionsResult.error ?? annualResult.error ?? categoriesResult.error ?? transactionsResult.error ?? cardsResult.error;
   const expenseTransactions = transactions.filter((transaction) => transaction.type === "expense");
   const reserveTransactions = transactions.filter((transaction) => transaction.type === "sinking_fund_reserve");
-  const cashLikeAccounts = accounts.filter((account) => account.active && account.type !== "investment");
+  const cashLikeAccounts = accounts.filter((account) => account.active && isCashLikeType(account.type as AccountType));
   const activeCards = ((cardsResult.data ?? []) as CardRow[]).filter((card) => card.active).map((card) => ({ id: card.id, name: card.name }));
   const linkedThisCycle = (id: string) => transactions.some((transaction) => transaction.related_entity_id === id);
   // A subscription/bill counts as paid whether it was paid from a cash account

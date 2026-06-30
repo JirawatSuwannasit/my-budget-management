@@ -38,6 +38,7 @@ export const dictionaries = {
     dashboard: {
       realAvailable: "เงินใช้ได้จริง",
       cashLike: "เงินสดและบัญชีใช้จ่าย",
+      savingsBalance: "เงินเก็บ (แยกติดตาม)",
       investmentTracking: "เงินลงทุนแยกติดตาม",
       cycleIncome: "รายรับรอบนี้",
       unpaidObligations: "ภาระที่ยังไม่จ่าย",
@@ -54,6 +55,7 @@ export const dictionaries = {
       dailySafeAmount: "ใช้ได้ปลอดภัยต่อวัน",
       availableBreakdown: "รายละเอียดเงินที่กันไว้",
       reservedBeforeSpending: "กันเงินก่อนใช้",
+      savingsAccountBalance: "ยอดบัญชีเงินเก็บ",
       investmentAccountBalance: "ยอดบัญชีลงทุน",
       cardLifecycle: "วงจรบัตรเครดิต",
       cardLifecycleTitle: "เกิดหนี้ก่อน เงินสดลดตอนจ่าย",
@@ -131,6 +133,7 @@ export const dictionaries = {
       title: "บัญชีของฉัน",
       subtitle: "บัญชีเงินสด ธนาคาร และวอลเล็ตจะนับเป็นเงินใช้ได้จริง ส่วนบัญชีลงทุนจะแสดงแยกเพื่อไม่ปนกับเงินที่ใช้จ่ายประจำวัน",
       cashLikeTotal: "เงินที่นับเป็นเงินใช้ได้จริง",
+      savingsTotal: "บัญชีเงินเก็บ แยกติดตาม",
       investmentTotal: "บัญชีลงทุน แยกติดตาม",
       addAccount: "เพิ่มบัญชี",
       accountList: "รายการบัญชี",
@@ -138,6 +141,7 @@ export const dictionaries = {
       loadError: "โหลดบัญชีไม่สำเร็จ",
       empty: "ยังไม่มีบัญชี เริ่มจากเพิ่มบัญชีหลักหรือเงินสดก่อน",
       countsAsReal: "นับในเงินใช้ได้จริง",
+      savingsNote: "บัญชีเงินเก็บ ไม่นับในเงินใช้ได้จริง",
       investmentNote: "บัญชีลงทุน ไม่นับในเงินใช้ได้จริง",
       editAccount: "แก้ไขบัญชี",
       types: {
@@ -145,6 +149,7 @@ export const dictionaries = {
         other_bank: "บัญชีธนาคารอื่น",
         cash: "เงินสด",
         wallet: "วอลเล็ต",
+        savings: "เงินเก็บ",
         investment: "บัญชีลงทุน"
       },
       form: {
@@ -156,6 +161,7 @@ export const dictionaries = {
         save: "บันทึกบัญชี",
         add: "เพิ่มบัญชี",
         cashLikeHint: "นับเป็นเงินใช้ได้จริง",
+        savingsHint: "เงินเก็บ ไม่นับเป็นเงินใช้ได้จริง",
         investmentHint: "แยกติดตาม ไม่นับเป็นเงินใช้ได้จริง"
       },
       messages: {
@@ -678,6 +684,7 @@ export const dictionaries = {
     dashboard: {
       realAvailable: "Real available money",
       cashLike: "Cash-like balance",
+      savingsBalance: "Savings (tracked separately)",
       investmentTracking: "Investment tracking",
       cycleIncome: "Cycle income",
       unpaidObligations: "Unpaid obligations",
@@ -694,6 +701,7 @@ export const dictionaries = {
       dailySafeAmount: "Daily safe amount",
       availableBreakdown: "Available money breakdown",
       reservedBeforeSpending: "Reserved before spending",
+      savingsAccountBalance: "Savings account balance",
       investmentAccountBalance: "Investment account balance",
       cardLifecycle: "Credit card lifecycle",
       cardLifecycleTitle: "Liability first, cash later",
@@ -771,6 +779,7 @@ export const dictionaries = {
       title: "My accounts",
       subtitle: "Cash, bank, and wallet accounts count as real available money. Investment accounts are shown separately so they do not mix with day-to-day spending.",
       cashLikeTotal: "Counted as real available money",
+      savingsTotal: "Savings accounts, tracked separately",
       investmentTotal: "Investment accounts, tracked separately",
       addAccount: "Add account",
       accountList: "Account list",
@@ -778,6 +787,7 @@ export const dictionaries = {
       loadError: "Could not load accounts",
       empty: "No accounts yet. Add a main bank or cash account to start.",
       countsAsReal: "Counts in real available money",
+      savingsNote: "Savings account, not counted in real available money",
       investmentNote: "Investment account, not counted in real available money",
       editAccount: "Edit account",
       types: {
@@ -785,6 +795,7 @@ export const dictionaries = {
         other_bank: "Other bank",
         cash: "Cash",
         wallet: "Wallet",
+        savings: "Savings",
         investment: "Investment"
       },
       form: {
@@ -796,6 +807,7 @@ export const dictionaries = {
         save: "Save account",
         add: "Add account",
         cashLikeHint: "Counts as real available money",
+        savingsHint: "Savings, not counted as real available money",
         investmentHint: "Tracked separately, not real available money"
       },
       messages: {

@@ -6,6 +6,8 @@ import { CardActivityForms, CardPaymentForm, DebtPaymentForm } from "@/component
 import { CreditCardStatementForm } from "@/components/debts-cards/statement-form";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
+import type { AccountType } from "@/lib/finance/types";
+import { isCashLikeType } from "@/lib/finance/types";
 import { createClient } from "@/lib/supabase/server";
 import { setCreditCardActive, setDebtActive } from "./actions";
 
@@ -118,7 +120,7 @@ export default async function DebtsCardsPage() {
 
   const activeDebts = debts.filter((debt) => debt.active);
   const activeCards = cards.filter((card) => card.active);
-  const cashLikeAccounts = accounts.filter((account) => account.active && account.type !== "investment");
+  const cashLikeAccounts = accounts.filter((account) => account.active && isCashLikeType(account.type as AccountType));
   const cardNameById = new Map(cards.map((card) => [card.id, card.name]));
   const defaultAccountId = (appSettingsResult.data as { default_account_id: string | null } | null)?.default_account_id ?? null;
 

@@ -24,7 +24,8 @@ export default async function AccountsPage() {
   const { data, error } = await supabase.from("accounts").select("id,name,type,balance,active,is_cash_like").order("active", { ascending: false }).order("name");
   const accounts = (data ?? []) as AccountRow[];
   const cashLikeTotal = accounts.filter((account) => account.active && account.is_cash_like).reduce((total, account) => total + Number(account.balance), 0);
-  const investmentTotal = accounts.filter((account) => account.active && !account.is_cash_like).reduce((total, account) => total + Number(account.balance), 0);
+  const savingsTotal = accounts.filter((account) => account.active && account.type === "savings").reduce((total, account) => total + Number(account.balance), 0);
+  const investmentTotal = accounts.filter((account) => account.active && account.type === "investment").reduce((total, account) => total + Number(account.balance), 0);
 
   return (
     <div className="grid gap-5">
@@ -39,10 +40,14 @@ export default async function AccountsPage() {
         </div>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2">
+      <section className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-panel border border-income/20 bg-income/10 p-4 text-income shadow-card">
           <p className="text-xs font-black uppercase tracking-normal opacity-70">{t.cashLikeTotal}</p>
           <p className="mt-3 text-3xl font-black">{formatMoney(cashLikeTotal)}</p>
+        </div>
+        <div className="rounded-panel border border-line bg-surface p-4 text-ink shadow-card">
+          <p className="text-xs font-black uppercase tracking-normal text-muted">{t.savingsTotal}</p>
+          <p className="mt-3 text-3xl font-black">{formatMoney(savingsTotal)}</p>
         </div>
         <div className="rounded-panel border border-line bg-surface p-4 text-ink shadow-card">
           <p className="text-xs font-black uppercase tracking-normal text-muted">{t.investmentTotal}</p>
@@ -75,7 +80,7 @@ export default async function AccountsPage() {
                     <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{t.types[account.type]}</span>
                   </div>
                   <p className="mt-2 text-2xl font-black text-ink">{formatMoney(account.balance)}</p>
-                  <p className="mt-1 text-sm font-semibold text-muted">{account.is_cash_like ? t.countsAsReal : t.investmentNote}</p>
+                  <p className="mt-1 text-sm font-semibold text-muted">{account.is_cash_like ? t.countsAsReal : account.type === "savings" ? t.savingsNote : t.investmentNote}</p>
                 </div>
                 <form action={setAccountActive}>
                   <input type="hidden" name="id" value={account.id} />
