@@ -106,7 +106,7 @@ export function TransactionForm({ accounts, categories, debts, cards, reserves, 
         </label>
       ) : null}
 
-      {(type === "income" || type === "expense") && categoryOptions.length > 0 ? (
+      {(type === "income" || type === "expense" || type === "credit_card_expense") && categoryOptions.length > 0 ? (
         <label className="grid gap-2 text-sm font-black text-ink">
           {t.form.category}
           <select name="category_id" defaultValue={transaction?.category_id ?? ""} className="rounded-2xl border border-line bg-elevated px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-surface">
