@@ -2,6 +2,7 @@ import { Banknote, CreditCard, Landmark, Plus, ReceiptText, TrendingDown } from 
 import type { ReactNode } from "react";
 import { CreditCardForm } from "@/components/debts-cards/card-form";
 import { DebtForm } from "@/components/debts-cards/debt-form";
+import { DeleteDebtForm } from "@/components/debts-cards/delete-debt-form";
 import { CardActivityForms, CardPaymentForm, DebtPaymentForm } from "@/components/debts-cards/payment-forms";
 import { computeCardObligation } from "@/lib/finance/dashboard-data";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
@@ -270,6 +271,10 @@ export default async function DebtsCardsPage() {
                         <div key={installment.id} className="rounded-2xl bg-surface p-3 text-sm font-bold text-ink">
                           <div className="flex flex-wrap items-center justify-between gap-2"><span>{installment.name}</span><StatusPill active={installment.active} locale={locale} /></div>
                           <p className="mt-2 text-muted">{t.installmentMonthly} {formatMoney(installment.monthly_payment)} · {t.installmentRemaining} {formatMoney(installment.remaining_balance)}</p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <ToggleActiveForm id={installment.id} active={installment.active} kind="debt" locale={locale} />
+                            <DeleteDebtForm id={installment.id} locale={locale} />
+                          </div>
                         </div>
                       ))}
                     </div>

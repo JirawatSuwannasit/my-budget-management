@@ -159,6 +159,23 @@ export async function setDebtActive(formData: FormData) {
   revalidateDebtCardViews();
 }
 
+export async function deleteDebt(formData: FormData) {
+  const messages = getMessages(formData);
+  const { supabase, userId } = await getUserContext(messages);
+  const id = textValue(formData, "id");
+  if (!id) throw new Error(messages.debtIdRequired);
+
+  // debt_payments cascades on delete, which would silently erase payment history
+  // without reversing the cash-account effects already applied at payment time.
+  // Block the delete instead of reversing balances after the fact.
+  const { count } = await supabase.from("debt_payments").select("id", { count: "exact", head: true }).eq("debt_id", id).eq("user_id", userId);
+  if ((count ?? 0) > 0) throw new Error(messages.installmentHasPayments);
+
+  const { error } = await supabase.from("debts").delete().eq("id", id).eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  revalidateDebtCardViews();
+}
+
 export async function saveCreditCard(_previousState: DebtCardActionState, formData: FormData): Promise<DebtCardActionState> {
   const messages = getMessages(formData);
   try {

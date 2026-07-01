@@ -457,6 +457,8 @@ export const dictionaries = {
       noInstallments: "ยังไม่มีรายการผ่อนบนบัตรนี้",
       installmentMonthly: "ผ่อนเดือนละ",
       installmentRemaining: "คงเหลือ",
+      deleteInstallment: "ลบรายการผ่อน",
+      deleteInstallmentConfirm: "ลบรายการผ่อนนี้? การกระทำนี้ย้อนกลับไม่ได้",
       recentCardActivity: "กิจกรรมบัตรล่าสุด",
       noCardActivity: "ยังไม่มีกิจกรรมบัตร",
       expense: "รายจ่าย",
@@ -540,7 +542,8 @@ export const dictionaries = {
         installmentTotalPositive: "ยอดรวมต้องมากกว่าศูนย์",
         installmentMonthsRange: "จำนวนงวดต้องอย่างน้อย 1 เดือน",
         installmentAdded: "เพิ่มรายการผ่อนแล้ว",
-        saveInstallmentFailed: "บันทึกรายการผ่อนไม่สำเร็จ"
+        saveInstallmentFailed: "บันทึกรายการผ่อนไม่สำเร็จ",
+        installmentHasPayments: "รายการผ่อนนี้มีประวัติการจ่ายแล้ว ลบไม่ได้ — ให้ปิดใช้งานแทนเพื่อเก็บประวัติและไม่ให้ยอดเงินเพี้ยน"
       }
     },
     transactions: {
@@ -1087,6 +1090,8 @@ export const dictionaries = {
       noInstallments: "No installments on this card yet.",
       installmentMonthly: "Monthly",
       installmentRemaining: "Remaining",
+      deleteInstallment: "Delete installment",
+      deleteInstallmentConfirm: "Delete this installment? This cannot be undone.",
       recentCardActivity: "Recent card activity",
       noCardActivity: "No card activity yet.",
       expense: "Expense",
@@ -1170,7 +1175,8 @@ export const dictionaries = {
         installmentTotalPositive: "Total amount must be greater than zero.",
         installmentMonthsRange: "Term must be at least 1 month.",
         installmentAdded: "Installment added.",
-        saveInstallmentFailed: "Could not save installment."
+        saveInstallmentFailed: "Could not save installment.",
+        installmentHasPayments: "This installment already has payments and can't be deleted — deactivate it instead to keep history and avoid balance drift."
       }
     },
     transactions: {
