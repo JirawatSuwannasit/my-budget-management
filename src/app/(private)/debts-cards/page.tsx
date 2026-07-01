@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { CreditCardForm } from "@/components/debts-cards/card-form";
 import { DebtForm } from "@/components/debts-cards/debt-form";
 import { CardActivityForms, CardPaymentForm, DebtPaymentForm } from "@/components/debts-cards/payment-forms";
-import { CreditCardStatementForm } from "@/components/debts-cards/statement-form";
+import { computeCardObligation } from "@/lib/finance/dashboard-data";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import type { AccountType } from "@/lib/finance/types";
@@ -28,9 +28,8 @@ type DebtRow = {
 };
 type DebtPaymentRow = { id: string; debt_id: string; account_id: string | null; amount: number | string; paid_date: string; source: string | null; notes: string | null; created_at: string };
 type CardRow = { id: string; name: string; billing_cut_day: number; payment_due_day: number; active: boolean };
-type StatementRow = { id: string; card_id: string; cycle_start: string; cycle_end: string; statement_amount_due: number | string; paid_amount: number | string; remaining_payable: number | string; due_date: string; status: "unpaid" | "partial" | "paid" };
-type CardTransactionRow = { id: string; card_id: string; statement_id: string | null; amount: number | string; transaction_date: string; billing_cycle_start: string; notes: string | null };
-type CardPaymentRow = { id: string; card_id: string; statement_id: string | null; account_id: string | null; amount: number | string; payment_date: string; created_at: string };
+type CardTransactionRow = { id: string; card_id: string; amount: number | string; transaction_date: string; notes: string | null };
+type CardPaymentRow = { id: string; card_id: string; account_id: string | null; amount: number | string; payment_date: string; created_at: string };
 
 function toNumber(value: number | string | null | undefined) {
   const numberValue = Number(value ?? 0);
@@ -62,13 +61,6 @@ function StatusPill({ active, locale }: { active: boolean; locale: Locale }) {
   return <span className={"rounded-full px-2.5 py-1 text-xs font-black " + (active ? "bg-income/10 text-income" : "bg-elevated text-muted")}>{active ? common.active : common.inactive}</span>;
 }
 
-function StatementStatusPill({ status, locale }: { status: StatementRow["status"]; locale: Locale }) {
-  const common = dictionaries[locale].common;
-  const className = status === "paid" ? "bg-income/10 text-income" : status === "partial" ? "bg-warning/10 text-warning" : "bg-danger/10 text-danger";
-  const label = status === "paid" ? common.paid : status === "partial" ? common.partial : common.unpaid;
-  return <span className={"rounded-full px-2.5 py-1 text-xs font-black " + className}>{label}</span>;
-}
-
 function ToggleActiveForm({ id, active, kind, locale }: { id: string; active: boolean; kind: "debt" | "card"; locale: Locale }) {
   const common = dictionaries[locale].common;
   return (
@@ -95,15 +87,14 @@ export default async function DebtsCardsPage() {
   const cycleStartDate = toDateInput(cycle.start);
   const cycleEndDate = toDateInput(cycle.end);
 
-  const [profileResult, accountsResult, debtsResult, debtPaymentsResult, cardsResult, statementsResult, cardTransactionsResult, cardPaymentsResult, appSettingsResult] = await Promise.all([
+  const [profileResult, accountsResult, debtsResult, debtPaymentsResult, cardsResult, cardTransactionsResult, cardPaymentsResult, appSettingsResult] = await Promise.all([
     user ? supabase.from("profiles").select("locale").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
     supabase.from("debts").select("id,name,type,original_amount,remaining_balance,interest_rate,monthly_payment,bonus_payment_amount,target_payoff_date,card_id,installment_months,active").order("active", { ascending: false }).order("name"),
     supabase.from("debt_payments").select("id,debt_id,account_id,amount,paid_date,source,notes,created_at").order("paid_date", { ascending: false }).limit(80),
     supabase.from("credit_cards").select("id,name,billing_cut_day,payment_due_day,active").order("active", { ascending: false }).order("name"),
-    supabase.from("credit_card_statements").select("id,card_id,cycle_start,cycle_end,statement_amount_due,paid_amount,remaining_payable,due_date,status").order("due_date", { ascending: false }).limit(80),
-    supabase.from("card_transactions").select("id,card_id,statement_id,amount,transaction_date,billing_cycle_start,notes").order("transaction_date", { ascending: false }).limit(120),
-    supabase.from("card_payments").select("id,card_id,statement_id,account_id,amount,payment_date,created_at").order("payment_date", { ascending: false }).limit(80),
+    supabase.from("card_transactions").select("id,card_id,amount,transaction_date,notes").order("transaction_date", { ascending: false }).limit(120),
+    supabase.from("card_payments").select("id,card_id,account_id,amount,payment_date,created_at").order("payment_date", { ascending: false }).limit(80),
     user ? supabase.from("app_settings").select("default_account_id").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null })
   ]);
 
@@ -113,16 +104,29 @@ export default async function DebtsCardsPage() {
   const debts = (debtsResult.data ?? []) as DebtRow[];
   const debtPayments = (debtPaymentsResult.data ?? []) as DebtPaymentRow[];
   const cards = (cardsResult.data ?? []) as CardRow[];
-  const statements = (statementsResult.data ?? []) as StatementRow[];
   const cardTransactions = (cardTransactionsResult.data ?? []) as CardTransactionRow[];
   const cardPayments = (cardPaymentsResult.data ?? []) as CardPaymentRow[];
-  const loadError = profileResult.error ?? accountsResult.error ?? debtsResult.error ?? debtPaymentsResult.error ?? cardsResult.error ?? statementsResult.error ?? cardTransactionsResult.error ?? cardPaymentsResult.error;
+  const loadError = profileResult.error ?? accountsResult.error ?? debtsResult.error ?? debtPaymentsResult.error ?? cardsResult.error ?? cardTransactionsResult.error ?? cardPaymentsResult.error;
 
   const activeDebts = debts.filter((debt) => debt.active);
+  const genericDebts = debts.filter((debt) => debt.type !== "installment");
   const activeCards = cards.filter((card) => card.active);
   const cashLikeAccounts = accounts.filter((account) => account.active && isCashLikeType(account.type as AccountType));
-  const cardNameById = new Map(cards.map((card) => [card.id, card.name]));
   const defaultAccountId = (appSettingsResult.data as { default_account_id: string | null } | null)?.default_account_id ?? null;
+
+  // Card obligations derived at read time (billed vs. current-cycle floating
+  // spend), same math the dashboard's safe-to-spend uses. Active cards only,
+  // mirroring how deactivated debts stop counting.
+  const obligationByCardId = new Map(
+    activeCards.map((card) => [
+      card.id,
+      computeCardObligation({
+        billingCutDay: card.billing_cut_day,
+        cardTransactions: cardTransactions.filter((transaction) => transaction.card_id === card.id),
+        cardPayments: cardPayments.filter((payment) => payment.card_id === card.id)
+      })
+    ])
+  );
 
   const totalDebtRemaining = activeDebts.reduce((total, debt) => total + toNumber(debt.remaining_balance), 0);
   const plannedDebtThisCycle = activeDebts.reduce((total, debt) => {
@@ -131,19 +135,8 @@ export default async function DebtsCardsPage() {
       .reduce((sum, payment) => sum + toNumber(payment.amount), 0);
     return total + Math.max(0, toNumber(debt.monthly_payment) - paidThisCycle);
   }, 0);
-  const currentCardSpending = cardTransactions.filter((transaction) => transaction.billing_cycle_start === cycleStartDate).reduce((total, transaction) => total + toNumber(transaction.amount), 0);
-  const remainingCardPayable = statements.filter((statement) => statement.status !== "paid" || toNumber(statement.remaining_payable) > 0).reduce((total, statement) => total + toNumber(statement.remaining_payable), 0);
-
-  const openStatementOptions = statements
-    .filter((statement) => statement.status !== "paid" || toNumber(statement.remaining_payable) > 0)
-    .map((statement) => ({
-      id: statement.id,
-      card_id: statement.card_id,
-      label: (cardNameById.get(statement.card_id) ?? t.form.creditCard) + " - " + t.statementOptionRemaining + " " + formatMoney(statement.remaining_payable) + " " + t.statementOptionDue + " " + statement.due_date,
-      remaining_payable: toNumber(statement.remaining_payable),
-      due_date: statement.due_date,
-      status: statement.status
-    }));
+  const currentCardSpending = [...obligationByCardId.values()].reduce((total, obligation) => total + obligation.currentCycleSpending, 0);
+  const remainingCardPayable = [...obligationByCardId.values()].reduce((total, obligation) => total + obligation.billedOutstanding, 0);
 
   return (
     <div className="grid gap-5">
@@ -187,9 +180,9 @@ export default async function DebtsCardsPage() {
         </div>
 
         <div className="grid gap-3">
-          <div className="flex items-center justify-between gap-4"><h2 className="text-xl font-black text-ink">{t.debtProgress}</h2><span className="rounded-full bg-surface px-3 py-1 text-xs font-black text-muted shadow-card">{debts.length} {t.debtsSuffix}</span></div>
-          {debts.length === 0 ? <EmptyState>{t.noDebts}</EmptyState> : null}
-          {debts.map((debt) => {
+          <div className="flex items-center justify-between gap-4"><h2 className="text-xl font-black text-ink">{t.debtProgress}</h2><span className="rounded-full bg-surface px-3 py-1 text-xs font-black text-muted shadow-card">{genericDebts.length} {t.debtsSuffix}</span></div>
+          {genericDebts.length === 0 ? <EmptyState>{t.noDebts}</EmptyState> : null}
+          {genericDebts.map((debt) => {
             const original = toNumber(debt.original_amount);
             const remaining = toNumber(debt.remaining_balance);
             const monthly = toNumber(debt.monthly_payment);
@@ -205,7 +198,7 @@ export default async function DebtsCardsPage() {
               <article key={debt.id} className="rounded-panel border border-line bg-surface p-4 shadow-card">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-black text-ink">{debt.name}</h3><StatusPill active={debt.active} locale={locale} /><span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{t.debtTypes[debt.type]}</span>{debt.type === "installment" ? <span className="rounded-full bg-debt/15 px-2.5 py-1 text-xs font-black text-debt">{(debt.card_id ? cardNameById.get(debt.card_id) : null) ?? t.form.creditCard}{debt.installment_months ? " · " + t.form.installmentTerm.replace("{n}", String(debt.installment_months)) : ""}</span> : null}</div>
+                    <div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-black text-ink">{debt.name}</h3><StatusPill active={debt.active} locale={locale} /><span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{t.debtTypes[debt.type]}</span></div>
                     <div className="mt-4 grid gap-3">
                       <ProgressBar percent={progress} color="bg-emerald-500" />
                       <div className="grid gap-2 text-sm font-bold text-muted sm:grid-cols-3">
@@ -238,25 +231,21 @@ export default async function DebtsCardsPage() {
             </summary>
             <div className="mt-4"><CreditCardForm locale={locale} /></div>
           </details>
-          <details className="rounded-panel border border-line bg-surface p-4 shadow-card">
-            <summary className="flex cursor-pointer items-center gap-2 text-xl font-black text-ink list-none [&::-webkit-details-marker]:hidden">
-              <ReceiptText className="text-primary" size={20} aria-hidden="true" />
-              <span>{t.addStatement}</span>
-              <Plus size={18} className="ml-auto text-primary" aria-hidden="true" />
-            </summary>
-            <div className="mt-4"><CreditCardStatementForm cards={activeCards} defaultCycleStart={cycleStartDate} defaultCycleEnd={cycleEndDate} locale={locale} /></div>
-          </details>
         </div>
 
         <div className="grid gap-3">
           <div className="flex items-center justify-between gap-4"><h2 className="text-xl font-black text-ink">{t.creditCards}</h2><span className="rounded-full bg-surface px-3 py-1 text-xs font-black text-muted shadow-card">{cards.length} {t.cardsSuffix}</span></div>
           {cards.length === 0 ? <EmptyState>{t.noCards}</EmptyState> : null}
           {cards.map((card) => {
-            const cardStatements = statements.filter((statement) => statement.card_id === card.id);
-            const cardOpenPayable = cardStatements.reduce((total, statement) => total + toNumber(statement.remaining_payable), 0);
-            const cardPaid = cardStatements.reduce((total, statement) => total + toNumber(statement.paid_amount), 0);
-            const cardDue = cardStatements.reduce((total, statement) => total + toNumber(statement.statement_amount_due), 0);
-            const cardCycleSpending = cardTransactions.filter((transaction) => transaction.card_id === card.id && transaction.billing_cycle_start === cycleStartDate).reduce((total, transaction) => total + toNumber(transaction.amount), 0);
+            // Every card gets its own read (not just active ones) so a deactivated
+            // card's history still shows correct figures here, even though only
+            // active cards feed the top summary stats / safe-to-spend.
+            const obligation = computeCardObligation({
+              billingCutDay: card.billing_cut_day,
+              cardTransactions: cardTransactions.filter((transaction) => transaction.card_id === card.id),
+              cardPayments: cardPayments.filter((payment) => payment.card_id === card.id)
+            });
+            const cardInstallments = debts.filter((debt) => debt.type === "installment" && debt.card_id === card.id);
             const recentCardTransactions = cardTransactions.filter((transaction) => transaction.card_id === card.id).slice(0, 5);
             const recentPayments = cardPayments.filter((payment) => payment.card_id === card.id).slice(0, 5);
             return (
@@ -264,11 +253,9 @@ export default async function DebtsCardsPage() {
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-black text-ink">{card.name}</h3><StatusPill active={card.active} locale={locale} /><span className="rounded-full bg-elevated px-2.5 py-1 text-xs font-black text-muted">{t.cutDay} {card.billing_cut_day}</span><span className="rounded-full bg-elevated px-2.5 py-1 text-xs font-black text-muted">{t.dueDay} {card.payment_due_day}</span></div>
-                    <div className="mt-4 grid gap-3 sm:grid-cols-4">
-                      <div className="rounded-2xl bg-warning/10 p-3 text-warning"><p className="text-xs font-black opacity-70">{t.currentSpending}</p><p className="mt-1 text-lg font-black">{formatMoney(cardCycleSpending)}</p></div>
-                      <div className="rounded-2xl bg-elevated p-3"><p className="text-xs font-black text-muted">{t.statementDue}</p><p className="mt-1 text-lg font-black text-ink">{formatMoney(cardDue)}</p></div>
-                      <div className="rounded-2xl bg-income/10 p-3 text-income"><p className="text-xs font-black opacity-70">{t.paid}</p><p className="mt-1 text-lg font-black">{formatMoney(cardPaid)}</p></div>
-                      <div className="rounded-2xl bg-investment/10 p-3 text-investment"><p className="text-xs font-black opacity-70">{t.remaining}</p><p className="mt-1 text-lg font-black">{formatMoney(cardOpenPayable)}</p></div>
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl bg-danger/10 p-3 text-danger"><p className="text-xs font-black opacity-70">{t.amountDue}</p><p className="mt-1 text-lg font-black">{formatMoney(obligation.billedOutstanding)}</p></div>
+                      <div className="rounded-2xl bg-warning/10 p-3 text-warning"><p className="text-xs font-black opacity-70">{t.floatingThisCycle}</p><p className="mt-1 text-lg font-black">{formatMoney(obligation.currentCycleSpending)}</p></div>
                     </div>
                   </div>
                   <ToggleActiveForm id={card.id} active={card.active} kind="card" locale={locale} />
@@ -276,14 +263,13 @@ export default async function DebtsCardsPage() {
 
                 <div className="mt-4 grid gap-3 lg:grid-cols-2">
                   <div className="rounded-2xl bg-elevated p-3">
-                    <p className="mb-2 text-xs font-black uppercase tracking-normal text-muted">{t.statements}</p>
-                    {cardStatements.length === 0 ? <p className="text-sm font-bold text-muted">{t.noStatements}</p> : null}
+                    <p className="mb-2 text-xs font-black uppercase tracking-normal text-muted">{t.installmentsOnCard}</p>
+                    {cardInstallments.length === 0 ? <p className="text-sm font-bold text-muted">{t.noInstallments}</p> : null}
                     <div className="grid gap-2">
-                      {cardStatements.slice(0, 4).map((statement) => (
-                        <div key={statement.id} className="rounded-2xl bg-surface p-3 text-sm font-bold text-ink">
-                          <div className="flex flex-wrap items-center justify-between gap-2"><span>{statement.cycle_start} - {statement.cycle_end}</span><StatementStatusPill status={statement.status} locale={locale} /></div>
-                          <p className="mt-2 text-muted">{t.dueLabel} {statement.due_date} - {t.remaining} {formatMoney(statement.remaining_payable)}</p>
-                          <details className="mt-2"><summary className="cursor-pointer text-xs font-black text-primary">{t.editStatement}</summary><div className="mt-3"><CreditCardStatementForm cards={activeCards} statement={statement} defaultCycleStart={cycleStartDate} defaultCycleEnd={cycleEndDate} locale={locale} /></div></details>
+                      {cardInstallments.map((installment) => (
+                        <div key={installment.id} className="rounded-2xl bg-surface p-3 text-sm font-bold text-ink">
+                          <div className="flex flex-wrap items-center justify-between gap-2"><span>{installment.name}</span><StatusPill active={installment.active} locale={locale} /></div>
+                          <p className="mt-2 text-muted">{t.installmentMonthly} {formatMoney(installment.monthly_payment)} · {t.installmentRemaining} {formatMoney(installment.remaining_balance)}</p>
                         </div>
                       ))}
                     </div>
@@ -318,9 +304,9 @@ export default async function DebtsCardsPage() {
           </div>
         </details>
         <div>
-          <div className="mb-3 flex items-center gap-2"><Landmark className="text-investment" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.payCreditCardStatement}</h2></div>
-          <CardPaymentForm statements={openStatementOptions} accounts={cashLikeAccounts} defaultAccountId={defaultAccountId} locale={locale} />
-          {openStatementOptions.length === 0 ? <p className="mt-3 rounded-2xl bg-warning/10 p-4 text-sm font-bold text-warning">{t.statementPaymentRequirement}</p> : null}
+          <div className="mb-3 flex items-center gap-2"><Landmark className="text-investment" size={20} aria-hidden="true" /><h2 className="text-xl font-black text-ink">{t.payCard}</h2></div>
+          <CardPaymentForm cards={activeCards} accounts={cashLikeAccounts} defaultAccountId={defaultAccountId} locale={locale} />
+          {activeCards.length === 0 || cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-warning/10 p-4 text-sm font-bold text-warning">{t.cardPaymentRequirement}</p> : null}
         </div>
       </section>
 

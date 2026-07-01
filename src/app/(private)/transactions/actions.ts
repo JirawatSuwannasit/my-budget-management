@@ -71,15 +71,6 @@ function revalidateFinanceViews() {
   revalidatePath("/planning");
   revalidatePath("/categories");
 }
-async function updateStatementPaidAmount(supabase: SupabaseServer, userId: string, statementId: string, delta: number) {
-  const { data, error } = await supabase.from("credit_card_statements").select("statement_amount_due,paid_amount").eq("id", statementId).eq("user_id", userId).single();
-  if (error) throw new Error(error.message);
-  const statementAmountDue = Number(data.statement_amount_due ?? 0);
-  const paidAmount = Math.max(0, Number(data.paid_amount ?? 0) + delta);
-  const status = paidAmount <= 0 ? "unpaid" : paidAmount >= statementAmountDue ? "paid" : "partial";
-  const { error: updateError } = await supabase.from("credit_card_statements").update({ paid_amount: paidAmount, status }).eq("id", statementId).eq("user_id", userId);
-  if (updateError) throw new Error(updateError.message);
-}
 async function updateDebtRemaining(supabase: SupabaseServer, userId: string, debtId: string, delta: number) {
   const { data, error } = await supabase.from("debts").select("remaining_balance").eq("id", debtId).eq("user_id", userId).single();
   if (error) throw new Error(error.message);
@@ -95,7 +86,6 @@ function buildPayload(formData: FormData, userId: string, messages: TransactionM
   const accountId = textValue(formData, "account_id");
   const rawDestinationAccountId = textValue(formData, "destination_account_id");
   const creditCardId = textValue(formData, "credit_card_id");
-  const statementId = textValue(formData, "statement_id");
   const debtId = textValue(formData, "debt_id");
   const reserveEntityId = textValue(formData, "reserve_entity_id");
   const expenseRelatedEntityId = textValue(formData, "expense_related_entity_id");
@@ -105,7 +95,7 @@ function buildPayload(formData: FormData, userId: string, messages: TransactionM
   if (type === "transfer" && !rawDestinationAccountId) throw new Error(messages.chooseTransferDestination);
   if (type === "investment_transfer" && !rawDestinationAccountId) throw new Error(messages.chooseInvestmentDestination);
   if (type === "credit_card_expense" && !creditCardId) throw new Error(messages.chooseCreditCard);
-  if (type === "credit_card_payment" && !statementId) throw new Error(messages.chooseStatement);
+  if (type === "credit_card_payment" && !creditCardId) throw new Error(messages.chooseCreditCard);
   if (type === "debt_payment" && !debtId) throw new Error(messages.chooseDebt);
   if (type === "sinking_fund_reserve" && rawDestinationAccountId) {
     // Annual-expense reserves are real transfers (source cash-like -> bound
@@ -119,9 +109,9 @@ function buildPayload(formData: FormData, userId: string, messages: TransactionM
   // paid by card) so cycle "paid/handled" detection works; fall back to the card
   // id for the standalone card-expense flow. Card linkage lives in
   // card_transactions.card_id regardless, and revert keys off transaction_id.
-  const relatedEntityId = type === "expense" ? expenseRelatedEntityId : type === "credit_card_expense" ? (expenseRelatedEntityId ?? creditCardId) : type === "credit_card_payment" ? statementId : type === "debt_payment" ? debtId : type === "sinking_fund_reserve" ? reserveEntityId : null;
+  const relatedEntityId = type === "expense" ? expenseRelatedEntityId : type === "credit_card_expense" ? (expenseRelatedEntityId ?? creditCardId) : type === "credit_card_payment" ? creditCardId : type === "debt_payment" ? debtId : type === "sinking_fund_reserve" ? reserveEntityId : null;
   const destinationAccountId = type === "transfer" || type === "investment_transfer" || type === "sinking_fund_reserve" ? rawDestinationAccountId : null;
-  return { transaction: { user_id: userId, account_id: accountId, destination_account_id: destinationAccountId, category_id: categoryId, type, amount, transaction_date: transactionDate, cycle_start_date: toDateInput(cycleStart), related_entity_id: relatedEntityId, notes }, extras: { creditCardId, statementId, debtId } };
+  return { transaction: { user_id: userId, account_id: accountId, destination_account_id: destinationAccountId, category_id: categoryId, type, amount, transaction_date: transactionDate, cycle_start_date: toDateInput(cycleStart), related_entity_id: relatedEntityId, notes }, extras: { creditCardId, debtId } };
 }
 async function applyTransactionSideEffects(supabase: SupabaseServer, userId: string, transactionId: string, payload: ReturnType<typeof buildPayload>, messages: TransactionMessages) {
   const tx = payload.transaction;
@@ -132,12 +122,9 @@ async function applyTransactionSideEffects(supabase: SupabaseServer, userId: str
     if (error) throw new Error(error.message);
   }
   if (tx.type === "credit_card_payment") {
-    if (!payload.extras.statementId || !tx.account_id) throw new Error(messages.statementAndAccountRequired);
-    const { data: statement, error: statementError } = await supabase.from("credit_card_statements").select("card_id").eq("id", payload.extras.statementId).eq("user_id", userId).single();
-    if (statementError) throw new Error(statementError.message);
-    const { error } = await supabase.from("card_payments").insert({ user_id: userId, transaction_id: transactionId, card_id: statement.card_id, statement_id: payload.extras.statementId, account_id: tx.account_id, amount: tx.amount, payment_date: tx.transaction_date });
+    if (!payload.extras.creditCardId || !tx.account_id) throw new Error(messages.cardAndAccountRequired);
+    const { error } = await supabase.from("card_payments").insert({ user_id: userId, transaction_id: transactionId, card_id: payload.extras.creditCardId, account_id: tx.account_id, amount: tx.amount, payment_date: tx.transaction_date });
     if (error) throw new Error(error.message);
-    await updateStatementPaidAmount(supabase, userId, payload.extras.statementId, tx.amount);
   }
   if (tx.type === "debt_payment") {
     if (!payload.extras.debtId || !tx.account_id) throw new Error(messages.debtAndAccountRequired);
@@ -157,12 +144,11 @@ async function revertTransactionSideEffects(supabase: SupabaseServer, userId: st
     return;
   }
   if (transaction.type === "credit_card_payment") {
-    const { data, error } = await supabase.from("card_payments").select("id,account_id,statement_id,amount").eq("transaction_id", transaction.id).eq("user_id", userId);
+    const { data, error } = await supabase.from("card_payments").select("id,account_id,amount").eq("transaction_id", transaction.id).eq("user_id", userId);
     if (error) throw new Error(error.message);
     if (!data || data.length === 0) throw new Error(messages.unsafeCardPayment);
     for (const payment of data) {
       if (payment.account_id) await adjustAccountBalance(supabase, userId, payment.account_id, Number(payment.amount), messages);
-      if (payment.statement_id) await updateStatementPaidAmount(supabase, userId, payment.statement_id, -Number(payment.amount));
     }
     const { error: deleteError } = await supabase.from("card_payments").delete().eq("transaction_id", transaction.id).eq("user_id", userId);
     if (deleteError) throw new Error(deleteError.message);

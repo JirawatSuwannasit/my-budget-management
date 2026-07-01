@@ -26,6 +26,29 @@ function clampStartDay(day: number) {
   return Math.min(MAX_CYCLE_START_DAY, Math.max(MIN_CYCLE_START_DAY, day));
 }
 
+function clampDayToMonth(year: number, monthIndex: number, day: number) {
+  const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+  return Math.min(Math.max(1, day), lastDay);
+}
+
+// The most recent credit-card billing cut on or before `today`. A card's
+// billing_cut_day can exceed a short month's length (e.g. 31 in February), so
+// it is clamped to that month's last day. A transaction dated on the cut day
+// itself counts as billed (cut happens at end of day).
+export function getLastBillingCutDate(today: Date, cutDay: number): Date {
+  const date = atLocalNoon(today);
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
+  const clampedThisMonth = clampDayToMonth(year, month, cutDay);
+
+  if (day >= clampedThisMonth) {
+    return new Date(year, month, clampedThisMonth, 12);
+  }
+
+  return new Date(year, month - 1, clampDayToMonth(year, month - 1, cutDay), 12);
+}
+
 export function getFinancialCycle(inputDate: Date, startDay: number = DEFAULT_CYCLE_START_DAY): FinancialCycle {
   const cycleStartDay = clampStartDay(startDay);
   const date = atLocalNoon(inputDate);

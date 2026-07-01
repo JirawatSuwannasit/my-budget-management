@@ -20,9 +20,9 @@ export const sampleDashboardInput: DashboardInput = {
     { id: "shopping", label: "Misc shopping", budgetAmount: 7000, usedAmount: 4100 },
     { id: "luxury", label: "Luxury", budgetAmount: 5000, usedAmount: 1700 }
   ],
-  creditCardStatements: [
-    { id: "card-1-statement", cardName: "Card 1", currentCycleSpending: 8300, statementAmountDue: 12400, paidAmount: 5000 },
-    { id: "card-2-statement", cardName: "Card 2", currentCycleSpending: 2600, statementAmountDue: 3900, paidAmount: 0 }
+  creditCards: [
+    { id: "card-1", cardName: "Card 1", billedOutstanding: 7400, currentCycleSpending: 8300 },
+    { id: "card-2", cardName: "Card 2", billedOutstanding: 3900, currentCycleSpending: 2600 }
   ],
   plannedDebtPayments: [
     { id: "main-debt", debtName: "Main debt", amount: 9000, paid: false }

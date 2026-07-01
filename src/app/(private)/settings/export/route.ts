@@ -12,8 +12,8 @@ const USER_TABLES = [
   "debts",
   "debt_payments",
   "credit_cards",
-  "credit_card_statements",
   "card_transactions",
+  "card_payments",
   "categories"
 ] as const;
 

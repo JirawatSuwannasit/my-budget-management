@@ -1,4 +1,4 @@
-import type { DashboardRows } from "./dashboard-data";
+import { computeCardObligation, type DashboardRows } from "./dashboard-data";
 
 // "Due & to-do this cycle" is a read-only view derived from the same Supabase rows the dashboard
 // loads. It never writes data; it only surfaces obligations the user still has to act on this cycle.
@@ -76,6 +76,15 @@ function clampDayToMonth(year: number, monthIndex: number, day: number) {
   return Math.min(day, lastDay);
 }
 
+// The next occurrence of payment_due_day strictly after the last billing cut
+// (a due day numerically before/at the cut day rolls into the following month,
+// the common real-world layout; a due day after the cut day stays same-month).
+function nextDueDateAfterCut(lastCut: Date, paymentDueDay: number): Date {
+  const sameMonth = new Date(lastCut.getFullYear(), lastCut.getMonth(), clampDayToMonth(lastCut.getFullYear(), lastCut.getMonth(), paymentDueDay), 12);
+  if (sameMonth.getTime() > lastCut.getTime()) return sameMonth;
+  return new Date(lastCut.getFullYear(), lastCut.getMonth() + 1, clampDayToMonth(lastCut.getFullYear(), lastCut.getMonth() + 1, paymentDueDay), 12);
+}
+
 function urgencyFor(dueDate: string | null, todayKey: string, soonKey: string): UpcomingUrgency {
   if (!dueDate) return "pending";
   if (dueDate < todayKey) return "overdue";
@@ -111,18 +120,26 @@ export function buildUpcomingItems({ rows, cycleStart, cycleEnd, today = new Dat
 
   const items: UpcomingItem[] = [];
 
-  // 1. Credit card statements still owed.
-  for (const statement of rows.creditCardStatements) {
-    if (statement.status === "paid") continue;
-    const remaining = toNumber(statement.remaining_payable);
-    if (remaining <= 0) continue;
+  // 1. Credit cards with a billed (already cut) outstanding balance.
+  for (const card of rows.creditCards) {
+    if (!isActive(card)) continue;
+    const obligation = computeCardObligation(
+      {
+        billingCutDay: card.billing_cut_day,
+        cardTransactions: rows.cardTransactions.filter((transaction) => transaction.card_id === card.id),
+        cardPayments: rows.cardPayments.filter((payment) => payment.card_id === card.id)
+      },
+      today
+    );
+    if (obligation.billedOutstanding <= 0) continue;
+    const dueDate = toDateInput(nextDueDateAfterCut(obligation.lastCut, card.payment_due_day));
     items.push({
-      id: "statement-" + statement.id,
+      id: "card-" + card.id,
       type: "card_statement",
-      title: cardNameById.get(statement.card_id) ?? "Credit card",
-      amount: remaining,
-      dueDate: statement.due_date ?? null,
-      urgency: urgencyFor(statement.due_date ?? null, todayKey, soonKey),
+      title: cardNameById.get(card.id) ?? "Credit card",
+      amount: obligation.billedOutstanding,
+      dueDate,
+      urgency: urgencyFor(dueDate, todayKey, soonKey),
       href: "/debts-cards"
     });
   }

@@ -9,7 +9,6 @@ type AccountRow = { id: string; name: string; type: AccountType; active: boolean
 type CategoryRow = { id: string; name: string; kind: CategoryKind; active: boolean };
 type DebtRow = { id: string; name: string; active: boolean };
 type CardRow = { id: string; name: string; active: boolean };
-type StatementRow = { id: string; card_id: string; due_date: string; statement_amount_due: number | string; paid_amount: number | string; remaining_payable: number | string; status: "unpaid" | "partial" | "paid" };
 type AnnualExpenseRow = { id: string; name: string; active: boolean };
 type SubscriptionRow = { id: string; name: string; frequency: "monthly" | "yearly"; active: boolean };
 type TransactionRow = { id: string; account_id: string | null; destination_account_id: string | null; category_id: string | null; type: TransactionType; amount: number | string; transaction_date: string; cycle_start_date: string; related_entity_id: string | null; notes: string | null; created_at: string };
@@ -27,12 +26,11 @@ export default async function TransactionsPage() {
   const locale = isLocale(profile?.locale) ? profile.locale : "th";
   const t = dictionaries[locale].transactions;
 
-  const [accountsResult, categoriesResult, debtsResult, cardsResult, statementsResult, annualResult, subscriptionsResult, transactionsResult, appSettingsResult] = await Promise.all([
+  const [accountsResult, categoriesResult, debtsResult, cardsResult, annualResult, subscriptionsResult, transactionsResult, appSettingsResult] = await Promise.all([
     supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
     supabase.from("categories").select("id,name,kind,active").order("name"),
     supabase.from("debts").select("id,name,active").order("active", { ascending: false }).order("name"),
     supabase.from("credit_cards").select("id,name,active").order("active", { ascending: false }).order("name"),
-    supabase.from("credit_card_statements").select("id,card_id,due_date,statement_amount_due,paid_amount,remaining_payable,status").order("due_date", { ascending: true }),
     supabase.from("annual_expenses").select("id,name,active").order("name"),
     supabase.from("subscriptions").select("id,name,frequency,active").order("name"),
     supabase.from("transactions").select("id,account_id,destination_account_id,category_id,type,amount,transaction_date,cycle_start_date,related_entity_id,notes,created_at").order("transaction_date", { ascending: false }).order("created_at", { ascending: false }).limit(100),
@@ -43,7 +41,6 @@ export default async function TransactionsPage() {
   const categories = (categoriesResult.data ?? []) as CategoryRow[];
   const debts = (debtsResult.data ?? []) as DebtRow[];
   const cards = (cardsResult.data ?? []) as CardRow[];
-  const statements = (statementsResult.data ?? []) as StatementRow[];
   const annualExpenses = (annualResult.data ?? []) as AnnualExpenseRow[];
   const subscriptions = (subscriptionsResult.data ?? []) as SubscriptionRow[];
   const transactions = (transactionsResult.data ?? []) as TransactionRow[];
@@ -58,7 +55,7 @@ export default async function TransactionsPage() {
   ];
   const accountName = new Map(accounts.map((account) => [account.id, account.name]));
   const defaultAccountId = (appSettingsResult.data as { default_account_id: string | null } | null)?.default_account_id ?? null;
-  const loadError = accountsResult.error ?? categoriesResult.error ?? debtsResult.error ?? cardsResult.error ?? statementsResult.error ?? annualResult.error ?? subscriptionsResult.error ?? transactionsResult.error;
+  const loadError = accountsResult.error ?? categoriesResult.error ?? debtsResult.error ?? cardsResult.error ?? annualResult.error ?? subscriptionsResult.error ?? transactionsResult.error;
 
   return (
     <div className="grid gap-5">
@@ -79,7 +76,7 @@ export default async function TransactionsPage() {
       <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
         <div>
           <h2 className="mb-3 text-xl font-black text-ink">{t.addTransaction}</h2>
-          <TransactionForm accounts={accounts} categories={categories} debts={debts} cards={cards} statements={statements} reserves={reserves} payables={payables} defaultAccountId={defaultAccountId} locale={locale} />
+          <TransactionForm accounts={accounts} categories={categories} debts={debts} cards={cards} reserves={reserves} payables={payables} defaultAccountId={defaultAccountId} locale={locale} />
         </div>
 
         <div className="grid gap-3">
@@ -104,7 +101,7 @@ export default async function TransactionsPage() {
               </div>
               <details className="mt-4">
                 <summary className="cursor-pointer text-sm font-black text-primary">{t.editTransaction}</summary>
-                <div className="mt-3"><TransactionForm accounts={accounts} categories={categories} debts={debts} cards={cards} statements={statements} reserves={reserves} payables={payables} transaction={transaction} defaultAccountId={defaultAccountId} locale={locale} compact /></div>
+                <div className="mt-3"><TransactionForm accounts={accounts} categories={categories} debts={debts} cards={cards} reserves={reserves} payables={payables} transaction={transaction} defaultAccountId={defaultAccountId} locale={locale} compact /></div>
               </details>
             </article>
           ))}

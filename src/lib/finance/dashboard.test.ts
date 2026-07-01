@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { getCycleStartForSalaryPayment, getFinancialCycle, getSalaryPaymentForCycle } from "./cycle";
+import { getCycleStartForSalaryPayment, getFinancialCycle, getLastBillingCutDate, getSalaryPaymentForCycle } from "./cycle";
 import { calculateDashboardSnapshot } from "./dashboard";
 import { getAccountBalanceDeltas } from "./transaction-effects";
-import { hasRealDashboardRows, mapDashboardRowsToInput, type DashboardRows } from "./dashboard-data";
+import { computeCardObligation, hasRealDashboardRows, mapDashboardRowsToInput, type DashboardRows } from "./dashboard-data";
 import { sampleDashboardInput } from "./sample-data";
 import type { DashboardInput } from "./types";
 
@@ -69,13 +69,11 @@ describe("calculateDashboardSnapshot", () => {
     expect(paid.realAvailableMoney).toBe(unpaid.realAvailableMoney + 699);
   });
 
-  it("tracks credit card expense as card liability without reducing cash immediately", () => {
+  it("tracks credit card current-cycle spending as informational without reducing cash immediately", () => {
     const baseline = calculateDashboardSnapshot(testInput());
     const input = testInput({
-      creditCardStatements: sampleDashboardInput.creditCardStatements.map((statement) =>
-        statement.id === "card-1-statement"
-          ? { ...statement, currentCycleSpending: statement.currentCycleSpending + 12345 }
-          : statement
+      creditCards: sampleDashboardInput.creditCards.map((card) =>
+        card.id === "card-1" ? { ...card, currentCycleSpending: card.currentCycleSpending + 12345 } : card
       )
     });
     const snapshot = calculateDashboardSnapshot(input);
@@ -92,10 +90,8 @@ describe("calculateDashboardSnapshot", () => {
       accounts: sampleDashboardInput.accounts.map((account) =>
         account.id === "main-bank" ? { ...account, balance: account.balance - paymentAmount } : account
       ),
-      creditCardStatements: sampleDashboardInput.creditCardStatements.map((statement) =>
-        statement.id === "card-1-statement"
-          ? { ...statement, paidAmount: statement.paidAmount + paymentAmount }
-          : statement
+      creditCards: sampleDashboardInput.creditCards.map((card) =>
+        card.id === "card-1" ? { ...card, billedOutstanding: card.billedOutstanding - paymentAmount } : card
       )
     });
     const snapshot = calculateDashboardSnapshot(input);
@@ -208,6 +204,64 @@ describe("financial cycle rules", () => {
   });
 });
 
+describe("getLastBillingCutDate", () => {
+  it("returns this month's cut when today is mid-month, well after the cut", () => {
+    expect(getLastBillingCutDate(new Date(2026, 7, 20, 9), 15)).toEqual(new Date(2026, 7, 15, 12));
+  });
+
+  it("returns last month's cut when today is before this month's cut day", () => {
+    expect(getLastBillingCutDate(new Date(2026, 7, 10, 9), 15)).toEqual(new Date(2026, 6, 15, 12));
+  });
+
+  it("treats the cut day itself as already billed (uses this month's cut)", () => {
+    expect(getLastBillingCutDate(new Date(2026, 7, 15, 9), 15)).toEqual(new Date(2026, 7, 15, 12));
+  });
+
+  it("clamps a cut day of 31 to a short month's last day", () => {
+    // February 2026 has 28 days. Before the clamped 28th, still in January's cut.
+    expect(getLastBillingCutDate(new Date(2026, 1, 20, 9), 31)).toEqual(new Date(2026, 0, 31, 12));
+    // On (or after) the clamped 28th, February's own (clamped) cut applies.
+    expect(getLastBillingCutDate(new Date(2026, 1, 28, 9), 31)).toEqual(new Date(2026, 1, 28, 12));
+  });
+});
+
+describe("computeCardObligation", () => {
+  const billingCutDay = 25;
+  const today = new Date(2026, 7, 10, 9); // Aug 10 2026; last cut is Jul 25.
+
+  it("splits card transactions into billed (on/before the cut) and current-cycle (after the cut)", () => {
+    const obligation = computeCardObligation(
+      {
+        billingCutDay,
+        cardTransactions: [
+          { amount: "5000", transaction_date: "2026-07-20" }, // billed
+          { amount: "1200", transaction_date: "2026-07-25" }, // billed (on the cut day)
+          { amount: "800", transaction_date: "2026-07-26" } // current cycle
+        ],
+        cardPayments: []
+      },
+      today
+    );
+
+    expect(obligation.billedSpend).toBe(6200);
+    expect(obligation.currentCycleSpending).toBe(800);
+    expect(obligation.billedOutstanding).toBe(6200);
+  });
+
+  it("pays down the billed balance first and never goes negative", () => {
+    const obligation = computeCardObligation(
+      {
+        billingCutDay,
+        cardTransactions: [{ amount: "10000", transaction_date: "2026-07-20" }],
+        cardPayments: [{ amount: "4000" }, { amount: "7000" }]
+      },
+      today
+    );
+
+    expect(obligation.totalPaid).toBe(11000);
+    expect(obligation.billedOutstanding).toBe(0);
+  });
+});
 
 describe("Supabase dashboard row mapping", () => {
   const cycleStart = new Date(2026, 6, 25, 12);
@@ -224,7 +278,7 @@ describe("Supabase dashboard row mapping", () => {
       debts: [],
       debtPayments: [],
       creditCards: [],
-      creditCardStatements: [],
+      cardPayments: [],
       cardTransactions: [],
       ...overrides
     };
@@ -340,22 +394,24 @@ describe("Supabase dashboard row mapping", () => {
     expect(snapshot.monthlySinkingFundReserves).toBe(500);
   });
 
-  it("aggregates card statements, paid amounts, and current card spending by card", () => {
+  it("derives billed vs. current-cycle card spending and pays down the billed balance first", () => {
+    const today = new Date(2026, 7, 10, 9); // Aug 10 2026; the card cuts on the 25th, so the last cut is Jul 25.
     const input = mapDashboardRowsToInput(
       rows({
-        creditCards: [{ id: "card", name: "Main card", active: true }],
-        creditCardStatements: [
-          { id: "old-paid", card_id: "card", statement_amount_due: "9999", paid_amount: "9999", remaining_payable: "0", due_date: "2026-07-10", status: "paid" },
-          { id: "stmt", card_id: "card", statement_amount_due: "12000", paid_amount: "5000", remaining_payable: "7000", due_date: "2026-08-10", status: "partial" }
+        creditCards: [{ id: "card", name: "Main card", billing_cut_day: 25, payment_due_day: 5, active: true }],
+        cardTransactions: [
+          { id: "billed", card_id: "card", amount: "12000", transaction_date: "2026-07-20" },
+          { id: "floating", card_id: "card", amount: "3300", transaction_date: "2026-07-27" }
         ],
-        cardTransactions: [{ id: "ct", card_id: "card", statement_id: null, amount: "3300", transaction_date: "2026-07-27", billing_cycle_start: "2026-07-25" }]
+        cardPayments: [{ id: "pay", card_id: "card", amount: "5000" }]
       }),
       cycleStart,
-      cycleEnd
+      cycleEnd,
+      today
     );
     const snapshot = calculateDashboardSnapshot(input);
 
-    expect(input.creditCardStatements).toEqual([{ id: "stmt", cardName: "Main card", currentCycleSpending: 3300, statementAmountDue: 12000, paidAmount: 5000 }]);
+    expect(input.creditCards).toEqual([{ id: "card", cardName: "Main card", billedOutstanding: 7000, currentCycleSpending: 3300 }]);
     expect(snapshot.currentCardCycleSpending).toBe(3300);
     expect(snapshot.remainingCreditCardPayable).toBe(7000);
   });

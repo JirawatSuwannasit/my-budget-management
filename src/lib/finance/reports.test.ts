@@ -15,7 +15,7 @@ function rows(overrides: Partial<DashboardRows> = {}): DashboardRows {
     debts: [],
     debtPayments: [],
     creditCards: [],
-    creditCardStatements: [],
+    cardPayments: [],
     cardTransactions: [],
     ...overrides
   };

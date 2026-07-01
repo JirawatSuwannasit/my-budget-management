@@ -10,7 +10,6 @@ export type TransactionFormAccount = { id: string; name: string; type: AccountTy
 export type TransactionFormCategory = { id: string; name: string; kind: CategoryKind; active: boolean };
 export type TransactionFormDebt = { id: string; name: string; active: boolean };
 export type TransactionFormCard = { id: string; name: string; active: boolean };
-export type TransactionFormStatement = { id: string; card_id: string; due_date: string; statement_amount_due: number | string; paid_amount: number | string; remaining_payable: number | string; status: "unpaid" | "partial" | "paid" };
 export type TransactionFormReserve = { id: string; label: string; kind: "annual" | "subscription" };
 export type TransactionFormPayable = { id: string; label: string; kind: "monthly_subscription" | "yearly_subscription" | "annual_expense" };
 export type TransactionFormValue = { id?: string; type?: TransactionType; amount?: number | string; transaction_date?: string; account_id?: string | null; destination_account_id?: string | null; category_id?: string | null; related_entity_id?: string | null; notes?: string | null };
@@ -20,7 +19,6 @@ type Props = {
   categories: TransactionFormCategory[];
   debts: TransactionFormDebt[];
   cards: TransactionFormCard[];
-  statements: TransactionFormStatement[];
   reserves: TransactionFormReserve[];
   payables: TransactionFormPayable[];
   transaction?: TransactionFormValue;
@@ -49,11 +47,8 @@ function todayInput() {
   return year + "-" + month + "-" + day;
 }
 
-function formatMoney(value: number | string) {
-  return new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(Number(value));
-}
 
-export function TransactionForm({ accounts, categories, debts, cards, statements, reserves, payables, transaction, defaultAccountId, locale, compact = false }: Props) {
+export function TransactionForm({ accounts, categories, debts, cards, reserves, payables, transaction, defaultAccountId, locale, compact = false }: Props) {
   const [state, formAction, isPending] = useActionState(saveTransaction, initialState);
   const t = dictionaries[locale].transactions;
   const [type, setType] = useState<TransactionType>(transaction?.type ?? "expense");
@@ -143,13 +138,10 @@ export function TransactionForm({ accounts, categories, debts, cards, statements
 
       {type === "credit_card_payment" ? (
         <label className="grid gap-2 text-sm font-black text-ink">
-          {t.form.statement}
-          <select name="statement_id" defaultValue={selectedRelated} required className="rounded-2xl border border-line bg-elevated px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-surface">
-            <option value="">{t.form.chooseStatement}</option>
-            {statements.filter((statement) => statement.status !== "paid" || Number(statement.remaining_payable) > 0).map((statement) => {
-              const card = cards.find((item) => item.id === statement.card_id);
-              return <option key={statement.id} value={statement.id}>{card?.name ?? t.form.creditCard} {t.due} {statement.due_date} - {t.outstandingShort} {formatMoney(statement.remaining_payable)}</option>;
-            })}
+          {t.form.creditCard}
+          <select name="credit_card_id" defaultValue={selectedRelated} required className="rounded-2xl border border-line bg-elevated px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-surface">
+            <option value="">{t.form.chooseCreditCard}</option>
+            {cards.filter((card) => card.active).map((card) => <option key={card.id} value={card.id}>{card.name}</option>)}
           </select>
         </label>
       ) : null}
