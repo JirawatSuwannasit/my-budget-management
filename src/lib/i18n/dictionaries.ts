@@ -36,7 +36,10 @@ export const dictionaries = {
       signOut: "ออกจากระบบ"
     },
     dashboard: {
-      realAvailable: "เงินใช้ได้จริง",
+      realAvailable: "เงินเหลือ",
+      netAfterCard: "เงินใช้ได้จริง",
+      netAfterCardHint: "เงินเหลือ หักยอดใช้บัตรรอบนี้ที่ยังลอยอยู่",
+      cardFloatingThisCycle: "ยอดใช้บัตรรอบนี้ (ลอย)",
       dailySafeAmount: "ใช้ได้ปลอดภัยต่อวัน",
       cycleBadge: "รอบ 25 ถึง 24",
       sourceSupabase: "ข้อมูลจริงจาก Supabase",
@@ -669,7 +672,10 @@ export const dictionaries = {
       signOut: "Log out"
     },
     dashboard: {
-      realAvailable: "Real available money",
+      realAvailable: "Money left",
+      netAfterCard: "Real spendable (net of card use)",
+      netAfterCardHint: "Money left minus this cycle's floating card spend",
+      cardFloatingThisCycle: "Card spend this cycle (floating)",
       dailySafeAmount: "Daily safe amount",
       cycleBadge: "25th to 24th cycle",
       sourceSupabase: "Live Supabase data",

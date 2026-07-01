@@ -56,6 +56,7 @@ export function DashboardShell({ cycle, input, snapshot, upcoming, source, statu
   const t = dictionaries[locale].dashboard;
   const real = snapshot.realAvailableMoney;
   const dailyAvailable = cycle.daysRemaining > 0 ? real / cycle.daysRemaining : real;
+  const netAfterCard = real - snapshot.currentCardCycleSpending;
 
   // One-word status cue derived from the numbers (color via existing tones).
   const health = real <= 0 ? "danger" : real < dailyAvailable * SAFE_BUFFER_DAYS ? "warning" : "healthy";
@@ -105,6 +106,9 @@ export function DashboardShell({ cycle, input, snapshot, upcoming, source, statu
 
         <p className="mt-5 text-caption font-black uppercase text-primary">{t.realAvailable}</p>
         <p className="mt-1 font-display text-display font-black leading-none tabular-nums text-ink md:text-display-lg">{formatMoney(real)}</p>
+        {snapshot.currentCardCycleSpending !== 0 ? (
+          <p className="mt-3 text-sm font-semibold text-muted">{t.netAfterCard}: <strong className={"tabular-nums " + (netAfterCard <= 0 ? "text-danger" : "text-ink")}>{formatMoney(netAfterCard)}</strong></p>
+        ) : null}
         <p className="mt-3 text-sm font-semibold text-muted">{t.dailySafeAmount}: <strong className={"tabular-nums " + healthText}>{formatMoney(dailyAvailable)}</strong></p>
 
         {status === "error" ? (
@@ -151,6 +155,21 @@ export function DashboardShell({ cycle, input, snapshot, upcoming, source, statu
             <span className="text-sm font-black text-ink">{t.realAvailable}</span>
             <span className={"font-display text-stat font-black tabular-nums " + healthText}>{formatMoney(real)}</span>
           </div>
+          {snapshot.currentCardCycleSpending > 0 ? (
+            <>
+              <div className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                <span className="font-bold text-muted">{t.cardFloatingThisCycle}</span>
+                <span className="flex items-baseline gap-3">
+                  <span className="tabular-nums font-bold text-warning">−{formatMoney(snapshot.currentCardCycleSpending)}</span>
+                  <span className="w-24 text-right tabular-nums font-semibold text-faint">{formatMoney(netAfterCard)}</span>
+                </span>
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-3 rounded-2xl bg-elevated px-3 py-3">
+                <span className="text-sm font-black text-ink">{t.netAfterCard}</span>
+                <span className={"font-display text-stat font-black tabular-nums " + (netAfterCard <= 0 ? "text-danger" : "text-ink")}>{formatMoney(netAfterCard)}</span>
+              </div>
+            </>
+          ) : null}
         </div>
       </Card>
 
