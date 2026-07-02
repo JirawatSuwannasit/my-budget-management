@@ -136,9 +136,13 @@ export function buildReportsData({
 
     const sumByType = (type: string) =>
       cycleTransactions.filter((transaction) => transaction.type === type).reduce((total, transaction) => total + toNumber(transaction.amount), 0);
+    const sumByTypes = (types: string[]) =>
+      cycleTransactions.filter((transaction) => types.includes(transaction.type)).reduce((total, transaction) => total + toNumber(transaction.amount), 0);
 
     const income = sumByType("income");
-    const expenses = sumByType("expense");
+    // Reports count card spend at transaction time (the moment it is charged),
+    // deliberately diverging from the dashboard's grace-period figure.
+    const expenses = sumByTypes(["expense", "credit_card_expense"]);
 
     return {
       cycleStartDate: key,
@@ -202,7 +206,7 @@ function buildCategoryBreakdown({
 }): CategoryBreakdown {
   const expenses = rows.transactions
     .filter((transaction) => transaction.cycle_start_date === selectedKey)
-    .filter((transaction) => transaction.type === "expense")
+    .filter((transaction) => transaction.type === "expense" || transaction.type === "credit_card_expense")
     .filter((transaction) => categoryActiveOrMissing(transaction.category_id));
 
   const totals = new Map<string | null, number>();
