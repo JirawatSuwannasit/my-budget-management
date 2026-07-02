@@ -4,6 +4,7 @@ import { CreditCardForm } from "@/components/debts-cards/card-form";
 import { DebtForm } from "@/components/debts-cards/debt-form";
 import { DeleteDebtForm } from "@/components/debts-cards/delete-debt-form";
 import { CardActivityForms, CardPaymentForm, DebtPaymentForm } from "@/components/debts-cards/payment-forms";
+import { LazyDetails } from "@/components/ui/lazy-details";
 import { computeCardObligation } from "@/lib/finance/dashboard-data";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
@@ -215,7 +216,7 @@ export default async function DebtsCardsPage() {
                   </div>
                   <ToggleActiveForm id={debt.id} active={debt.active} kind="debt" locale={locale} />
                 </div>
-                <details className="mt-4"><summary className="cursor-pointer text-sm font-black text-primary">{t.editDebt}</summary><div className="mt-3"><DebtForm debt={debt} compact locale={locale} /></div></details>
+                <LazyDetails className="mt-4" summaryClassName="cursor-pointer text-sm font-black text-primary" summary={t.editDebt}><div className="mt-3"><DebtForm debt={debt} compact locale={locale} /></div></LazyDetails>
               </article>
             );
           })}
@@ -289,7 +290,7 @@ export default async function DebtsCardsPage() {
                   </div>
                 </div>
 
-                <details className="mt-4"><summary className="cursor-pointer text-sm font-black text-primary">{t.editCard}</summary><div className="mt-3"><CreditCardForm card={card} locale={locale} /></div></details>
+                <LazyDetails className="mt-4" summaryClassName="cursor-pointer text-sm font-black text-primary" summary={t.editCard}><div className="mt-3"><CreditCardForm card={card} locale={locale} /></div></LazyDetails>
               </article>
             );
           })}

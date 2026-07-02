@@ -3,6 +3,7 @@ import { AnnualExpenseForm } from "@/components/planning/annual-expense-form";
 import { BudgetForm } from "@/components/planning/budget-form";
 import { PayAnnualBillForm, PaySubscriptionForm, ReserveAnnualExpenseForm, ReserveSubscriptionForm } from "@/components/planning/payment-workflow-forms";
 import { SubscriptionForm } from "@/components/planning/subscription-form";
+import { LazyDetails } from "@/components/ui/lazy-details";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
 import type { AccountType, CategoryKind } from "@/lib/finance/types";
 import { isCashLikeType } from "@/lib/finance/types";
@@ -199,10 +200,9 @@ export default async function PlanningPage() {
                 </div>
                 <ToggleActiveForm id={budget.id} active={budget.active} action={setBudgetActive} locale={locale} />
               </div>
-              <details className="mt-4">
-                <summary className="cursor-pointer text-sm font-black text-primary">{t.editBudget}</summary>
+              <LazyDetails className="mt-4" summaryClassName="cursor-pointer text-sm font-black text-primary" summary={t.editBudget}>
                 <div className="mt-3"><BudgetForm budget={{ ...budget, category_name: budget.categoryName }} cycleStartDate={cycleStartDate} compact locale={locale} /></div>
-              </details>
+              </LazyDetails>
             </article>
           ))}
         </div>
@@ -252,10 +252,9 @@ export default async function PlanningPage() {
                   </div>
                 ) : null}
                 {subscription.active && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-warning/10 p-3 text-sm font-bold text-warning">{t.addCashLikeAccountSubscription}</p> : null}
-                <details className="mt-4">
-                  <summary className="cursor-pointer text-sm font-black text-primary">{t.editSubscription}</summary>
+                <LazyDetails className="mt-4" summaryClassName="cursor-pointer text-sm font-black text-primary" summary={t.editSubscription}>
                   <div className="mt-3"><SubscriptionForm subscription={{ ...subscription, category_name: categoryName }} compact locale={locale} /></div>
-                </details>
+                </LazyDetails>
               </article>
             );
           })}
@@ -311,10 +310,9 @@ export default async function PlanningPage() {
                   </div>
                 ) : null}
                 {expense.active && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-warning/10 p-3 text-sm font-bold text-warning">{t.addCashLikeAccountAnnual}</p> : null}
-                <details className="mt-4">
-                  <summary className="cursor-pointer text-sm font-black text-primary">{t.editSinkingFund}</summary>
+                <LazyDetails className="mt-4" summaryClassName="cursor-pointer text-sm font-black text-primary" summary={t.editSinkingFund}>
                   <div className="mt-3"><AnnualExpenseForm annualExpense={{ ...expense, category_name: categoryName }} accounts={cashLikeAccounts} compact locale={locale} /></div>
-                </details>
+                </LazyDetails>
               </article>
             );
           })}

@@ -1,9 +1,14 @@
+import Link from "next/link";
 import { ListChecks } from "lucide-react";
 import { DeleteTransactionForm } from "@/components/transactions/delete-transaction-form";
 import { TransactionForm } from "@/components/transactions/transaction-form";
+import { LazyDetails } from "@/components/ui/lazy-details";
 import { createClient } from "@/lib/supabase/server";
 import { dictionaries, isLocale } from "@/lib/i18n/dictionaries";
 import type { AccountType, CategoryKind, TransactionType } from "@/lib/finance/types";
+
+const RECENT_PAGE_SIZE = 25;
+const RECENT_MAX = 500;
 
 type AccountRow = { id: string; name: string; type: AccountType; active: boolean };
 type CategoryRow = { id: string; name: string; kind: CategoryKind; active: boolean };
@@ -17,7 +22,11 @@ function formatMoney(value: number | string) {
   return new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(Number(value));
 }
 
-export default async function TransactionsPage() {
+export default async function TransactionsPage({ searchParams }: { searchParams: Promise<{ recent?: string }> }) {
+  const { recent } = await searchParams;
+  const parsedRecent = Number(recent);
+  const recentLimit = Number.isInteger(parsedRecent) && parsedRecent > RECENT_PAGE_SIZE ? Math.min(parsedRecent, RECENT_MAX) : RECENT_PAGE_SIZE;
+
   const supabase = await createClient();
   const {
     data: { user }
@@ -33,7 +42,7 @@ export default async function TransactionsPage() {
     supabase.from("credit_cards").select("id,name,active").order("active", { ascending: false }).order("name"),
     supabase.from("annual_expenses").select("id,name,active").order("name"),
     supabase.from("subscriptions").select("id,name,frequency,active").order("name"),
-    supabase.from("transactions").select("id,account_id,destination_account_id,category_id,type,amount,transaction_date,cycle_start_date,related_entity_id,notes,created_at").order("transaction_date", { ascending: false }).order("created_at", { ascending: false }).limit(100),
+    supabase.from("transactions").select("id,account_id,destination_account_id,category_id,type,amount,transaction_date,cycle_start_date,related_entity_id,notes,created_at").order("transaction_date", { ascending: false }).order("created_at", { ascending: false }).limit(recentLimit),
     user ? supabase.from("app_settings").select("default_account_id").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null })
   ]);
 
@@ -99,12 +108,16 @@ export default async function TransactionsPage() {
                 </div>
                 <DeleteTransactionForm id={transaction.id} locale={locale} />
               </div>
-              <details className="mt-4">
-                <summary className="cursor-pointer text-sm font-black text-primary">{t.editTransaction}</summary>
+              <LazyDetails className="mt-4" summaryClassName="cursor-pointer text-sm font-black text-primary" summary={t.editTransaction}>
                 <div className="mt-3"><TransactionForm accounts={accounts} categories={categories} debts={debts} cards={cards} reserves={reserves} payables={payables} transaction={transaction} defaultAccountId={defaultAccountId} locale={locale} compact /></div>
-              </details>
+              </LazyDetails>
             </article>
           ))}
+          {transactions.length === recentLimit && recentLimit < RECENT_MAX ? (
+            <Link href={`/transactions?recent=${recentLimit + RECENT_PAGE_SIZE}`} className="rounded-panel border border-line bg-surface p-4 text-center text-sm font-black text-primary shadow-card transition hover:border-primary/40">
+              {t.showMore}
+            </Link>
+          ) : null}
         </div>
       </section>
     </div>
