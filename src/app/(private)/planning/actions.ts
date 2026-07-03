@@ -163,11 +163,26 @@ export async function saveSubscription(_previousState: PlanningActionState, form
     const price = parseAmount(formData.get("price"), messages);
     const billingDay = parseBillingDay(formData.get("billing_day"), messages);
     const paymentMethod = textValue(formData, "payment_method");
+    const paymentSource = textValue(formData, "payment_source");
+    const [sourceKind, sourceId] = paymentSource ? paymentSource.split(":") : [null, null];
+    const sourceAccountId = sourceKind === "account" ? sourceId : null;
+    const sourceCardId = sourceKind === "card" ? sourceId : null;
     const active = formData.get("active") === "on";
 
     if (!name) throw new Error(messages.subscriptionNameRequired);
 
-    const payload = { user_id: userId, name, category_id: categoryId, frequency, price, billing_day: billingDay, payment_method: paymentMethod, active };
+    const payload = {
+      user_id: userId,
+      name,
+      category_id: categoryId,
+      frequency,
+      price,
+      billing_day: billingDay,
+      payment_method: paymentMethod,
+      source_account_id: sourceAccountId,
+      source_card_id: sourceCardId,
+      active
+    };
     if (id) {
       const { error } = await supabase.from("subscriptions").update(payload).eq("id", id).eq("user_id", userId);
       if (error) throw new Error(error.message);

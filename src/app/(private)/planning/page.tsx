@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { deleteAnnualExpense, deleteBudget, deleteSubscription, setAnnualExpenseActive, setBudgetActive, setSubscriptionActive } from "./actions";
 
 type BudgetRow = { id: string; category_id: string | null; label: string; amount: number | string; cycle_start_date: string; active: boolean };
-type SubscriptionRow = { id: string; category_id: string | null; name: string; frequency: "monthly" | "yearly"; price: number | string; billing_day: number; payment_method: string | null; active: boolean };
+type SubscriptionRow = { id: string; category_id: string | null; name: string; frequency: "monthly" | "yearly"; price: number | string; billing_day: number; payment_method: string | null; source_account_id: string | null; source_card_id: string | null; active: boolean };
 type AnnualExpenseRow = { id: string; category_id: string | null; name: string; annual_amount: number | string; monthly_reserve: number | string | null; due_date: string | null; reserve_account_id: string | null; active: boolean };
 type CategoryRow = { id: string; name: string; kind: CategoryKind; active: boolean };
 type TransactionRow = { id: string; category_id: string | null; type: string; amount: number | string; cycle_start_date: string; related_entity_id: string | null };
@@ -75,7 +75,7 @@ export default async function PlanningPage() {
     user ? supabase.from("profiles").select("locale").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
     supabase.from("budgets").select("id,category_id,label,amount,cycle_start_date,active").eq("cycle_start_date", cycleStartDate).order("active", { ascending: false }).order("label"),
-    supabase.from("subscriptions").select("id,category_id,name,frequency,price,billing_day,payment_method,active").order("active", { ascending: false }).order("name"),
+    supabase.from("subscriptions").select("id,category_id,name,frequency,price,billing_day,payment_method,source_account_id,source_card_id,active").order("active", { ascending: false }).order("name"),
     supabase.from("annual_expenses").select("id,category_id,name,annual_amount,monthly_reserve,due_date,reserve_account_id,active").order("active", { ascending: false }).order("name"),
     supabase.from("categories").select("id,name,kind,active").order("name"),
     supabase.from("transactions").select("id,category_id,type,amount,cycle_start_date,related_entity_id").eq("cycle_start_date", cycleStartDate),
@@ -220,7 +220,7 @@ export default async function PlanningPage() {
             <Plus size={18} className="ml-auto text-primary" aria-hidden="true" />
           </summary>
           <div className="mt-4">
-            <SubscriptionForm locale={locale} />
+            <SubscriptionForm accounts={cashLikeAccounts} creditCards={activeCards} locale={locale} />
           </div>
         </details>
 
@@ -260,7 +260,7 @@ export default async function PlanningPage() {
                 ) : null}
                 {subscription.active && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-warning/10 p-3 text-sm font-bold text-warning">{t.addCashLikeAccountSubscription}</p> : null}
                 <LazyDetails className="mt-4" summaryClassName="cursor-pointer text-sm font-black text-primary" summary={t.editSubscription}>
-                  <div className="mt-3"><SubscriptionForm subscription={{ ...subscription, category_name: categoryName }} compact locale={locale} /></div>
+                  <div className="mt-3"><SubscriptionForm subscription={{ ...subscription, category_name: categoryName }} accounts={cashLikeAccounts} creditCards={activeCards} compact locale={locale} /></div>
                 </LazyDetails>
               </article>
             );
