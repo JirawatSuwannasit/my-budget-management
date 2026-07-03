@@ -94,6 +94,7 @@ export default async function PlanningPage() {
   const transactions = (transactionsResult.data ?? []) as TransactionRow[];
   const categoryNameById = new Map(categories.map((category) => [category.id, category.name]));
   const accountNameById = new Map(accounts.map((account) => [account.id, account.name]));
+  const cardNameById = new Map(((cardsResult.data ?? []) as CardRow[]).map((card) => [card.id, card.name]));
   const defaultAccountId = (appSettingsResult.data as { default_account_id: string | null } | null)?.default_account_id ?? null;
   const loadError = profileResult.error ?? accountsResult.error ?? budgetsResult.error ?? subscriptionsResult.error ?? annualResult.error ?? categoriesResult.error ?? transactionsResult.error ?? cardsResult.error;
   const expenseTransactions = transactions.filter((transaction) => transaction.type === "expense");
@@ -233,6 +234,11 @@ export default async function PlanningPage() {
             const isReserved = reservedThisCycle(subscription.id);
             const isPaid = paidThisCycle(subscription.id);
             const paidOrReserved = isReserved || isPaid;
+            const boundSource = subscription.source_card_id
+              ? { kind: "card" as const, id: subscription.source_card_id, name: cardNameById.get(subscription.source_card_id) ?? common.other }
+              : subscription.source_account_id
+                ? { kind: "account" as const, id: subscription.source_account_id, name: accountNameById.get(subscription.source_account_id) ?? common.other }
+                : null;
             return (
               <article key={subscription.id} className="rounded-panel border border-line bg-surface p-4 shadow-card">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -255,7 +261,7 @@ export default async function PlanningPage() {
                 {subscription.active ? (
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
                     {subscription.frequency === "yearly" ? <ReserveSubscriptionForm subscriptionId={subscription.id} amount={reserveMonthly} locale={locale} /> : null}
-                    <PaySubscriptionForm subscriptionId={subscription.id} categoryId={subscription.category_id} amount={toNumber(subscription.price)} accounts={cashLikeAccounts} creditCards={activeCards} defaultAccountId={defaultAccountId} frequency={subscription.frequency} locale={locale} />
+                    <PaySubscriptionForm subscriptionId={subscription.id} categoryId={subscription.category_id} amount={toNumber(subscription.price)} accounts={cashLikeAccounts} creditCards={activeCards} defaultAccountId={defaultAccountId} boundSource={boundSource} frequency={subscription.frequency} locale={locale} />
                   </div>
                 ) : null}
                 {subscription.active && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-warning/10 p-3 text-sm font-bold text-warning">{t.addCashLikeAccountSubscription}</p> : null}

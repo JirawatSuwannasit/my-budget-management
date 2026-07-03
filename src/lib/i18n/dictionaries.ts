@@ -366,7 +366,8 @@ export const dictionaries = {
         sourceAccount: "บัญชีต้นทาง",
         chooseSourceAccount: "เลือกบัญชีต้นทาง",
         transfersToReserve: "โอนเข้า",
-        setReserveAccountFirst: "ตั้งบัญชีกันเงินก่อน (แก้ไขกองทุนนี้)"
+        setReserveAccountFirst: "ตั้งบัญชีกันเงินก่อน (แก้ไขกองทุนนี้)",
+        chargedFrom: "ตัดจาก"
       },
       form: {
         budgetName: "ชื่องบ",
@@ -1007,7 +1008,8 @@ export const dictionaries = {
         sourceAccount: "Source account",
         chooseSourceAccount: "Choose source account",
         transfersToReserve: "Transfers to",
-        setReserveAccountFirst: "Set a reserve account first (edit this fund)."
+        setReserveAccountFirst: "Set a reserve account first (edit this fund).",
+        chargedFrom: "Charged from"
       },
       form: {
         budgetName: "Budget name",

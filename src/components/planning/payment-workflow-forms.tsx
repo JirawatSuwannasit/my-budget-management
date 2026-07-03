@@ -37,6 +37,8 @@ function AccountSelect({ accounts, defaultAccountId, locale }: { accounts: Plann
   );
 }
 
+export type PlanningBoundSource = { kind: "account" | "card"; id: string; name: string };
+
 export function PaySubscriptionForm({
   subscriptionId,
   categoryId,
@@ -44,6 +46,7 @@ export function PaySubscriptionForm({
   accounts,
   creditCards,
   defaultAccountId,
+  boundSource,
   frequency,
   locale
 }: {
@@ -53,6 +56,7 @@ export function PaySubscriptionForm({
   accounts: PlanningAccountOption[];
   creditCards: PlanningCardOption[];
   defaultAccountId?: string | null;
+  boundSource?: PlanningBoundSource | null;
   frequency: "monthly" | "yearly";
   locale: Locale;
 }) {
@@ -67,7 +71,12 @@ export function PaySubscriptionForm({
   const preferredAccountId = defaultAccountId && accounts.some((account) => account.id === defaultAccountId) ? defaultAccountId : accounts[0]?.id;
   const defaultSource = preferredAccountId ? "account:" + preferredAccountId : creditCards[0] ? "card:" + creditCards[0].id : "";
   const [source, setSource] = useState(defaultSource);
-  const [kind, sourceId] = source ? (source.split(":") as ["account" | "card", string]) : ["", ""];
+
+  // A subscription bound to a source (Prompt 1) always pays from that source;
+  // the picker only applies to legacy subscriptions without a binding.
+  const [pickerKind, pickerSourceId] = source ? (source.split(":") as ["account" | "card", string]) : ["", ""];
+  const kind = boundSource ? boundSource.kind : pickerKind;
+  const sourceId = boundSource ? boundSource.id : pickerSourceId;
   const isCard = kind === "card";
   const noSources = accounts.length === 0 && creditCards.length === 0;
 
@@ -85,29 +94,36 @@ export function PaySubscriptionForm({
       {isCard ? <input type="hidden" name="credit_card_id" value={sourceId} /> : <input type="hidden" name="account_id" value={sourceId} />}
       <input type="hidden" name="notes" value={frequency === "yearly" ? "Annual subscription paid from planning page" : "Monthly subscription paid from planning page"} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <label className="grid gap-2 text-xs font-black text-ink">
-          {t.paymentSource}
-          <select value={source} onChange={(event) => setSource(event.target.value)} required disabled={noSources} className="rounded-2xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60 disabled:cursor-not-allowed disabled:opacity-60">
-            {noSources ? <option value="" disabled>{t.chooseAccount}</option> : null}
-            {accounts.length > 0 ? (
-              <optgroup label={t.accountGroup}>
-                {accounts.map((account) => <option key={account.id} value={"account:" + account.id}>{account.name}</option>)}
-              </optgroup>
-            ) : null}
-            {creditCards.length > 0 ? (
-              <optgroup label={t.cardGroup}>
-                {creditCards.map((card) => <option key={card.id} value={"card:" + card.id}>{card.name}</option>)}
-              </optgroup>
-            ) : null}
-          </select>
-        </label>
+        {boundSource ? (
+          <div className="grid gap-2 text-xs font-black text-ink">
+            {t.chargedFrom}
+            <span className="rounded-2xl border border-line bg-surface px-3 py-2.5 text-sm font-bold text-ink">{boundSource.name}</span>
+          </div>
+        ) : (
+          <label className="grid gap-2 text-xs font-black text-ink">
+            {t.paymentSource}
+            <select value={source} onChange={(event) => setSource(event.target.value)} required disabled={noSources} className="rounded-2xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60 disabled:cursor-not-allowed disabled:opacity-60">
+              {noSources ? <option value="" disabled>{t.chooseAccount}</option> : null}
+              {accounts.length > 0 ? (
+                <optgroup label={t.accountGroup}>
+                  {accounts.map((account) => <option key={account.id} value={"account:" + account.id}>{account.name}</option>)}
+                </optgroup>
+              ) : null}
+              {creditCards.length > 0 ? (
+                <optgroup label={t.cardGroup}>
+                  {creditCards.map((card) => <option key={card.id} value={"card:" + card.id}>{card.name}</option>)}
+                </optgroup>
+              ) : null}
+            </select>
+          </label>
+        )}
         <label className="grid gap-2 text-xs font-black text-ink">
           {t.paymentDate}
           <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
       </div>
       {isCard ? <p className="text-xs font-bold text-warning">{t.payWithCard}</p> : null}
-      <button disabled={isPending || noSources || !source} className="rounded-2xl bg-primary px-4 py-2.5 text-xs font-black text-canvas shadow-glow transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
+      <button disabled={isPending || (!boundSource && (noSources || !source))} className="rounded-2xl bg-primary px-4 py-2.5 text-xs font-black text-canvas shadow-glow transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
         {isPending ? common.saving : frequency === "yearly" ? t.payAnnualSubscription : t.paySubscription}
       </button>
       <ResultMessage state={state} />
