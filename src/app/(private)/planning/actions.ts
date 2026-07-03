@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { saveTransaction } from "@/app/(private)/transactions/actions";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
+import { selectDueSubscriptionCharges, type ChargeableSubscription, type CycleTransactionLink } from "@/lib/finance/subscription-charges";
 import type { CategoryKind } from "@/lib/finance/types";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/server";
@@ -271,4 +273,91 @@ export async function deleteAnnualExpense(formData: FormData) {
   const { error } = await supabase.from("annual_expenses").delete().eq("id", id).eq("user_id", userId);
   if (error) throw new Error(error.message);
   revalidatePlanningViews();
+}
+
+export type SubscriptionChargeResult = { charged: number; skipped: number };
+
+// Lazy materialization: triggered once per app-shell mount (client one-shot effect),
+// not by a scheduler. Idempotent — re-running mid-cycle after a successful charge
+// re-derives "due" from the DB and finds nothing left to charge for that subscription.
+export async function processDueSubscriptionCharges(): Promise<SubscriptionChargeResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) return { charged: 0, skipped: 0 };
+  const userId = user.id;
+
+  const startDay = await getUserCycleStartDay(supabase, userId);
+  const cycle = getFinancialCycle(todayAtNoon(), startDay);
+  const cycleStartKey = toDateInput(cycle.start);
+
+  const [subscriptionsResult, transactionsResult] = await Promise.all([
+    supabase
+      .from("subscriptions")
+      .select("id,category_id,price,billing_day,frequency,active,source_account_id,source_card_id")
+      .eq("user_id", userId)
+      .eq("active", true)
+      .eq("frequency", "monthly"),
+    supabase.from("transactions").select("related_entity_id,cycle_start_date").eq("user_id", userId).eq("cycle_start_date", cycleStartKey)
+  ]);
+  if (subscriptionsResult.error || transactionsResult.error) return { charged: 0, skipped: 0 };
+
+  const dueCharges = selectDueSubscriptionCharges({
+    subscriptions: (subscriptionsResult.data ?? []) as ChargeableSubscription[],
+    cycleTransactions: (transactionsResult.data ?? []) as CycleTransactionLink[],
+    cycleStart: cycle.start,
+    cycleEnd: cycle.end
+  });
+  if (dueCharges.length === 0) return { charged: 0, skipped: 0 };
+
+  // Pre-check cash-account balances so an insufficient-funds charge is never
+  // attempted (no partial/phantom write): card-bound charges never touch a cash
+  // balance (credit_card_expense is a liability, not a cash delta), so only
+  // account-bound charges need this guard.
+  const accountIds = [...new Set(dueCharges.filter((charge) => charge.sourceKind === "account").map((charge) => charge.sourceId))];
+  const remainingBalanceById = new Map<string, number>();
+  if (accountIds.length > 0) {
+    const { data: accountRows, error: accountError } = await supabase.from("accounts").select("id,balance").eq("user_id", userId).in("id", accountIds);
+    if (accountError) return { charged: 0, skipped: 0 };
+    for (const row of accountRows ?? []) remainingBalanceById.set(row.id, Number(row.balance ?? 0));
+  }
+
+  let charged = 0;
+  let skipped = 0;
+  for (const charge of dueCharges) {
+    if (charge.sourceKind === "account") {
+      const remaining = remainingBalanceById.get(charge.sourceId) ?? 0;
+      if (remaining - charge.amount < 0) {
+        skipped += 1;
+        continue;
+      }
+      // Keep a running balance so multiple due charges on the same account this
+      // batch can't all be approved against a balance that only covers one of them.
+      remainingBalanceById.set(charge.sourceId, remaining - charge.amount);
+    }
+
+    try {
+      const chargeFormData = new FormData();
+      chargeFormData.set("locale", "th");
+      chargeFormData.set("type", charge.sourceKind === "card" ? "credit_card_expense" : "expense");
+      chargeFormData.set("amount", String(charge.amount));
+      chargeFormData.set("category_id", charge.categoryId ?? "");
+      chargeFormData.set("expense_related_entity_id", charge.subscriptionId);
+      chargeFormData.set("transaction_date", toDateInput(todayAtNoon()));
+      chargeFormData.set("notes", "Auto-charged subscription (lazy materialization)");
+      if (charge.sourceKind === "card") chargeFormData.set("credit_card_id", charge.sourceId);
+      else chargeFormData.set("account_id", charge.sourceId);
+
+      const result = await saveTransaction({ status: "idle", message: "" }, chargeFormData);
+      if (result.status === "success") charged += 1;
+      else skipped += 1;
+    } catch {
+      skipped += 1;
+    }
+  }
+
+  if (charged > 0) revalidatePlanningViews();
+  return { charged, skipped };
 }

@@ -33,7 +33,9 @@ export const dictionaries = {
       shortUpcoming: "เตือน",
       shortReports: "รายงาน",
       shortSettings: "ตั้งค่า",
-      signOut: "ออกจากระบบ"
+      signOut: "ออกจากระบบ",
+      autoChargedNote: "ตัดค่าสมาชิกอัตโนมัติแล้ว {count} รายการ",
+      dismiss: "ปิด"
     },
     dashboard: {
       realAvailable: "เงินเหลือ",
@@ -675,7 +677,9 @@ export const dictionaries = {
       shortUpcoming: "Due",
       shortReports: "Reports",
       shortSettings: "Settings",
-      signOut: "Log out"
+      signOut: "Log out",
+      autoChargedNote: "{count} subscription(s) auto-charged.",
+      dismiss: "Dismiss"
     },
     dashboard: {
       realAvailable: "Money left",

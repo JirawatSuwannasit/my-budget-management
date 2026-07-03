@@ -93,7 +93,8 @@ function urgencyFor(dueDate: string | null, todayKey: string, soonKey: string): 
 }
 
 // Map a recurring billing day (1..31) onto a concrete date inside the current cycle window.
-function billingDayDueDate(billingDay: number, cycleStart: Date, cycleEnd: Date, startKey: string, endKey: string): string | null {
+// Exported so callers (e.g. subscription auto-charge) reuse the exact same "due this cycle" rule.
+export function billingDayDueDate(billingDay: number, cycleStart: Date, cycleEnd: Date, startKey: string, endKey: string): string | null {
   const months = [
     { year: cycleStart.getFullYear(), month: cycleStart.getMonth() },
     { year: cycleEnd.getFullYear(), month: cycleEnd.getMonth() }
