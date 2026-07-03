@@ -124,7 +124,7 @@ export function PaySubscriptionForm({
       </div>
       {isCard ? <p className="text-xs font-bold text-warning">{t.payWithCard}</p> : null}
       <button disabled={isPending || (!boundSource && (noSources || !source))} className="rounded-2xl bg-primary px-4 py-2.5 text-xs font-black text-canvas shadow-glow transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60">
-        {isPending ? common.saving : frequency === "yearly" ? t.payAnnualSubscription : t.paySubscription}
+        {isPending ? common.saving : frequency === "yearly" ? t.payAnnualSubscription : t.payNow}
       </button>
       <ResultMessage state={state} />
     </form>
