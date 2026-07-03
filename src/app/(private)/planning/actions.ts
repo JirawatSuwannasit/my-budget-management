@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { saveTransaction } from "@/app/(private)/transactions/actions";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
 import { selectDueSubscriptionCharges, type ChargeableSubscription, type CycleTransactionLink } from "@/lib/finance/subscription-charges";
+import { selectSubscriptionSourcePromotions, type ScheduledSourceSubscription } from "@/lib/finance/subscription-source-promotion";
 import type { CategoryKind } from "@/lib/finance/types";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/server";
@@ -222,6 +223,80 @@ export async function deleteSubscription(formData: FormData) {
   revalidatePlanningViews();
 }
 
+// Schedules a payment-source change for the START of the NEXT billing cycle;
+// the current cycle's source_account_id/source_card_id (and any charge already
+// due this cycle) are untouched. Pass an empty next_payment_source to cancel a
+// pending schedule. Promotion itself happens lazily in
+// processDueSubscriptionCharges, on the first app-open of the effective cycle.
+export async function setNextSubscriptionSource(formData: FormData) {
+  const messages = getMessages(formData);
+  const { supabase, userId } = await getUserContext(messages);
+  const id = textValue(formData, "id");
+  if (!id) throw new Error(messages.subscriptionIdRequired);
+
+  const nextPaymentSource = textValue(formData, "next_payment_source");
+  if (!nextPaymentSource) {
+    const { error } = await supabase
+      .from("subscriptions")
+      .update({ next_source_account_id: null, next_source_card_id: null, next_source_effective_from: null })
+      .eq("id", id)
+      .eq("user_id", userId);
+    if (error) throw new Error(error.message);
+    revalidatePlanningViews();
+    return;
+  }
+
+  const [sourceKind, sourceId] = nextPaymentSource.split(":");
+  const nextSourceAccountId = sourceKind === "account" ? sourceId : null;
+  const nextSourceCardId = sourceKind === "card" ? sourceId : null;
+
+  const startDay = await getUserCycleStartDay(supabase, userId);
+  const currentCycle = getFinancialCycle(todayAtNoon(), startDay);
+  const nextCycleProbe = new Date(currentCycle.end.getFullYear(), currentCycle.end.getMonth(), currentCycle.end.getDate() + 1, 12, 0, 0, 0);
+  const nextCycle = getFinancialCycle(nextCycleProbe, startDay);
+
+  const { error } = await supabase
+    .from("subscriptions")
+    .update({ next_source_account_id: nextSourceAccountId, next_source_card_id: nextSourceCardId, next_source_effective_from: toDateInput(nextCycle.start) })
+    .eq("id", id)
+    .eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  revalidatePlanningViews();
+}
+
+// Idempotent: a promoted row's next_source_effective_from is cleared, so
+// re-running finds nothing left to promote for it (see
+// subscription-source-promotion.ts for the pure selection logic under test).
+// Failures are swallowed per-row so one bad row can't block the others or the
+// charge batch that runs right after this in processDueSubscriptionCharges.
+async function promoteScheduledSubscriptionSources(supabase: SupabaseServer, userId: string, cycleStart: Date) {
+  const { data, error } = await supabase
+    .from("subscriptions")
+    .select("id,next_source_account_id,next_source_card_id,next_source_effective_from")
+    .eq("user_id", userId)
+    .not("next_source_effective_from", "is", null);
+  if (error || !data) return;
+
+  const promotions = selectSubscriptionSourcePromotions({ subscriptions: data as ScheduledSourceSubscription[], cycleStart });
+  if (promotions.length === 0) return;
+
+  await Promise.all(
+    promotions.map((promotion) =>
+      supabase
+        .from("subscriptions")
+        .update({
+          source_account_id: promotion.sourceAccountId,
+          source_card_id: promotion.sourceCardId,
+          next_source_account_id: null,
+          next_source_card_id: null,
+          next_source_effective_from: null
+        })
+        .eq("id", promotion.subscriptionId)
+        .eq("user_id", userId)
+    )
+  );
+}
+
 export async function saveAnnualExpense(_previousState: PlanningActionState, formData: FormData): Promise<PlanningActionState> {
   const messages = getMessages(formData);
   try {
@@ -292,6 +367,11 @@ export async function processDueSubscriptionCharges(): Promise<SubscriptionCharg
   const startDay = await getUserCycleStartDay(supabase, userId);
   const cycle = getFinancialCycle(todayAtNoon(), startDay);
   const cycleStartKey = toDateInput(cycle.start);
+
+  // Promotion must fully complete before the subscriptions fetch below, so the
+  // first app-open of a newly-effective cycle charges from the newly-promoted
+  // source rather than the stale one.
+  await promoteScheduledSubscriptionSources(supabase, userId, cycle.start);
 
   const [subscriptionsResult, transactionsResult] = await Promise.all([
     supabase
