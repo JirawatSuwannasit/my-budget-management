@@ -141,6 +141,16 @@ export async function setBudgetActive(formData: FormData) {
   revalidatePlanningViews();
 }
 
+export async function deleteBudget(formData: FormData) {
+  const messages = getMessages(formData);
+  const { supabase, userId } = await getUserContext(messages);
+  const id = textValue(formData, "id");
+  if (!id) throw new Error(messages.budgetIdRequired);
+  const { error } = await supabase.from("budgets").delete().eq("id", id).eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  revalidatePlanningViews();
+}
+
 export async function saveSubscription(_previousState: PlanningActionState, formData: FormData): Promise<PlanningActionState> {
   const messages = getMessages(formData);
   try {
@@ -185,6 +195,16 @@ export async function setSubscriptionActive(formData: FormData) {
   revalidatePlanningViews();
 }
 
+export async function deleteSubscription(formData: FormData) {
+  const messages = getMessages(formData);
+  const { supabase, userId } = await getUserContext(messages);
+  const id = textValue(formData, "id");
+  if (!id) throw new Error(messages.subscriptionIdRequired);
+  const { error } = await supabase.from("subscriptions").delete().eq("id", id).eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  revalidatePlanningViews();
+}
+
 export async function saveAnnualExpense(_previousState: PlanningActionState, formData: FormData): Promise<PlanningActionState> {
   const messages = getMessages(formData);
   try {
@@ -224,6 +244,16 @@ export async function setAnnualExpenseActive(formData: FormData) {
   const active = formData.get("active") === "true";
   if (!id) throw new Error(messages.annualExpenseIdRequired);
   const { error } = await supabase.from("annual_expenses").update({ active }).eq("id", id).eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  revalidatePlanningViews();
+}
+
+export async function deleteAnnualExpense(formData: FormData) {
+  const messages = getMessages(formData);
+  const { supabase, userId } = await getUserContext(messages);
+  const id = textValue(formData, "id");
+  if (!id) throw new Error(messages.annualExpenseIdRequired);
+  const { error } = await supabase.from("annual_expenses").delete().eq("id", id).eq("user_id", userId);
   if (error) throw new Error(error.message);
   revalidatePlanningViews();
 }

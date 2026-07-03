@@ -343,6 +343,8 @@ export const dictionaries = {
       noDueDate: "ยังไม่ระบุวันครบกำหนด",
       addCashLikeAccountAnnual: "เพิ่มบัญชีเงินสด/ธนาคารก่อนจ่ายบิลรายปีจากหน้านี้",
       editSinkingFund: "แก้ไขเงินกัน",
+      deleteItem: "ลบรายการ",
+      deleteItemConfirm: "ลบรายการนี้ถาวร? ประวัติธุรกรรมที่บันทึกไว้จะยังอยู่",
       dashboardLogic: "หมายเหตุการคำนวณ Dashboard",
       dashboardLogicText: "ค่าสมาชิกรายเดือนจะลดเงินใช้ได้จริงจนกว่าจะจ่ายในรอบปัจจุบัน ค่าสมาชิกรายปีและค่าใช้จ่ายรายปีจะลดเงินใช้ได้จริงเป็นเงินกันรายเดือนจนกว่าจะบันทึกรายการกันเงิน งบจะลดเฉพาะส่วนที่กันไว้แล้วยังไม่ได้ใช้ จึงไม่หักรายจ่ายซ้ำ",
       payment: {
@@ -980,6 +982,8 @@ export const dictionaries = {
       noDueDate: "No due date",
       addCashLikeAccountAnnual: "Add a cash-like account before paying annual bills from this page.",
       editSinkingFund: "Edit sinking fund",
+      deleteItem: "Delete",
+      deleteItemConfirm: "Permanently delete this item? Recorded transactions are kept.",
       dashboardLogic: "Dashboard logic",
       dashboardLogicText: "Monthly subscriptions reduce real available money until paid in the current cycle. Yearly subscriptions and annual expenses reduce real available money as monthly reserves until marked with a sinking fund reserve transaction. Budgets reduce only their unspent reserved amount, so paid expenses are not double counted.",
       payment: {

@@ -1,6 +1,7 @@
 import { Banknote, CalendarClock, PiggyBank, Plus, Repeat, WalletCards } from "lucide-react";
 import { AnnualExpenseForm } from "@/components/planning/annual-expense-form";
 import { BudgetForm } from "@/components/planning/budget-form";
+import { DeletePlanningItemForm } from "@/components/planning/delete-planning-item-form";
 import { PayAnnualBillForm, PaySubscriptionForm, ReserveAnnualExpenseForm, ReserveSubscriptionForm } from "@/components/planning/payment-workflow-forms";
 import { SubscriptionForm } from "@/components/planning/subscription-form";
 import { LazyDetails } from "@/components/ui/lazy-details";
@@ -9,7 +10,7 @@ import type { AccountType, CategoryKind } from "@/lib/finance/types";
 import { isCashLikeType } from "@/lib/finance/types";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/server";
-import { setAnnualExpenseActive, setBudgetActive, setSubscriptionActive } from "./actions";
+import { deleteAnnualExpense, deleteBudget, deleteSubscription, setAnnualExpenseActive, setBudgetActive, setSubscriptionActive } from "./actions";
 
 type BudgetRow = { id: string; category_id: string | null; label: string; amount: number | string; cycle_start_date: string; active: boolean };
 type SubscriptionRow = { id: string; category_id: string | null; name: string; frequency: "monthly" | "yearly"; price: number | string; billing_day: number; payment_method: string | null; active: boolean };
@@ -198,7 +199,10 @@ export default async function PlanningPage() {
                     </div>
                   </div>
                 </div>
-                <ToggleActiveForm id={budget.id} active={budget.active} action={setBudgetActive} locale={locale} />
+                <div className="flex flex-wrap items-center gap-2">
+                  <ToggleActiveForm id={budget.id} active={budget.active} action={setBudgetActive} locale={locale} />
+                  <DeletePlanningItemForm id={budget.id} action={deleteBudget} confirmText={t.deleteItemConfirm} label={t.deleteItem} locale={locale} />
+                </div>
               </div>
               <LazyDetails className="mt-4" summaryClassName="cursor-pointer text-sm font-black text-primary" summary={t.editBudget}>
                 <div className="mt-3"><BudgetForm budget={{ ...budget, category_name: budget.categoryName }} cycleStartDate={cycleStartDate} compact locale={locale} /></div>
@@ -243,7 +247,10 @@ export default async function PlanningPage() {
                     <p className="mt-1 text-sm font-semibold text-muted">{subscription.frequency === "monthly" ? t.monthlyFixedObligation : t.yearlySinkingFundReserve + " " + formatMoney(reserveMonthly) + "/" + t.monthly} · {t.billingDay} {subscription.billing_day}</p>
                     {paidOrReserved ? <p className="mt-2 text-sm font-black text-income">{isPaid ? t.paidThisCycle : t.reservedThisCycle}</p> : null}
                   </div>
-                  <ToggleActiveForm id={subscription.id} active={subscription.active} action={setSubscriptionActive} locale={locale} />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ToggleActiveForm id={subscription.id} active={subscription.active} action={setSubscriptionActive} locale={locale} />
+                    <DeletePlanningItemForm id={subscription.id} action={deleteSubscription} confirmText={t.deleteItemConfirm} label={t.deleteItem} locale={locale} />
+                  </div>
                 </div>
                 {subscription.active ? (
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -301,7 +308,10 @@ export default async function PlanningPage() {
                       </div>
                     </div>
                   </div>
-                  <ToggleActiveForm id={expense.id} active={expense.active} action={setAnnualExpenseActive} locale={locale} />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ToggleActiveForm id={expense.id} active={expense.active} action={setAnnualExpenseActive} locale={locale} />
+                    <DeletePlanningItemForm id={expense.id} action={deleteAnnualExpense} confirmText={t.deleteItemConfirm} label={t.deleteItem} locale={locale} />
+                  </div>
                 </div>
                 {expense.active ? (
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
