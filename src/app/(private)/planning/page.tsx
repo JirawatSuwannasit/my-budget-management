@@ -2,7 +2,7 @@ import { Banknote, CalendarClock, PiggyBank, Plus, Repeat, WalletCards } from "l
 import { AnnualExpenseForm } from "@/components/planning/annual-expense-form";
 import { BudgetForm } from "@/components/planning/budget-form";
 import { DeletePlanningItemForm } from "@/components/planning/delete-planning-item-form";
-import { PayAnnualBillForm, PaySubscriptionForm, ReserveAnnualExpenseForm, ReserveSubscriptionForm } from "@/components/planning/payment-workflow-forms";
+import { PayAnnualBillForm, PaySubscriptionForm, ReserveAnnualExpenseForm, ReserveSubscriptionForm, type PlanningAccountOption, type PlanningBoundSource, type PlanningCardOption } from "@/components/planning/payment-workflow-forms";
 import { SubscriptionForm } from "@/components/planning/subscription-form";
 import { LazyDetails } from "@/components/ui/lazy-details";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
@@ -10,10 +10,24 @@ import type { AccountType, CategoryKind } from "@/lib/finance/types";
 import { isCashLikeType } from "@/lib/finance/types";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/server";
-import { deleteAnnualExpense, deleteBudget, deleteSubscription, setAnnualExpenseActive, setBudgetActive, setSubscriptionActive } from "./actions";
+import { deleteAnnualExpense, deleteBudget, deleteSubscription, setAnnualExpenseActive, setBudgetActive, setNextSubscriptionSource, setSubscriptionActive } from "./actions";
 
 type BudgetRow = { id: string; category_id: string | null; label: string; amount: number | string; cycle_start_date: string; active: boolean };
-type SubscriptionRow = { id: string; category_id: string | null; name: string; frequency: "monthly" | "yearly"; price: number | string; billing_day: number; payment_method: string | null; source_account_id: string | null; source_card_id: string | null; active: boolean };
+type SubscriptionRow = {
+  id: string;
+  category_id: string | null;
+  name: string;
+  frequency: "monthly" | "yearly";
+  price: number | string;
+  billing_day: number;
+  payment_method: string | null;
+  source_account_id: string | null;
+  source_card_id: string | null;
+  next_source_account_id: string | null;
+  next_source_card_id: string | null;
+  next_source_effective_from: string | null;
+  active: boolean;
+};
 type AnnualExpenseRow = { id: string; category_id: string | null; name: string; annual_amount: number | string; monthly_reserve: number | string | null; due_date: string | null; reserve_account_id: string | null; active: boolean };
 type CategoryRow = { id: string; name: string; kind: CategoryKind; active: boolean };
 type TransactionRow = { id: string; category_id: string | null; type: string; amount: number | string; cycle_start_date: string; related_entity_id: string | null };
@@ -63,6 +77,63 @@ function ToggleActiveForm({ id, active, action, locale }: { id: string; active: 
   );
 }
 
+// Scheduling a source change never touches the current cycle's source_*; it
+// only writes next_source_* (promoted lazily on the next app-open in the
+// effective cycle). Submitting the picker's empty option cancels a pending
+// schedule the same way the separate "cancel" button below does.
+function NextSourceForm({
+  subscriptionId,
+  accounts,
+  creditCards,
+  pendingSource,
+  locale
+}: {
+  subscriptionId: string;
+  accounts: PlanningAccountOption[];
+  creditCards: PlanningCardOption[];
+  pendingSource: PlanningBoundSource | null;
+  locale: Locale;
+}) {
+  const t = dictionaries[locale].planning;
+  const defaultValue = pendingSource ? pendingSource.kind + ":" + pendingSource.id : "";
+  const noSources = accounts.length === 0 && creditCards.length === 0;
+  return (
+    <div className="grid gap-2 rounded-2xl border border-line bg-elevated p-3">
+      <form action={setNextSubscriptionSource} className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+        <input type="hidden" name="id" value={subscriptionId} />
+        <input type="hidden" name="locale" value={locale} />
+        <label className="grid gap-2 text-xs font-black text-ink">
+          {t.nextCycleSourceLabel}
+          <select name="next_payment_source" defaultValue={defaultValue} disabled={noSources} className="rounded-2xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60 disabled:cursor-not-allowed disabled:opacity-60">
+            <option value="">{t.form.paymentSourceNone}</option>
+            {accounts.length > 0 ? (
+              <optgroup label={t.payment.accountGroup}>
+                {accounts.map((account) => <option key={account.id} value={"account:" + account.id}>{account.name}</option>)}
+              </optgroup>
+            ) : null}
+            {creditCards.length > 0 ? (
+              <optgroup label={t.payment.cardGroup}>
+                {creditCards.map((card) => <option key={card.id} value={"card:" + card.id}>{card.name}</option>)}
+              </optgroup>
+            ) : null}
+          </select>
+        </label>
+        <button type="submit" disabled={noSources} className="rounded-2xl border border-line bg-surface px-4 py-2.5 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60">
+          {t.nextCycleSourceLabel}
+        </button>
+      </form>
+      {pendingSource ? (
+        <form action={setNextSubscriptionSource}>
+          <input type="hidden" name="id" value={subscriptionId} />
+          <input type="hidden" name="locale" value={locale} />
+          <input type="hidden" name="next_payment_source" value="" />
+          <button type="submit" className="text-xs font-black text-danger transition hover:opacity-80">{t.nextCycleSourceClear}</button>
+        </form>
+      ) : null}
+    </div>
+  );
+}
+
 export default async function PlanningPage() {
   const supabase = await createClient();
   const {
@@ -75,7 +146,11 @@ export default async function PlanningPage() {
     user ? supabase.from("profiles").select("locale").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
     supabase.from("budgets").select("id,category_id,label,amount,cycle_start_date,active").eq("cycle_start_date", cycleStartDate).order("active", { ascending: false }).order("label"),
-    supabase.from("subscriptions").select("id,category_id,name,frequency,price,billing_day,payment_method,source_account_id,source_card_id,active").order("active", { ascending: false }).order("name"),
+    supabase
+      .from("subscriptions")
+      .select("id,category_id,name,frequency,price,billing_day,payment_method,source_account_id,source_card_id,next_source_account_id,next_source_card_id,next_source_effective_from,active")
+      .order("active", { ascending: false })
+      .order("name"),
     supabase.from("annual_expenses").select("id,category_id,name,annual_amount,monthly_reserve,due_date,reserve_account_id,active").order("active", { ascending: false }).order("name"),
     supabase.from("categories").select("id,name,kind,active").order("name"),
     supabase.from("transactions").select("id,category_id,type,amount,cycle_start_date,related_entity_id").eq("cycle_start_date", cycleStartDate),
@@ -239,6 +314,11 @@ export default async function PlanningPage() {
               : subscription.source_account_id
                 ? { kind: "account" as const, id: subscription.source_account_id, name: accountNameById.get(subscription.source_account_id) ?? common.other }
                 : null;
+            const nextSource = subscription.next_source_card_id
+              ? { kind: "card" as const, id: subscription.next_source_card_id, name: cardNameById.get(subscription.next_source_card_id) ?? common.other }
+              : subscription.next_source_account_id
+                ? { kind: "account" as const, id: subscription.next_source_account_id, name: accountNameById.get(subscription.next_source_account_id) ?? common.other }
+                : null;
             // Once handled this cycle (e.g. auto-charged), hide the matching manual
             // action so it doesn't imply the item still needs attention. The green
             // "paid/reserved this cycle" line above already communicates that.
@@ -258,6 +338,7 @@ export default async function PlanningPage() {
                     <p className="mt-3 text-2xl font-black text-ink">{formatMoney(subscription.price)}</p>
                     <p className="mt-1 text-sm font-semibold text-muted">{subscription.frequency === "monthly" ? t.monthlyFixedObligation : t.yearlySinkingFundReserve + " " + formatMoney(reserveMonthly) + "/" + t.monthly} · {t.billingDay} {subscription.billing_day}</p>
                     {paidOrReserved ? <p className="mt-2 text-sm font-black text-income">{isPaid ? t.paidThisCycle : t.reservedThisCycle}</p> : null}
+                    {nextSource ? <p className="mt-2 text-xs font-bold text-muted">{t.nextCycleSourceHint} {nextSource.name} ({t.nextCycleEffective} {subscription.next_source_effective_from})</p> : null}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <ToggleActiveForm id={subscription.id} active={subscription.active} action={setSubscriptionActive} locale={locale} />
@@ -272,7 +353,10 @@ export default async function PlanningPage() {
                 ) : null}
                 {subscription.active && showPayForm && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-warning/10 p-3 text-sm font-bold text-warning">{t.addCashLikeAccountSubscription}</p> : null}
                 <LazyDetails className="mt-4" summaryClassName="cursor-pointer text-sm font-black text-primary" summary={t.editSubscription}>
-                  <div className="mt-3"><SubscriptionForm subscription={{ ...subscription, category_name: categoryName }} accounts={cashLikeAccounts} creditCards={activeCards} compact locale={locale} /></div>
+                  <div className="mt-3 grid gap-3">
+                    <SubscriptionForm subscription={{ ...subscription, category_name: categoryName }} accounts={cashLikeAccounts} creditCards={activeCards} compact locale={locale} />
+                    <NextSourceForm subscriptionId={subscription.id} accounts={cashLikeAccounts} creditCards={activeCards} pendingSource={nextSource} locale={locale} />
+                  </div>
                 </LazyDetails>
               </article>
             );
