@@ -95,3 +95,42 @@ export async function applyAccountBalanceDeltas(supabase: SupabaseServer, userId
     })
   );
 }
+
+/**
+ * Adjusts a debt's remaining_balance by `delta` (negative to pay down, positive
+ * to restore on reversal), clamped at zero. Shared by the manual debt_payment
+ * path and the card-linked installment auto-charge/reversal paths so both stay
+ * in exact agreement on how remaining_balance moves.
+ */
+export async function updateDebtRemaining(supabase: SupabaseServer, userId: string, debtId: string, delta: number): Promise<void> {
+  const { data, error } = await supabase.from("debts").select("remaining_balance").eq("id", debtId).eq("user_id", userId).single();
+  if (error) throw new Error(error.message);
+  const remainingBalance = Math.max(0, Number(data.remaining_balance ?? 0) + delta);
+  const { error: updateError } = await supabase.from("debts").update({ remaining_balance: remainingBalance }).eq("id", debtId).eq("user_id", userId);
+  if (updateError) throw new Error(updateError.message);
+}
+
+/**
+ * Restores remaining_balance for every debt_payments row still linked to a
+ * transaction, then deletes those rows. A card-linked installment's auto-charge
+ * is itself a credit_card_expense transaction (not a debt_payment), with its
+ * paydown recorded as a separate null-account debt_payments row written
+ * directly; this lets reversing that charge restore remaining_balance the same
+ * way the debt_payment transaction type's own reversal already does. A no-op
+ * when no debt_payments row is linked (e.g. a plain, non-installment card
+ * expense).
+ */
+export async function reverseLinkedDebtPayments(supabase: SupabaseServer, userId: string, transactionId: string): Promise<void> {
+  const { data, error } = await supabase.from("debt_payments").select("id,debt_id,amount").eq("transaction_id", transactionId).eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  const payments = data ?? [];
+  if (payments.length === 0) return;
+
+  await Promise.all([
+    ...payments.map((payment) => updateDebtRemaining(supabase, userId, payment.debt_id, Number(payment.amount))),
+    (async () => {
+      const { error: deleteError } = await supabase.from("debt_payments").delete().eq("transaction_id", transactionId).eq("user_id", userId);
+      if (deleteError) throw new Error(deleteError.message);
+    })()
+  ]);
+}

@@ -213,6 +213,10 @@ export function buildUpcomingItems({ rows, cycleStart, cycleEnd, today = new Dat
   // 5. Active debts whose monthly payment has not been fully recorded this cycle.
   for (const debt of rows.debts) {
     if (!isActive(debt)) continue;
+    // Card-linked installments are auto-charged into the card float; their
+    // reminder now comes from the card statement item above (section 1), which
+    // already includes the auto-charged amount once it bills.
+    if (debt.type === "installment" && debt.card_id) continue;
     const monthly = toNumber(debt.monthly_payment);
     if (monthly <= 0) continue;
     const paidThisCycle = rows.debtPayments

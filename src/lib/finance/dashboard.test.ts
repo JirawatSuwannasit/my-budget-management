@@ -432,6 +432,21 @@ describe("Supabase dashboard row mapping", () => {
     expect(input.plannedDebtPayments).toEqual([{ id: "debt", debtName: "Main debt", amount: 5000, paid: false }]);
   });
 
+  it("excludes card-linked installments from planned debt payments (their obligation is the card float, not a second immediate deduction)", () => {
+    const input = mapDashboardRowsToInput(
+      rows({
+        debts: [
+          { id: "installment", name: "Phone installment", type: "installment", card_id: "card-1", remaining_balance: "396", monthly_payment: "396", active: true },
+          { id: "loan", name: "Personal loan", type: "personal_loan", remaining_balance: "500000", monthly_payment: "9000", active: true }
+        ]
+      }),
+      cycleStart,
+      cycleEnd
+    );
+
+    expect(input.plannedDebtPayments).toEqual([{ id: "loan", debtName: "Personal loan", amount: 9000, paid: false }]);
+  });
+
   it("detects whether Supabase returned real dashboard rows", () => {
     expect(hasRealDashboardRows(rows())).toBe(false);
     expect(hasRealDashboardRows(rows({ accounts: [{ id: "main", name: "Main", type: "main_bank", balance: 1, active: true }] }))).toBe(true);
@@ -446,6 +461,10 @@ describe("transaction account balance effects", () => {
 
   it("does not reduce cash for credit card expenses", () => {
     expect(getAccountBalanceDeltas({ type: "credit_card_expense", amount: 150, accountId: "cash" })).toEqual([]);
+  });
+
+  it("moves no cash for a debt payment with no account (the card-linked installment auto-paydown)", () => {
+    expect(getAccountBalanceDeltas({ type: "debt_payment", amount: 396, accountId: null })).toEqual([]);
   });
 
   it("moves money without creating expense for transfers", () => {

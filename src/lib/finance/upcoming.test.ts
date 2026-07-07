@@ -187,6 +187,20 @@ describe("buildUpcomingItems", () => {
     expect(paid.allCaughtUp).toBe(true);
   });
 
+  it("emits no section-5 debt reminder for a card-linked installment (its reminder comes from the card statement item instead)", () => {
+    const summary = buildUpcomingItems({
+      rows: rows({
+        debts: [{ id: "installment", name: "Phone installment", type: "installment", card_id: "card-1", remaining_balance: "396", monthly_payment: "396", active: true }]
+      }),
+      cycleStart,
+      cycleEnd,
+      today
+    });
+
+    expect(summary.items.find((item) => item.id === "debt-installment")).toBeUndefined();
+    expect(summary.allCaughtUp).toBe(true);
+  });
+
   it("sorts overdue before due-soon before pending", () => {
     const soon = billedCard("soon-card", "Soon card", 9, "100");
     const overdue = billedCard("overdue-card", "Overdue card", 1, "100");

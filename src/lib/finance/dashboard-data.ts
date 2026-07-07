@@ -65,6 +65,8 @@ type AnnualExpenseRow = {
 type DebtRow = {
   id: string;
   name: string;
+  type?: string | null;
+  card_id?: string | null;
   remaining_balance: number | string | null;
   monthly_payment: number | string | null;
   active: boolean | null;
@@ -233,8 +235,13 @@ export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, c
       reservedThisCycle: isPaidInCycle(cycleTransactions, expense.id, cycleStartDate)
     }));
 
+  // Card-linked installments draw down via the card float (billedOutstanding,
+  // post-cut only) exactly like a card-bound subscription; excluding them here
+  // avoids subtracting the same monthly amount from safe-to-spend a second
+  // time, immediately, before the card has even cut.
   const plannedDebtPayments = rows.debts
     .filter(active)
+    .filter((debt) => !(debt.type === "installment" && debt.card_id))
     .map((debt) => ({
       id: debt.id,
       debtName: debt.name,

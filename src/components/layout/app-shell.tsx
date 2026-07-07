@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BarChart3, BellRing, CreditCard, Landmark, LayoutDashboard, LineChart, ListChecks, Settings, Tag, WalletCards, X } from "lucide-react";
-import { processDueSubscriptionCharges } from "@/app/(private)/planning/actions";
+import { processDueInstallmentCharges, processDueSubscriptionCharges } from "@/app/(private)/planning/actions";
 import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/browser";
 
@@ -32,16 +32,20 @@ export function AppShell({ children, userEmail, locale, badges = {} }: Readonly<
   const [autoChargedCount, setAutoChargedCount] = useState(0);
 
   // Lazy materialization: no scheduler exists in this stack, so due subscription
-  // charges are posted once per app-shell mount instead. Fire-and-forget; the
-  // server action revalidates the finance views itself on success.
+  // and card-linked installment charges are posted once per app-shell mount
+  // instead. Fire-and-forget; each server action revalidates the finance views
+  // itself on success. The two engines are independent (different tables), so
+  // they run in parallel.
   useEffect(() => {
     if (hasTriggeredCharges.current) return;
     hasTriggeredCharges.current = true;
-    processDueSubscriptionCharges()
-      .then((result) => {
-        if (result.charged > 0) setAutoChargedCount(result.charged);
-      })
-      .catch(() => {});
+    Promise.all([
+      processDueSubscriptionCharges().catch(() => ({ charged: 0, skipped: 0 })),
+      processDueInstallmentCharges().catch(() => ({ charged: 0, skipped: 0 }))
+    ]).then(([subscriptionResult, installmentResult]) => {
+      const total = subscriptionResult.charged + installmentResult.charged;
+      if (total > 0) setAutoChargedCount(total);
+    });
   }, []);
 
   async function signOut() {

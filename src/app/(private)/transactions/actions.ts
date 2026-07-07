@@ -3,11 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
-import { addDelta, applyAccountBalanceDeltas, getAccountBalanceDeltas, getReverseAccountBalanceDeltas, type AccountBalanceDelta } from "@/lib/finance/transaction-effects";
+import { addDelta, applyAccountBalanceDeltas, getAccountBalanceDeltas, getReverseAccountBalanceDeltas, reverseLinkedDebtPayments, updateDebtRemaining, type AccountBalanceDelta } from "@/lib/finance/transaction-effects";
 import type { TransactionType } from "@/lib/finance/types";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 
-export type TransactionActionState = { status: "idle" | "success" | "error"; message: string };
+export type TransactionActionState = { status: "idle" | "success" | "error"; message: string; transactionId?: string };
 type SupabaseServer = Awaited<ReturnType<typeof createClient>>;
 type TransactionRow = { id: string; account_id: string | null; destination_account_id: string | null; type: TransactionType; amount: number | string; transaction_date: string; cycle_start_date: string; related_entity_id: string | null; notes: string | null };
 type TransactionMessages = Record<keyof typeof dictionaries.en.transactions.messages, string>;
@@ -65,13 +65,6 @@ function revalidateFinanceViews() {
   revalidatePath("/debts-cards");
   revalidatePath("/planning");
   revalidatePath("/categories");
-}
-async function updateDebtRemaining(supabase: SupabaseServer, userId: string, debtId: string, delta: number) {
-  const { data, error } = await supabase.from("debts").select("remaining_balance").eq("id", debtId).eq("user_id", userId).single();
-  if (error) throw new Error(error.message);
-  const remainingBalance = Math.max(0, Number(data.remaining_balance ?? 0) + delta);
-  const { error: updateError } = await supabase.from("debts").update({ remaining_balance: remainingBalance }).eq("id", debtId).eq("user_id", userId);
-  if (updateError) throw new Error(updateError.message);
 }
 function buildPayload(formData: FormData, userId: string, messages: TransactionMessages, startDay: number) {
   const type = parseType(formData.get("type"), messages);
@@ -157,7 +150,13 @@ async function revertTransactionSideEffects(supabase: SupabaseServer, userId: st
     const { data, error } = await supabase.from("card_transactions").select("id").eq("transaction_id", transaction.id).eq("user_id", userId);
     if (error) throw new Error(error.message);
     if (!data || data.length === 0) throw new Error(messages.unsafeCardExpense);
-    await deleteChildRows(supabase, userId, "card_transactions", transaction.id);
+    // A card-linked installment's auto-charge is a credit_card_expense that also
+    // carries a linked debt_payments paydown row (account_id null, written
+    // directly by processDueInstallmentCharges rather than through this
+    // module's own debt_payment path). reverseLinkedDebtPayments restores
+    // remaining_balance for it; it's a no-op for a plain card expense with no
+    // linked debt_payments row.
+    await Promise.all([deleteChildRows(supabase, userId, "card_transactions", transaction.id), reverseLinkedDebtPayments(supabase, userId, transaction.id)]);
     return;
   }
   if (transaction.type === "credit_card_payment") {
@@ -204,7 +203,7 @@ export async function saveTransaction(_previousState: TransactionActionState, fo
       if (error) throw new Error(error.message);
       await applyTransactionSideEffects(supabase, userId, id, payload, messages);
       revalidateFinanceViews();
-      return { status: "success", message: messages.updated };
+      return { status: "success", message: messages.updated, transactionId: id };
     }
 
     const startDay = await getUserCycleStartDay(supabase, userId);
@@ -217,7 +216,7 @@ export async function saveTransaction(_previousState: TransactionActionState, fo
     if (error) throw new Error(error.message);
     await insertChildRow(supabase, userId, inserted.id, payload, messages);
     revalidateFinanceViews();
-    return { status: "success", message: messages.added };
+    return { status: "success", message: messages.added, transactionId: inserted.id };
   } catch (error) {
     return { status: "error", message: error instanceof Error ? error.message : messages.saveFailed };
   }

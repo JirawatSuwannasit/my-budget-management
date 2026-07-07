@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { saveTransaction } from "@/app/(private)/transactions/actions";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
+import { selectDueInstallmentCharges, type ChargeableInstallment } from "@/lib/finance/installment-charges";
 import { selectDueSubscriptionCharges, type ChargeableSubscription, type CycleTransactionLink } from "@/lib/finance/subscription-charges";
 import { selectSubscriptionSourcePromotions, type ScheduledSourceSubscription } from "@/lib/finance/subscription-source-promotion";
+import { updateDebtRemaining } from "@/lib/finance/transaction-effects";
 import type { CategoryKind } from "@/lib/finance/types";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/server";
@@ -433,6 +435,94 @@ export async function processDueSubscriptionCharges(): Promise<SubscriptionCharg
       const result = await saveTransaction({ status: "idle", message: "" }, chargeFormData);
       if (result.status === "success") charged += 1;
       else skipped += 1;
+    } catch {
+      skipped += 1;
+    }
+  }
+
+  if (charged > 0) revalidatePlanningViews();
+  return { charged, skipped };
+}
+
+export type InstallmentChargeResult = { charged: number; skipped: number };
+
+// Lazy materialization mirror of processDueSubscriptionCharges, but for
+// card-linked installments: each cycle posts a credit_card_expense (the float,
+// exactly like a card-bound subscription) via saveTransaction, then separately
+// draws down the debt with a null-account debt_payments row written directly
+// (never through saveTransaction's debt_payment path, which requires a cash
+// account). Charging stops once remaining_balance reaches zero.
+export async function processDueInstallmentCharges(): Promise<InstallmentChargeResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) return { charged: 0, skipped: 0 };
+  const userId = user.id;
+
+  const startDay = await getUserCycleStartDay(supabase, userId);
+  const cycle = getFinancialCycle(todayAtNoon(), startDay);
+  const cycleStartKey = toDateInput(cycle.start);
+
+  const [installmentsResult, transactionsResult] = await Promise.all([
+    supabase
+      .from("debts")
+      .select("id,type,card_id,monthly_payment,remaining_balance,active")
+      .eq("user_id", userId)
+      .eq("type", "installment")
+      .eq("active", true)
+      .not("card_id", "is", null)
+      .gt("remaining_balance", 0),
+    supabase.from("transactions").select("related_entity_id,cycle_start_date").eq("user_id", userId).eq("cycle_start_date", cycleStartKey)
+  ]);
+  if (installmentsResult.error || transactionsResult.error) return { charged: 0, skipped: 0 };
+
+  const dueCharges = selectDueInstallmentCharges({
+    installments: (installmentsResult.data ?? []) as ChargeableInstallment[],
+    cycleTransactions: (transactionsResult.data ?? []) as CycleTransactionLink[],
+    cycleStart: cycle.start
+  });
+  if (dueCharges.length === 0) return { charged: 0, skipped: 0 };
+
+  let charged = 0;
+  let skipped = 0;
+  for (const charge of dueCharges) {
+    try {
+      const chargeFormData = new FormData();
+      chargeFormData.set("locale", "th");
+      chargeFormData.set("type", "credit_card_expense");
+      chargeFormData.set("amount", String(charge.amount));
+      chargeFormData.set("expense_related_entity_id", charge.debtId);
+      chargeFormData.set("credit_card_id", charge.cardId);
+      chargeFormData.set("transaction_date", toDateInput(todayAtNoon()));
+      chargeFormData.set("notes", "Auto-charged installment (lazy materialization)");
+
+      const result = await saveTransaction({ status: "idle", message: "" }, chargeFormData);
+      if (result.status !== "success" || !result.transactionId) {
+        skipped += 1;
+        continue;
+      }
+
+      // Links back to the card-charge transaction so deleting it cleanly
+      // restores remaining_balance via the existing debt_payments-by-
+      // transaction_id reversal (see revertTransactionSideEffects).
+      const { error: paymentError } = await supabase.from("debt_payments").insert({
+        user_id: userId,
+        debt_id: charge.debtId,
+        account_id: null,
+        amount: charge.amount,
+        paid_date: toDateInput(todayAtNoon()),
+        source: "installment_auto",
+        transaction_id: result.transactionId
+      });
+      if (paymentError) {
+        skipped += 1;
+        continue;
+      }
+
+      await updateDebtRemaining(supabase, userId, charge.debtId, -charge.amount);
+      charged += 1;
     } catch {
       skipped += 1;
     }
