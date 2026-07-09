@@ -468,7 +468,7 @@ export async function processDueInstallmentCharges(): Promise<InstallmentChargeR
   const [installmentsResult, transactionsResult] = await Promise.all([
     supabase
       .from("debts")
-      .select("id,type,card_id,monthly_payment,remaining_balance,active")
+      .select("id,type,card_id,category_id,monthly_payment,remaining_balance,active")
       .eq("user_id", userId)
       .eq("type", "installment")
       .eq("active", true)
@@ -493,6 +493,7 @@ export async function processDueInstallmentCharges(): Promise<InstallmentChargeR
       chargeFormData.set("locale", "th");
       chargeFormData.set("type", "credit_card_expense");
       chargeFormData.set("amount", String(charge.amount));
+      chargeFormData.set("category_id", charge.categoryId ?? "");
       chargeFormData.set("expense_related_entity_id", charge.debtId);
       chargeFormData.set("credit_card_id", charge.cardId);
       chargeFormData.set("transaction_date", toDateInput(todayAtNoon()));

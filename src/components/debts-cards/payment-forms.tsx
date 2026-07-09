@@ -168,7 +168,7 @@ export function CardPaymentForm({ cards, accounts, defaultAccountId, locale }: {
 // saveCardInstallment. It does NOT create a card_transaction or statement —
 // installments live entirely on the debt rail and are paid via the debt-payment
 // form. Purchase date is collected for the user's reference only.
-function CardInstallmentForm({ cards, locale }: { cards: CardOption[]; locale: Locale }) {
+function CardInstallmentForm({ cards, categories, locale }: { cards: CardOption[]; categories: CategoryOption[]; locale: Locale }) {
   const [state, formAction, isPending] = useActionState(saveCardInstallment, installmentInitialState);
   const t = dictionaries[locale].debtsCards.form;
   const common = dictionaries[locale].common;
@@ -201,6 +201,15 @@ function CardInstallmentForm({ cards, locale }: { cards: CardOption[]; locale: L
           <input name="interest_rate" type="number" min="0" step="0.01" defaultValue={0} className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold tabular-nums outline-none transition focus:border-primary/60" />
         </label>
       </div>
+      {categories.length > 0 ? (
+        <label className="grid gap-2 text-sm font-black text-ink">
+          {t.category}
+          <select name="category_id" defaultValue="" className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60">
+            <option value="">{t.chooseCategory}</option>
+            {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+          </select>
+        </label>
+      ) : null}
       <label className="grid gap-2 text-sm font-black text-ink">
         {t.installmentPurchaseDate}
         <input name="purchase_date" type="date" defaultValue={todayInput()} className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
@@ -238,7 +247,7 @@ export function CardActivityForms({ cards, categories, locale }: { cards: CardOp
           );
         })}
       </div>
-      {mode === "general" ? <CardExpenseForm cards={cards} categories={categories} locale={locale} /> : <CardInstallmentForm cards={cards} locale={locale} />}
+      {mode === "general" ? <CardExpenseForm cards={cards} categories={categories} locale={locale} /> : <CardInstallmentForm cards={cards} categories={categories} locale={locale} />}
     </div>
   );
 }

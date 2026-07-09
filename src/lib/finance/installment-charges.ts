@@ -11,6 +11,7 @@ export type ChargeableInstallment = {
   id: string;
   type: string;
   card_id: string | null;
+  category_id: string | null;
   monthly_payment: number | string;
   remaining_balance: number | string;
   active: boolean | null;
@@ -19,6 +20,7 @@ export type ChargeableInstallment = {
 export type DueInstallmentCharge = {
   debtId: string;
   cardId: string;
+  categoryId: string | null;
   amount: number;
 };
 
@@ -69,7 +71,7 @@ export function selectDueInstallmentCharges({ installments, cycleTransactions, c
 
     const amount = Math.min(toNumber(installment.monthly_payment), remaining);
     if (amount <= 0) continue;
-    due.push({ debtId: installment.id, cardId: installment.card_id, amount });
+    due.push({ debtId: installment.id, cardId: installment.card_id, categoryId: installment.category_id, amount });
   }
   return due;
 }

@@ -112,6 +112,7 @@ export async function saveCardInstallment(_previousState: DebtCardActionState, f
     const total = parseAmount(formData.get("total"), messages);
     const months = Number(formData.get("months") ?? 0);
     const interestRate = parseAmount(formData.get("interest_rate"), messages);
+    const categoryId = textValue(formData, "category_id");
 
     if (!cardId) throw new Error(messages.chooseCard);
     if (!name) throw new Error(messages.installmentNameRequired);
@@ -128,6 +129,7 @@ export async function saveCardInstallment(_previousState: DebtCardActionState, f
       type: "installment" as DebtType,
       name,
       card_id: cardId,
+      category_id: categoryId,
       original_amount: totalRepayable,
       remaining_balance: totalRepayable,
       interest_rate: interestRate,

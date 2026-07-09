@@ -11,6 +11,7 @@ function installment(overrides: Partial<ChargeableInstallment> = {}): Chargeable
     id: "debt-1",
     type: "installment",
     card_id: "card-1",
+    category_id: "cat-1",
     monthly_payment: "396",
     remaining_balance: "792",
     active: true,
@@ -21,17 +22,33 @@ function installment(overrides: Partial<ChargeableInstallment> = {}): Chargeable
 describe("selectDueInstallmentCharges", () => {
   it("charges the monthly amount for an active card-linked installment with a remaining balance", () => {
     const due = selectDueInstallmentCharges({ installments: [installment()], cycleTransactions: [], cycleStart: cycle1Start });
-    expect(due).toEqual([{ debtId: "debt-1", cardId: "card-1", amount: 396 }]);
+    expect(due).toEqual([{ debtId: "debt-1", cardId: "card-1", categoryId: "cat-1", amount: 396 }]);
+  });
+
+  it("propagates the debt's fixed category_id onto every due charge (including a legacy installment with no category)", () => {
+    const withCategory = selectDueInstallmentCharges({ installments: [installment({ category_id: "cat-1" })], cycleTransactions: [], cycleStart: cycle1Start });
+    expect(withCategory).toEqual([{ debtId: "debt-1", cardId: "card-1", categoryId: "cat-1", amount: 396 }]);
+
+    const withoutCategory = selectDueInstallmentCharges({ installments: [installment({ category_id: null })], cycleTransactions: [], cycleStart: cycle1Start });
+    expect(withoutCategory).toEqual([{ debtId: "debt-1", cardId: "card-1", categoryId: null, amount: 396 }]);
+  });
+
+  it("stamps every cycle's charge with the same fixed category, so month 2..N share month 1's category", () => {
+    const cycle1 = selectDueInstallmentCharges({ installments: [installment({ category_id: "cat-groceries", remaining_balance: "792" })], cycleTransactions: [], cycleStart: cycle1Start });
+    const cycle2 = selectDueInstallmentCharges({ installments: [installment({ category_id: "cat-groceries", remaining_balance: "396" })], cycleTransactions: [], cycleStart: cycle2Start });
+
+    expect(cycle1[0].categoryId).toBe("cat-groceries");
+    expect(cycle2[0].categoryId).toBe(cycle1[0].categoryId);
   });
 
   it("splits a 792/2-month installment across two cycles and stops on the third once the balance is cleared", () => {
     // Cycle 1: full balance, charges the monthly amount.
     const cycle1 = selectDueInstallmentCharges({ installments: [installment({ remaining_balance: "792" })], cycleTransactions: [], cycleStart: cycle1Start });
-    expect(cycle1).toEqual([{ debtId: "debt-1", cardId: "card-1", amount: 396 }]);
+    expect(cycle1).toEqual([{ debtId: "debt-1", cardId: "card-1", categoryId: "cat-1", amount: 396 }]);
 
     // Cycle 2: remaining balance after cycle 1's charge, fresh cycle transactions.
     const cycle2 = selectDueInstallmentCharges({ installments: [installment({ remaining_balance: "396" })], cycleTransactions: [], cycleStart: cycle2Start });
-    expect(cycle2).toEqual([{ debtId: "debt-1", cardId: "card-1", amount: 396 }]);
+    expect(cycle2).toEqual([{ debtId: "debt-1", cardId: "card-1", categoryId: "cat-1", amount: 396 }]);
 
     // Cycle 3: balance reached zero after cycle 2's charge — never charge past it.
     const cycle3 = selectDueInstallmentCharges({ installments: [installment({ remaining_balance: "0" })], cycleTransactions: [], cycleStart: cycle3Start });
