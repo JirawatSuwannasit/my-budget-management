@@ -32,6 +32,7 @@ type DebtPaymentRow = { id: string; debt_id: string; account_id: string | null; 
 type CardRow = { id: string; name: string; billing_cut_day: number; payment_due_day: number; active: boolean };
 type CardTransactionRow = { id: string; card_id: string; amount: number | string; transaction_date: string; notes: string | null };
 type CardPaymentRow = { id: string; card_id: string; account_id: string | null; amount: number | string; payment_date: string; created_at: string };
+type CategoryRow = { id: string; name: string; kind: string; active: boolean };
 
 function toNumber(value: number | string | null | undefined) {
   const numberValue = Number(value ?? 0);
@@ -89,7 +90,7 @@ export default async function DebtsCardsPage() {
   const cycleStartDate = toDateInput(cycle.start);
   const cycleEndDate = toDateInput(cycle.end);
 
-  const [profileResult, accountsResult, debtsResult, debtPaymentsResult, cardsResult, cardTransactionsResult, cardPaymentsResult, appSettingsResult] = await Promise.all([
+  const [profileResult, accountsResult, debtsResult, debtPaymentsResult, cardsResult, cardTransactionsResult, cardPaymentsResult, categoriesResult, appSettingsResult] = await Promise.all([
     user ? supabase.from("profiles").select("locale").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
     supabase.from("debts").select("id,name,type,original_amount,remaining_balance,interest_rate,monthly_payment,bonus_payment_amount,target_payoff_date,card_id,installment_months,active").order("active", { ascending: false }).order("name"),
@@ -97,6 +98,7 @@ export default async function DebtsCardsPage() {
     supabase.from("credit_cards").select("id,name,billing_cut_day,payment_due_day,active").order("active", { ascending: false }).order("name"),
     supabase.from("card_transactions").select("id,card_id,amount,transaction_date,notes").order("transaction_date", { ascending: false }).limit(120),
     supabase.from("card_payments").select("id,card_id,account_id,amount,payment_date,created_at").order("payment_date", { ascending: false }).limit(80),
+    supabase.from("categories").select("id,name,kind,active").order("name"),
     user ? supabase.from("app_settings").select("default_account_id").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null })
   ]);
 
@@ -108,12 +110,14 @@ export default async function DebtsCardsPage() {
   const cards = (cardsResult.data ?? []) as CardRow[];
   const cardTransactions = (cardTransactionsResult.data ?? []) as CardTransactionRow[];
   const cardPayments = (cardPaymentsResult.data ?? []) as CardPaymentRow[];
-  const loadError = profileResult.error ?? accountsResult.error ?? debtsResult.error ?? debtPaymentsResult.error ?? cardsResult.error ?? cardTransactionsResult.error ?? cardPaymentsResult.error;
+  const categories = (categoriesResult.data ?? []) as CategoryRow[];
+  const loadError = profileResult.error ?? accountsResult.error ?? debtsResult.error ?? debtPaymentsResult.error ?? cardsResult.error ?? cardTransactionsResult.error ?? cardPaymentsResult.error ?? categoriesResult.error;
 
   const activeDebts = debts.filter((debt) => debt.active);
   const genericDebts = debts.filter((debt) => debt.type !== "installment");
   const activeCards = cards.filter((card) => card.active);
   const cashLikeAccounts = accounts.filter((account) => account.active && isCashLikeType(account.type as AccountType));
+  const expenseCategories = categories.filter((category) => category.active && category.kind === "expense").map((category) => ({ id: category.id, name: category.name }));
   const defaultAccountId = (appSettingsResult.data as { default_account_id: string | null } | null)?.default_account_id ?? null;
 
   // Card obligations derived at read time (billed vs. current-cycle floating
@@ -305,7 +309,7 @@ export default async function DebtsCardsPage() {
             <Plus size={18} className="ml-auto text-primary" aria-hidden="true" />
           </summary>
           <div className="mt-4">
-            <CardActivityForms cards={activeCards} locale={locale} />
+            <CardActivityForms cards={activeCards} categories={expenseCategories} locale={locale} />
             <p className="mt-3 rounded-2xl bg-surface p-4 text-sm font-bold text-muted shadow-card">{t.cardExpenseHelp}</p>
           </div>
         </details>

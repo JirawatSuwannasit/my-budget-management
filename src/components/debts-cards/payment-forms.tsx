@@ -8,6 +8,7 @@ import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 export type AccountOption = { id: string; name: string; type: string; active?: boolean };
 export type DebtOption = { id: string; name: string; monthly_payment?: number | string; remaining_balance?: number | string; active?: boolean };
 export type CardOption = { id: string; name: string; active?: boolean };
+export type CategoryOption = { id: string; name: string };
 
 const initialState: TransactionActionState = { status: "idle", message: "" };
 const installmentInitialState: DebtCardActionState = { status: "idle", message: "" };
@@ -78,7 +79,7 @@ export function DebtPaymentForm({ debts, accounts, defaultAccountId, locale }: {
   );
 }
 
-export function CardExpenseForm({ cards, locale }: { cards: CardOption[]; locale: Locale }) {
+export function CardExpenseForm({ cards, categories, locale }: { cards: CardOption[]; categories: CategoryOption[]; locale: Locale }) {
   const [state, formAction, isPending] = useActionState(saveTransaction, initialState);
   const t = dictionaries[locale].debtsCards.form;
   const common = dictionaries[locale].common;
@@ -104,6 +105,15 @@ export function CardExpenseForm({ cards, locale }: { cards: CardOption[]; locale
           <input name="transaction_date" type="date" defaultValue={todayInput()} required className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
         </label>
       </div>
+      {categories.length > 0 ? (
+        <label className="grid gap-2 text-sm font-black text-ink">
+          {t.category}
+          <select name="category_id" defaultValue="" className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60">
+            <option value="">{t.chooseCategory}</option>
+            {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+          </select>
+        </label>
+      ) : null}
       <label className="grid gap-2 text-sm font-black text-ink">
         {t.notes}
         <input name="notes" placeholder={t.notesPlaceholder} className="rounded-2xl border border-line bg-surface px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60" />
@@ -206,7 +216,7 @@ function CardInstallmentForm({ cards, locale }: { cards: CardOption[]; locale: L
 
 // Mode toggle for the card section: general spending (statement rail) vs
 // installment (debt rail). General spending is unchanged.
-export function CardActivityForms({ cards, locale }: { cards: CardOption[]; locale: Locale }) {
+export function CardActivityForms({ cards, categories, locale }: { cards: CardOption[]; categories: CategoryOption[]; locale: Locale }) {
   const t = dictionaries[locale].debtsCards.form;
   const [mode, setMode] = useState<"general" | "installment">("general");
 
@@ -228,7 +238,7 @@ export function CardActivityForms({ cards, locale }: { cards: CardOption[]; loca
           );
         })}
       </div>
-      {mode === "general" ? <CardExpenseForm cards={cards} locale={locale} /> : <CardInstallmentForm cards={cards} locale={locale} />}
+      {mode === "general" ? <CardExpenseForm cards={cards} categories={categories} locale={locale} /> : <CardInstallmentForm cards={cards} locale={locale} />}
     </div>
   );
 }
