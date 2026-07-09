@@ -22,6 +22,7 @@ export type Account = {
   name: string;
   type: AccountType;
   balance: number;
+  low_balance_threshold: number | null;
 };
 
 export type Obligation = {

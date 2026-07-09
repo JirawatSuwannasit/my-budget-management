@@ -156,7 +156,9 @@ export const dictionaries = {
         add: "เพิ่มบัญชี",
         cashLikeHint: "นับเป็นเงินใช้ได้จริง",
         savingsHint: "เงินเก็บ ไม่นับเป็นเงินใช้ได้จริง",
-        investmentHint: "แยกติดตาม ไม่นับเป็นเงินใช้ได้จริง"
+        investmentHint: "แยกติดตาม ไม่นับเป็นเงินใช้ได้จริง",
+        lowBalanceThreshold: "แจ้งเตือนเมื่อเงินต่ำกว่า",
+        lowBalanceThresholdHint: "เว้นว่างไว้เพื่อปิดการแจ้งเตือน"
       },
       messages: {
         loginAgain: "กรุณาเข้าสู่ระบบอีกครั้ง",
@@ -239,7 +241,8 @@ export const dictionaries = {
         annual_bill: "บิลรายปี",
         subscription: "ค่าสมาชิกรายเดือน",
         sinking_fund: "เงินกันรายเดือน",
-        debt: "ชำระหนี้"
+        debt: "ชำระหนี้",
+        low_balance: "เงินใกล้หมด"
       }
     },
     categories: {
@@ -805,7 +808,9 @@ export const dictionaries = {
         add: "Add account",
         cashLikeHint: "Counts as real available money",
         savingsHint: "Savings, not counted as real available money",
-        investmentHint: "Tracked separately, not real available money"
+        investmentHint: "Tracked separately, not real available money",
+        lowBalanceThreshold: "Low-balance alert",
+        lowBalanceThresholdHint: "Leave empty to disable"
       },
       messages: {
         loginAgain: "Please log in again.",
@@ -888,7 +893,8 @@ export const dictionaries = {
         annual_bill: "Annual bill",
         subscription: "Monthly subscription",
         sinking_fund: "Monthly reserve",
-        debt: "Debt payment"
+        debt: "Debt payment",
+        low_balance: "Low balance"
       }
     },
     categories: {

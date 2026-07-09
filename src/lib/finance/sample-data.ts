@@ -2,12 +2,12 @@ import type { DashboardInput } from "./types";
 
 export const sampleDashboardInput: DashboardInput = {
   accounts: [
-    { id: "main-bank", name: "Main bank", type: "main_bank", balance: 79000 },
-    { id: "other-bank", name: "Other bank", type: "other_bank", balance: 14500 },
-    { id: "cash", name: "Cash", type: "cash", balance: 2500 },
-    { id: "wallet", name: "Wallet", type: "wallet", balance: 1800 },
-    { id: "investment", name: "Investment account", type: "investment", balance: 42000 },
-    { id: "savings", name: "Savings account", type: "savings", balance: 50000 }
+    { id: "main-bank", name: "Main bank", type: "main_bank", balance: 79000, low_balance_threshold: null },
+    { id: "other-bank", name: "Other bank", type: "other_bank", balance: 14500, low_balance_threshold: null },
+    { id: "cash", name: "Cash", type: "cash", balance: 2500, low_balance_threshold: null },
+    { id: "wallet", name: "Wallet", type: "wallet", balance: 1800, low_balance_threshold: null },
+    { id: "investment", name: "Investment account", type: "investment", balance: 42000, low_balance_threshold: null },
+    { id: "savings", name: "Savings account", type: "savings", balance: 50000, low_balance_threshold: null }
   ],
   obligations: [
     { id: "phone", label: "Phone bill", amount: 699, paid: false, kind: "bill" },

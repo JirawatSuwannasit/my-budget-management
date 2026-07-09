@@ -7,8 +7,8 @@ import { computeCardObligation, type DashboardRows } from "./dashboard-data";
 export const DUE_SOON_DAYS = 7;
 
 export type UpcomingUrgency = "overdue" | "due-soon" | "pending";
-export type UpcomingType = "card_statement" | "annual_bill" | "subscription" | "sinking_fund" | "debt";
-export type UpcomingHref = "/planning" | "/debts-cards";
+export type UpcomingType = "card_statement" | "annual_bill" | "subscription" | "sinking_fund" | "debt" | "low_balance";
+export type UpcomingHref = "/planning" | "/debts-cards" | "/accounts";
 
 export type UpcomingItem = {
   id: string;
@@ -50,7 +50,7 @@ export function emptyUpcomingSummary(): UpcomingSummary {
     totalCount: 0,
     urgentCount: 0,
     allCaughtUp: true,
-    urgentByHref: { "/planning": 0, "/debts-cards": 0 }
+    urgentByHref: { "/planning": 0, "/debts-cards": 0, "/accounts": 0 }
   };
 }
 
@@ -235,6 +235,25 @@ export function buildUpcomingItems({ rows, cycleStart, cycleEnd, today = new Dat
     });
   }
 
+  // 6. Active accounts whose current balance has fallen below their optional
+  // low-balance threshold. Compares the raw stored balance directly (not the
+  // dashboard's safe-to-spend figure); this display surfaces only here in the
+  // Upcoming panel, never on the Accounts page itself.
+  for (const account of rows.accounts) {
+    if (!isActive(account)) continue;
+    if (account.low_balance_threshold === null || account.low_balance_threshold === undefined) continue;
+    if (toNumber(account.balance) >= toNumber(account.low_balance_threshold)) continue;
+    items.push({
+      id: "low-balance-" + account.id,
+      type: "low_balance",
+      title: account.name,
+      amount: toNumber(account.balance),
+      dueDate: null,
+      urgency: "due-soon",
+      href: "/accounts"
+    });
+  }
+
   items.sort((a, b) => {
     if (URGENCY_RANK[a.urgency] !== URGENCY_RANK[b.urgency]) return URGENCY_RANK[a.urgency] - URGENCY_RANK[b.urgency];
     if (a.dueDate && b.dueDate && a.dueDate !== b.dueDate) return a.dueDate < b.dueDate ? -1 : 1;
@@ -246,7 +265,7 @@ export function buildUpcomingItems({ rows, cycleStart, cycleEnd, today = new Dat
   const overdueCount = items.filter((item) => item.urgency === "overdue").length;
   const dueSoonCount = items.filter((item) => item.urgency === "due-soon").length;
   const pendingCount = items.filter((item) => item.urgency === "pending").length;
-  const urgentByHref: Record<UpcomingHref, number> = { "/planning": 0, "/debts-cards": 0 };
+  const urgentByHref: Record<UpcomingHref, number> = { "/planning": 0, "/debts-cards": 0, "/accounts": 0 };
   for (const item of items) {
     if (item.urgency === "overdue" || item.urgency === "due-soon") urgentByHref[item.href] += 1;
   }

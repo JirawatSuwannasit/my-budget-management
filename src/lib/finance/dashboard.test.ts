@@ -288,8 +288,8 @@ describe("Supabase dashboard row mapping", () => {
     const input = mapDashboardRowsToInput(
       rows({
         accounts: [
-          { id: "main", name: "Main", type: "main_bank", balance: "50000", active: true },
-          { id: "invest", name: "Invest", type: "investment", balance: "25000", active: true }
+          { id: "main", name: "Main", type: "main_bank", balance: "50000", active: true, low_balance_threshold: null },
+          { id: "invest", name: "Invest", type: "investment", balance: "25000", active: true, low_balance_threshold: null }
         ],
         transactions: [
           { id: "income", account_id: "main", category_id: null, type: "income", amount: "90000", transaction_date: "2026-07-25", cycle_start_date: "2026-07-25", related_entity_id: null },
@@ -449,7 +449,7 @@ describe("Supabase dashboard row mapping", () => {
 
   it("detects whether Supabase returned real dashboard rows", () => {
     expect(hasRealDashboardRows(rows())).toBe(false);
-    expect(hasRealDashboardRows(rows({ accounts: [{ id: "main", name: "Main", type: "main_bank", balance: 1, active: true }] }))).toBe(true);
+    expect(hasRealDashboardRows(rows({ accounts: [{ id: "main", name: "Main", type: "main_bank", balance: 1, active: true, low_balance_threshold: null }] }))).toBe(true);
   });
 });
 

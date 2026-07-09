@@ -20,7 +20,8 @@ export default async function PrivateLayout({ children }: Readonly<{ children: R
   const badges: Record<string, number> = {
     "/upcoming": upcoming.urgentCount,
     "/planning": upcoming.urgentByHref["/planning"],
-    "/debts-cards": upcoming.urgentByHref["/debts-cards"]
+    "/debts-cards": upcoming.urgentByHref["/debts-cards"],
+    "/accounts": upcoming.urgentByHref["/accounts"]
   };
 
   return <AppShell userEmail={user.email ?? "private user"} locale={locale} badges={badges}>{children}</AppShell>;

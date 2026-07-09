@@ -201,6 +201,59 @@ describe("buildUpcomingItems", () => {
     expect(summary.allCaughtUp).toBe(true);
   });
 
+  it("surfaces a low-balance reminder when an active account's balance falls below its threshold", () => {
+    const summary = buildUpcomingItems({
+      rows: rows({
+        accounts: [{ id: "acct-1", name: "Main bank", type: "main_bank", balance: 32, low_balance_threshold: 50, active: true }]
+      }),
+      cycleStart,
+      cycleEnd,
+      today
+    });
+
+    expect(summary.items).toEqual([{ id: "low-balance-acct-1", type: "low_balance", title: "Main bank", amount: 32, dueDate: null, urgency: "due-soon", href: "/accounts" }]);
+    expect(summary.urgentByHref["/accounts"]).toBe(1);
+  });
+
+  it("does not surface a low-balance reminder when the balance is at or above the threshold", () => {
+    const summary = buildUpcomingItems({
+      rows: rows({
+        accounts: [{ id: "acct-1", name: "Main bank", type: "main_bank", balance: 80, low_balance_threshold: 50, active: true }]
+      }),
+      cycleStart,
+      cycleEnd,
+      today
+    });
+
+    expect(summary.allCaughtUp).toBe(true);
+  });
+
+  it("does not surface a low-balance reminder when the account has no threshold set", () => {
+    const summary = buildUpcomingItems({
+      rows: rows({
+        accounts: [{ id: "acct-1", name: "Main bank", type: "main_bank", balance: 32, low_balance_threshold: null, active: true }]
+      }),
+      cycleStart,
+      cycleEnd,
+      today
+    });
+
+    expect(summary.allCaughtUp).toBe(true);
+  });
+
+  it("does not surface a low-balance reminder for an inactive account below its threshold", () => {
+    const summary = buildUpcomingItems({
+      rows: rows({
+        accounts: [{ id: "acct-1", name: "Main bank", type: "main_bank", balance: 32, low_balance_threshold: 50, active: false }]
+      }),
+      cycleStart,
+      cycleEnd,
+      today
+    });
+
+    expect(summary.allCaughtUp).toBe(true);
+  });
+
   it("sorts overdue before due-soon before pending", () => {
     const soon = billedCard("soon-card", "Soon card", 9, "100");
     const overdue = billedCard("overdue-card", "Overdue card", 1, "100");

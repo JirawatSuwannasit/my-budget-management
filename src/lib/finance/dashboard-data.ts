@@ -15,6 +15,7 @@ type AccountRow = {
   type: Account["type"];
   balance: number | string | null;
   active: boolean | null;
+  low_balance_threshold: number | string | null;
 };
 
 type TransactionRow = {
@@ -182,7 +183,8 @@ export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, c
     id: account.id,
     name: account.name,
     type: account.type,
-    balance: toNumber(account.balance)
+    balance: toNumber(account.balance),
+    low_balance_threshold: account.low_balance_threshold === null || account.low_balance_threshold === undefined ? null : toNumber(account.low_balance_threshold)
   }));
 
   const monthlySubscriptionObligations = rows.subscriptions
