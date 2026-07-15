@@ -61,6 +61,7 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, upco
     ...fund,
     used: fund.reservedThisCycle ? fund.monthlyReserve : 0
   }));
+  const usableBudgetRemaining = input.reservedBudgets.reduce((sum, b) => sum + (b.budgetAmount - b.usedAmount), 0);
 
   return (
     <div className="grid gap-5">
@@ -164,6 +165,12 @@ export function DashboardShell({ cycle, salaryPaymentDate, input, snapshot, upco
           </div>
           <Link href="/planning" className="grid h-11 w-11 place-items-center rounded-2xl bg-primary text-canvas shadow-card" aria-label={t.budgetSinkingTitle}><Plus size={20} aria-hidden="true" /></Link>
         </div>
+        {input.reservedBudgets.length > 0 ? (
+          <div className="flex items-center justify-between gap-4 text-sm font-bold">
+            <span className="text-muted">{t.usableBudgetRemaining}</span>
+            <span className={usableBudgetRemaining < 0 ? "text-danger" : "text-ink"}>{formatMoney(usableBudgetRemaining)}</span>
+          </div>
+        ) : null}
         {input.reservedBudgets.length === 0 && sinkingFunds.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-line bg-elevated p-4 text-sm font-bold text-muted">{t.noBudgets}</p>
         ) : null}
