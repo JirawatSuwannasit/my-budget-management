@@ -6,7 +6,6 @@ import { createClient } from "@/lib/supabase/server";
 
 export type DebtCardActionState = { status: "idle" | "success" | "error"; message: string };
 type DebtType = "personal_loan" | "interest_free" | "installment" | "credit_card_debt" | "other";
-type StatementStatus = "unpaid" | "partial" | "paid";
 type DebtCardMessages = Record<keyof typeof dictionaries.en.debtsCards.messages, string>;
 
 const debtTypes: DebtType[] = ["personal_loan", "interest_free", "installment", "credit_card_debt", "other"];
@@ -50,11 +49,6 @@ function parseDay(value: FormDataEntryValue | null, messages: DebtCardMessages) 
 function parseDebtType(value: FormDataEntryValue | null, messages: DebtCardMessages): DebtType {
   if (typeof value !== "string" || !debtTypes.includes(value as DebtType)) throw new Error(messages.invalidDebtType);
   return value as DebtType;
-}
-
-function statementStatus(statementAmountDue: number, paidAmount: number): StatementStatus {
-  if (paidAmount <= 0) return "unpaid";
-  return paidAmount >= statementAmountDue ? "paid" : "partial";
 }
 
 function revalidateDebtCardViews() {
@@ -118,6 +112,7 @@ export async function saveCardInstallment(_previousState: DebtCardActionState, f
     const total = parseAmount(formData.get("total"), messages);
     const months = Number(formData.get("months") ?? 0);
     const interestRate = parseAmount(formData.get("interest_rate"), messages);
+    const categoryId = textValue(formData, "category_id");
 
     if (!cardId) throw new Error(messages.chooseCard);
     if (!name) throw new Error(messages.installmentNameRequired);
@@ -134,6 +129,7 @@ export async function saveCardInstallment(_previousState: DebtCardActionState, f
       type: "installment" as DebtType,
       name,
       card_id: cardId,
+      category_id: categoryId,
       original_amount: totalRepayable,
       remaining_balance: totalRepayable,
       interest_rate: interestRate,
@@ -161,6 +157,23 @@ export async function setDebtActive(formData: FormData) {
   const active = formData.get("active") === "true";
   if (!id) throw new Error(messages.debtIdRequired);
   const { error } = await supabase.from("debts").update({ active }).eq("id", id).eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  revalidateDebtCardViews();
+}
+
+export async function deleteDebt(formData: FormData) {
+  const messages = getMessages(formData);
+  const { supabase, userId } = await getUserContext(messages);
+  const id = textValue(formData, "id");
+  if (!id) throw new Error(messages.debtIdRequired);
+
+  // debt_payments cascades on delete, which would silently erase payment history
+  // without reversing the cash-account effects already applied at payment time.
+  // Block the delete instead of reversing balances after the fact.
+  const { count } = await supabase.from("debt_payments").select("id", { count: "exact", head: true }).eq("debt_id", id).eq("user_id", userId);
+  if ((count ?? 0) > 0) throw new Error(messages.installmentHasPayments);
+
+  const { error } = await supabase.from("debts").delete().eq("id", id).eq("user_id", userId);
   if (error) throw new Error(error.message);
   revalidateDebtCardViews();
 }
@@ -203,46 +216,4 @@ export async function setCreditCardActive(formData: FormData) {
   const { error } = await supabase.from("credit_cards").update({ active }).eq("id", id).eq("user_id", userId);
   if (error) throw new Error(error.message);
   revalidateDebtCardViews();
-}
-
-export async function saveCreditCardStatement(_previousState: DebtCardActionState, formData: FormData): Promise<DebtCardActionState> {
-  const messages = getMessages(formData);
-  try {
-    const { supabase, userId } = await getUserContext(messages);
-    const id = textValue(formData, "id");
-    const cardId = textValue(formData, "card_id");
-    const cycleStart = textValue(formData, "cycle_start");
-    const cycleEnd = textValue(formData, "cycle_end");
-    const dueDate = textValue(formData, "due_date");
-    const statementAmountDue = parseAmount(formData.get("statement_amount_due"), messages);
-    const paidAmount = parseAmount(formData.get("paid_amount"), messages);
-
-    if (!cardId) throw new Error(messages.chooseCard);
-    if (!cycleStart || !cycleEnd || !dueDate) throw new Error(messages.statementDatesRequired);
-
-    const payload = {
-      user_id: userId,
-      card_id: cardId,
-      cycle_start: cycleStart,
-      cycle_end: cycleEnd,
-      due_date: dueDate,
-      statement_amount_due: statementAmountDue,
-      paid_amount: paidAmount,
-      status: statementStatus(statementAmountDue, paidAmount)
-    };
-
-    if (id) {
-      const { error } = await supabase.from("credit_card_statements").update(payload).eq("id", id).eq("user_id", userId);
-      if (error) throw new Error(error.message);
-      revalidateDebtCardViews();
-      return { status: "success", message: messages.statementUpdated };
-    }
-
-    const { error } = await supabase.from("credit_card_statements").insert(payload);
-    if (error) throw new Error(error.message);
-    revalidateDebtCardViews();
-    return { status: "success", message: messages.statementAdded };
-  } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : messages.saveStatementFailed };
-  }
 }

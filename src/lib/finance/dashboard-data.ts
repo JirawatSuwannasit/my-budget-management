@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Account, DashboardInput } from "./types";
+import { getLastBillingCutDate } from "./cycle";
+import type { Account, CreditCardObligation, DashboardInput } from "./types";
 
 export type DashboardDataSource = "supabase" | "demo";
 
@@ -14,6 +15,7 @@ type AccountRow = {
   type: Account["type"];
   balance: number | string | null;
   active: boolean | null;
+  low_balance_threshold: number | string | null;
 };
 
 type TransactionRow = {
@@ -64,6 +66,8 @@ type AnnualExpenseRow = {
 type DebtRow = {
   id: string;
   name: string;
+  type?: string | null;
+  card_id?: string | null;
   remaining_balance: number | string | null;
   monthly_payment: number | string | null;
   active: boolean | null;
@@ -76,28 +80,24 @@ type DebtPaymentRow = {
   paid_date: string;
 };
 
-type CreditCardStatementRow = {
-  id: string;
-  card_id: string;
-  statement_amount_due: number | string | null;
-  paid_amount: number | string | null;
-  remaining_payable: number | string | null;
-  due_date: string;
-  status: "unpaid" | "partial" | "paid";
-};
-
 type CardTransactionRow = {
   id: string;
   card_id: string;
-  statement_id: string | null;
   amount: number | string | null;
   transaction_date: string;
-  billing_cycle_start: string;
+};
+
+type CardPaymentRow = {
+  id: string;
+  card_id: string;
+  amount: number | string | null;
 };
 
 type CreditCardRow = {
   id: string;
   name: string;
+  billing_cut_day: number;
+  payment_due_day: number;
   active: boolean | null;
 };
 
@@ -111,7 +111,7 @@ export type DashboardRows = {
   debts: DebtRow[];
   debtPayments: DebtPaymentRow[];
   creditCards: CreditCardRow[];
-  creditCardStatements: CreditCardStatementRow[];
+  cardPayments: CardPaymentRow[];
   cardTransactions: CardTransactionRow[];
 };
 
@@ -133,7 +133,38 @@ function isPaidInCycle(transactions: TransactionRow[], relatedEntityId: string, 
   return transactions.some((transaction) => transaction.related_entity_id === relatedEntityId && transaction.cycle_start_date === cycleStartDate);
 }
 
-export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, cycleEnd?: Date): DashboardInput {
+// Local calendar date (not UTC, unlike cycleDate) so it matches the local-noon
+// dates getLastBillingCutDate returns with no timezone shift.
+function toDateOnly(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return year + "-" + month + "-" + day;
+}
+
+export type CardObligationInputs = {
+  billingCutDay: number;
+  cardTransactions: Array<{ amount: number | string | null; transaction_date: string }>;
+  cardPayments: Array<{ amount: number | string | null }>;
+};
+
+// Card-centric obligation model: a card_transaction is "billed" once its date
+// is on/before the most recent billing cut, else it is "current" (floating,
+// informational only). Payments pay down the billed balance first. Pure and
+// reused by the dashboard snapshot, the debts-cards page, and the Upcoming
+// page so all three agree on the same numbers.
+export function computeCardObligation({ billingCutDay, cardTransactions, cardPayments }: CardObligationInputs, today: Date = new Date()) {
+  const lastCut = getLastBillingCutDate(today, billingCutDay);
+  const lastCutKey = toDateOnly(lastCut);
+  const billedSpend = cardTransactions.filter((transaction) => transaction.transaction_date <= lastCutKey).reduce((total, transaction) => total + toNumber(transaction.amount), 0);
+  const currentCycleSpending = cardTransactions.filter((transaction) => transaction.transaction_date > lastCutKey).reduce((total, transaction) => total + toNumber(transaction.amount), 0);
+  const totalPaid = cardPayments.reduce((total, payment) => total + toNumber(payment.amount), 0);
+  const billedOutstanding = Math.max(0, billedSpend - totalPaid);
+
+  return { lastCut, billedSpend, currentCycleSpending, totalPaid, billedOutstanding };
+}
+
+export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, cycleEnd?: Date, today: Date = new Date()): DashboardInput {
   const cycleStartDate = cycleDate(cycleStart);
   const cycleEndDate = cycleDate(cycleEnd ?? new Date(cycleStart.getFullYear(), cycleStart.getMonth() + 1, 24, 12));
   const hasCategoryRows = rows.categories.length > 0;
@@ -152,7 +183,8 @@ export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, c
     id: account.id,
     name: account.name,
     type: account.type,
-    balance: toNumber(account.balance)
+    balance: toNumber(account.balance),
+    low_balance_threshold: account.low_balance_threshold === null || account.low_balance_threshold === undefined ? null : toNumber(account.low_balance_threshold)
   }));
 
   const monthlySubscriptionObligations = rows.subscriptions
@@ -205,8 +237,13 @@ export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, c
       reservedThisCycle: isPaidInCycle(cycleTransactions, expense.id, cycleStartDate)
     }));
 
+  // Card-linked installments draw down via the card float (billedOutstanding,
+  // post-cut only) exactly like a card-bound subscription; excluding them here
+  // avoids subtracting the same monthly amount from safe-to-spend a second
+  // time, immediately, before the card has even cut.
   const plannedDebtPayments = rows.debts
     .filter(active)
+    .filter((debt) => !(debt.type === "installment" && debt.card_id))
     .map((debt) => ({
       id: debt.id,
       debtName: debt.name,
@@ -214,29 +251,22 @@ export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, c
       paid: toNumber(debt.monthly_payment) > 0 && debtPaymentsThisCycle.filter((payment) => payment.debt_id === debt.id).reduce((total, payment) => total + toNumber(payment.amount), 0) >= toNumber(debt.monthly_payment)
     }));
 
-  const currentSpendingByCard = rows.cardTransactions
-    .filter((transaction) => transaction.billing_cycle_start === cycleStartDate)
-    .reduce((map, transaction) => map.set(transaction.card_id, (map.get(transaction.card_id) ?? 0) + toNumber(transaction.amount)), new Map<string, number>());
-
-  const payableStatements = rows.creditCardStatements.filter((statement) => statement.status !== "paid" || toNumber(statement.remaining_payable) > 0);
-  const statementTotalsByCard = payableStatements.reduce((map, statement) => {
-    const existing = map.get(statement.card_id) ?? { statementAmountDue: 0, paidAmount: 0, statementIds: [] as string[] };
-    existing.statementAmountDue += toNumber(statement.statement_amount_due);
-    existing.paidAmount += toNumber(statement.paid_amount);
-    existing.statementIds.push(statement.id);
-    map.set(statement.card_id, existing);
-    return map;
-  }, new Map<string, { statementAmountDue: number; paidAmount: number; statementIds: string[] }>());
-
-  const cardIds = new Set([...activeCards.map((card) => card.id), ...currentSpendingByCard.keys(), ...statementTotalsByCard.keys()]);
-  const creditCardStatements = [...cardIds].map((cardId) => {
-    const totals = statementTotalsByCard.get(cardId) ?? { statementAmountDue: 0, paidAmount: 0, statementIds: [] };
+  // Card obligations are derived per active card (deactivating a card also
+  // retires its balance from safe-to-spend, mirroring how debts are handled).
+  const creditCards: CreditCardObligation[] = activeCards.map((card) => {
+    const obligation = computeCardObligation(
+      {
+        billingCutDay: card.billing_cut_day,
+        cardTransactions: rows.cardTransactions.filter((transaction) => transaction.card_id === card.id),
+        cardPayments: rows.cardPayments.filter((payment) => payment.card_id === card.id)
+      },
+      today
+    );
     return {
-      id: totals.statementIds[0] ?? cardId,
-      cardName: cardNameById.get(cardId) ?? "Credit card",
-      currentCycleSpending: currentSpendingByCard.get(cardId) ?? 0,
-      statementAmountDue: totals.statementAmountDue,
-      paidAmount: totals.paidAmount
+      id: card.id,
+      cardName: cardNameById.get(card.id) ?? "Credit card",
+      billedOutstanding: obligation.billedOutstanding,
+      currentCycleSpending: obligation.currentCycleSpending
     };
   });
 
@@ -248,7 +278,7 @@ export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, c
     accounts,
     obligations: monthlySubscriptionObligations,
     reservedBudgets,
-    creditCardStatements,
+    creditCards,
     plannedDebtPayments,
     sinkingFundReserves: [...annualExpenseReserves, ...yearlySubscriptionReserves],
     cycleIncome,
@@ -258,7 +288,7 @@ export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, c
 }
 
 export function hasRealDashboardRows(rows: DashboardRows) {
-  return rows.accounts.length > 0 || rows.transactions.length > 0 || rows.budgets.length > 0 || rows.subscriptions.length > 0 || rows.annualExpenses.length > 0 || rows.debts.length > 0 || rows.creditCards.length > 0 || rows.creditCardStatements.length > 0 || rows.cardTransactions.length > 0;
+  return rows.accounts.length > 0 || rows.transactions.length > 0 || rows.budgets.length > 0 || rows.subscriptions.length > 0 || rows.annualExpenses.length > 0 || rows.debts.length > 0 || rows.creditCards.length > 0 || rows.cardPayments.length > 0 || rows.cardTransactions.length > 0;
 }
 
 async function selectTable<T>(supabase: SupabaseClient, table: string, columns = "*") {
@@ -268,7 +298,7 @@ async function selectTable<T>(supabase: SupabaseClient, table: string, columns =
 }
 
 export async function loadDashboardRows(supabase: SupabaseClient): Promise<DashboardRows> {
-  const [accounts, categories, transactions, budgets, subscriptions, annualExpenses, debts, debtPayments, creditCards, creditCardStatements, cardTransactions] = await Promise.all([
+  const [accounts, categories, transactions, budgets, subscriptions, annualExpenses, debts, debtPayments, creditCards, cardPayments, cardTransactions] = await Promise.all([
     selectTable<AccountRow>(supabase, "accounts"),
     selectTable<CategoryRow>(supabase, "categories", "id,active"),
     selectTable<TransactionRow>(supabase, "transactions"),
@@ -278,9 +308,9 @@ export async function loadDashboardRows(supabase: SupabaseClient): Promise<Dashb
     selectTable<DebtRow>(supabase, "debts"),
     selectTable<DebtPaymentRow>(supabase, "debt_payments"),
     selectTable<CreditCardRow>(supabase, "credit_cards"),
-    selectTable<CreditCardStatementRow>(supabase, "credit_card_statements"),
+    selectTable<CardPaymentRow>(supabase, "card_payments"),
     selectTable<CardTransactionRow>(supabase, "card_transactions")
   ]);
 
-  return { accounts, categories, transactions, budgets, subscriptions, annualExpenses, debts, debtPayments, creditCards, creditCardStatements, cardTransactions };
+  return { accounts, categories, transactions, budgets, subscriptions, annualExpenses, debts, debtPayments, creditCards, cardPayments, cardTransactions };
 }

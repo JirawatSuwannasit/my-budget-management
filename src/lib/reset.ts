@@ -15,7 +15,6 @@ export const RESET_CONFIRM_WORD = "RESET";
 export const RESET_TABLE_ORDER = [
   "card_payments",
   "card_transactions",
-  "credit_card_statements",
   "credit_cards",
   "debt_payments",
   "debts",

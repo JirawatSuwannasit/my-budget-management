@@ -15,7 +15,7 @@ function rows(overrides: Partial<DashboardRows> = {}): DashboardRows {
     debts: [],
     debtPayments: [],
     creditCards: [],
-    creditCardStatements: [],
+    cardPayments: [],
     cardTransactions: [],
     ...overrides
   };
@@ -120,6 +120,32 @@ describe("buildReportsData", () => {
       { cycleStartDate: "2026-06-25", start: new Date(2026, 5, 25, 12), label: "25 Jun 2026 - 24 Jul 2026", remaining: 500000 },
       { cycleStartDate: "2026-07-25", start: new Date(2026, 6, 25, 12), label: "25 Jul 2026 - 24 Aug 2026", remaining: 491000 }
     ]);
+  });
+
+  it("counts credit_card_expense toward the cycle expense total and merges it into the matching cash-expense category slice, excluding credit_card_payment", () => {
+    const data = buildReportsData({
+      rows: rows({
+        categories: [{ id: "daily", active: true }],
+        transactions: [
+          { id: "inc", account_id: "main", category_id: null, type: "income", amount: "50000", transaction_date: "2026-07-25", cycle_start_date: "2026-07-25", related_entity_id: null },
+          { id: "cash-exp", account_id: "main", category_id: "daily", type: "expense", amount: "4000", transaction_date: "2026-07-26", cycle_start_date: "2026-07-25", related_entity_id: null },
+          { id: "card-exp", account_id: null, category_id: "daily", type: "credit_card_expense", amount: "1500", transaction_date: "2026-07-27", cycle_start_date: "2026-07-25", related_entity_id: "card1" },
+          { id: "card-pay", account_id: "main", category_id: null, type: "credit_card_payment", amount: "1500", transaction_date: "2026-07-29", cycle_start_date: "2026-07-25", related_entity_id: "card1" }
+        ]
+      }),
+      categories: [{ id: "daily", name: "Daily food", active: true }],
+      ...params
+    });
+
+    const current = data.cycles[0];
+    // Cash (4000) + card charge (1500) = 5500; the 1500 card *payment* settling
+    // that charge is bill settlement, not spend, and must not add another 1500.
+    expect(current.expenses).toBe(5500);
+    expect(current.net).toBe(44500);
+
+    // Cash and card spend in the same category merge into a single slice.
+    expect(data.categoryBreakdown.total).toBe(5500);
+    expect(data.categoryBreakdown.slices).toEqual([{ categoryId: "daily", label: "Daily food", amount: 5500, share: 1 }]);
   });
 
   it("groups overflow categories into an Other slice", () => {

@@ -1,4 +1,4 @@
-import type { DashboardRows } from "./dashboard-data";
+import { computeCardObligation, type DashboardRows } from "./dashboard-data";
 
 // "Due & to-do this cycle" is a read-only view derived from the same Supabase rows the dashboard
 // loads. It never writes data; it only surfaces obligations the user still has to act on this cycle.
@@ -7,8 +7,8 @@ import type { DashboardRows } from "./dashboard-data";
 export const DUE_SOON_DAYS = 7;
 
 export type UpcomingUrgency = "overdue" | "due-soon" | "pending";
-export type UpcomingType = "card_statement" | "annual_bill" | "subscription" | "sinking_fund" | "debt";
-export type UpcomingHref = "/planning" | "/debts-cards";
+export type UpcomingType = "card_statement" | "annual_bill" | "subscription" | "sinking_fund" | "debt" | "low_balance";
+export type UpcomingHref = "/planning" | "/debts-cards" | "/accounts";
 
 export type UpcomingItem = {
   id: string;
@@ -50,7 +50,7 @@ export function emptyUpcomingSummary(): UpcomingSummary {
     totalCount: 0,
     urgentCount: 0,
     allCaughtUp: true,
-    urgentByHref: { "/planning": 0, "/debts-cards": 0 }
+    urgentByHref: { "/planning": 0, "/debts-cards": 0, "/accounts": 0 }
   };
 }
 
@@ -76,6 +76,15 @@ function clampDayToMonth(year: number, monthIndex: number, day: number) {
   return Math.min(day, lastDay);
 }
 
+// The next occurrence of payment_due_day strictly after the last billing cut
+// (a due day numerically before/at the cut day rolls into the following month,
+// the common real-world layout; a due day after the cut day stays same-month).
+function nextDueDateAfterCut(lastCut: Date, paymentDueDay: number): Date {
+  const sameMonth = new Date(lastCut.getFullYear(), lastCut.getMonth(), clampDayToMonth(lastCut.getFullYear(), lastCut.getMonth(), paymentDueDay), 12);
+  if (sameMonth.getTime() > lastCut.getTime()) return sameMonth;
+  return new Date(lastCut.getFullYear(), lastCut.getMonth() + 1, clampDayToMonth(lastCut.getFullYear(), lastCut.getMonth() + 1, paymentDueDay), 12);
+}
+
 function urgencyFor(dueDate: string | null, todayKey: string, soonKey: string): UpcomingUrgency {
   if (!dueDate) return "pending";
   if (dueDate < todayKey) return "overdue";
@@ -84,7 +93,8 @@ function urgencyFor(dueDate: string | null, todayKey: string, soonKey: string): 
 }
 
 // Map a recurring billing day (1..31) onto a concrete date inside the current cycle window.
-function billingDayDueDate(billingDay: number, cycleStart: Date, cycleEnd: Date, startKey: string, endKey: string): string | null {
+// Exported so callers (e.g. subscription auto-charge) reuse the exact same "due this cycle" rule.
+export function billingDayDueDate(billingDay: number, cycleStart: Date, cycleEnd: Date, startKey: string, endKey: string): string | null {
   const months = [
     { year: cycleStart.getFullYear(), month: cycleStart.getMonth() },
     { year: cycleEnd.getFullYear(), month: cycleEnd.getMonth() }
@@ -111,18 +121,26 @@ export function buildUpcomingItems({ rows, cycleStart, cycleEnd, today = new Dat
 
   const items: UpcomingItem[] = [];
 
-  // 1. Credit card statements still owed.
-  for (const statement of rows.creditCardStatements) {
-    if (statement.status === "paid") continue;
-    const remaining = toNumber(statement.remaining_payable);
-    if (remaining <= 0) continue;
+  // 1. Credit cards with a billed (already cut) outstanding balance.
+  for (const card of rows.creditCards) {
+    if (!isActive(card)) continue;
+    const obligation = computeCardObligation(
+      {
+        billingCutDay: card.billing_cut_day,
+        cardTransactions: rows.cardTransactions.filter((transaction) => transaction.card_id === card.id),
+        cardPayments: rows.cardPayments.filter((payment) => payment.card_id === card.id)
+      },
+      today
+    );
+    if (obligation.billedOutstanding <= 0) continue;
+    const dueDate = toDateInput(nextDueDateAfterCut(obligation.lastCut, card.payment_due_day));
     items.push({
-      id: "statement-" + statement.id,
+      id: "card-" + card.id,
       type: "card_statement",
-      title: cardNameById.get(statement.card_id) ?? "Credit card",
-      amount: remaining,
-      dueDate: statement.due_date ?? null,
-      urgency: urgencyFor(statement.due_date ?? null, todayKey, soonKey),
+      title: cardNameById.get(card.id) ?? "Credit card",
+      amount: obligation.billedOutstanding,
+      dueDate,
+      urgency: urgencyFor(dueDate, todayKey, soonKey),
       href: "/debts-cards"
     });
   }
@@ -195,6 +213,10 @@ export function buildUpcomingItems({ rows, cycleStart, cycleEnd, today = new Dat
   // 5. Active debts whose monthly payment has not been fully recorded this cycle.
   for (const debt of rows.debts) {
     if (!isActive(debt)) continue;
+    // Card-linked installments are auto-charged into the card float; their
+    // reminder now comes from the card statement item above (section 1), which
+    // already includes the auto-charged amount once it bills.
+    if (debt.type === "installment" && debt.card_id) continue;
     const monthly = toNumber(debt.monthly_payment);
     if (monthly <= 0) continue;
     const paidThisCycle = rows.debtPayments
@@ -213,6 +235,25 @@ export function buildUpcomingItems({ rows, cycleStart, cycleEnd, today = new Dat
     });
   }
 
+  // 6. Active accounts whose current balance has fallen below their optional
+  // low-balance threshold. Compares the raw stored balance directly (not the
+  // dashboard's safe-to-spend figure); this display surfaces only here in the
+  // Upcoming panel, never on the Accounts page itself.
+  for (const account of rows.accounts) {
+    if (!isActive(account)) continue;
+    if (account.low_balance_threshold === null || account.low_balance_threshold === undefined) continue;
+    if (toNumber(account.balance) >= toNumber(account.low_balance_threshold)) continue;
+    items.push({
+      id: "low-balance-" + account.id,
+      type: "low_balance",
+      title: account.name,
+      amount: toNumber(account.balance),
+      dueDate: null,
+      urgency: "due-soon",
+      href: "/accounts"
+    });
+  }
+
   items.sort((a, b) => {
     if (URGENCY_RANK[a.urgency] !== URGENCY_RANK[b.urgency]) return URGENCY_RANK[a.urgency] - URGENCY_RANK[b.urgency];
     if (a.dueDate && b.dueDate && a.dueDate !== b.dueDate) return a.dueDate < b.dueDate ? -1 : 1;
@@ -224,7 +265,7 @@ export function buildUpcomingItems({ rows, cycleStart, cycleEnd, today = new Dat
   const overdueCount = items.filter((item) => item.urgency === "overdue").length;
   const dueSoonCount = items.filter((item) => item.urgency === "due-soon").length;
   const pendingCount = items.filter((item) => item.urgency === "pending").length;
-  const urgentByHref: Record<UpcomingHref, number> = { "/planning": 0, "/debts-cards": 0 };
+  const urgentByHref: Record<UpcomingHref, number> = { "/planning": 0, "/debts-cards": 0, "/accounts": 0 };
   for (const item of items) {
     if (item.urgency === "overdue" || item.urgency === "due-soon") urgentByHref[item.href] += 1;
   }

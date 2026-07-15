@@ -1,17 +1,33 @@
-import { Banknote, CalendarClock, PiggyBank, Repeat, WalletCards } from "lucide-react";
+import { Banknote, CalendarClock, PiggyBank, Plus, Repeat, WalletCards } from "lucide-react";
 import { AnnualExpenseForm } from "@/components/planning/annual-expense-form";
 import { BudgetForm } from "@/components/planning/budget-form";
-import { PayAnnualBillForm, PaySubscriptionForm, ReserveAnnualExpenseForm, ReserveSubscriptionForm } from "@/components/planning/payment-workflow-forms";
+import { DeletePlanningItemForm } from "@/components/planning/delete-planning-item-form";
+import { PayAnnualBillForm, PaySubscriptionForm, ReserveAnnualExpenseForm, ReserveSubscriptionForm, type PlanningAccountOption, type PlanningBoundSource, type PlanningCardOption } from "@/components/planning/payment-workflow-forms";
 import { SubscriptionForm } from "@/components/planning/subscription-form";
+import { LazyDetails } from "@/components/ui/lazy-details";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
 import type { AccountType, CategoryKind } from "@/lib/finance/types";
 import { isCashLikeType } from "@/lib/finance/types";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/server";
-import { setAnnualExpenseActive, setBudgetActive, setSubscriptionActive } from "./actions";
+import { deleteAnnualExpense, deleteBudget, deleteSubscription, setAnnualExpenseActive, setBudgetActive, setNextSubscriptionSource, setSubscriptionActive } from "./actions";
 
 type BudgetRow = { id: string; category_id: string | null; label: string; amount: number | string; cycle_start_date: string; active: boolean };
-type SubscriptionRow = { id: string; category_id: string | null; name: string; frequency: "monthly" | "yearly"; price: number | string; billing_day: number; payment_method: string | null; active: boolean };
+type SubscriptionRow = {
+  id: string;
+  category_id: string | null;
+  name: string;
+  frequency: "monthly" | "yearly";
+  price: number | string;
+  billing_day: number;
+  payment_method: string | null;
+  source_account_id: string | null;
+  source_card_id: string | null;
+  next_source_account_id: string | null;
+  next_source_card_id: string | null;
+  next_source_effective_from: string | null;
+  active: boolean;
+};
 type AnnualExpenseRow = { id: string; category_id: string | null; name: string; annual_amount: number | string; monthly_reserve: number | string | null; due_date: string | null; reserve_account_id: string | null; active: boolean };
 type CategoryRow = { id: string; name: string; kind: CategoryKind; active: boolean };
 type TransactionRow = { id: string; category_id: string | null; type: string; amount: number | string; cycle_start_date: string; related_entity_id: string | null };
@@ -61,6 +77,63 @@ function ToggleActiveForm({ id, active, action, locale }: { id: string; active: 
   );
 }
 
+// Scheduling a source change never touches the current cycle's source_*; it
+// only writes next_source_* (promoted lazily on the next app-open in the
+// effective cycle). Submitting the picker's empty option cancels a pending
+// schedule the same way the separate "cancel" button below does.
+function NextSourceForm({
+  subscriptionId,
+  accounts,
+  creditCards,
+  pendingSource,
+  locale
+}: {
+  subscriptionId: string;
+  accounts: PlanningAccountOption[];
+  creditCards: PlanningCardOption[];
+  pendingSource: PlanningBoundSource | null;
+  locale: Locale;
+}) {
+  const t = dictionaries[locale].planning;
+  const defaultValue = pendingSource ? pendingSource.kind + ":" + pendingSource.id : "";
+  const noSources = accounts.length === 0 && creditCards.length === 0;
+  return (
+    <div className="grid gap-2 rounded-2xl border border-line bg-elevated p-3">
+      <form action={setNextSubscriptionSource} className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+        <input type="hidden" name="id" value={subscriptionId} />
+        <input type="hidden" name="locale" value={locale} />
+        <label className="grid gap-2 text-xs font-black text-ink">
+          {t.nextCycleSourceLabel}
+          <select name="next_payment_source" defaultValue={defaultValue} disabled={noSources} className="rounded-2xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-primary/60 disabled:cursor-not-allowed disabled:opacity-60">
+            <option value="">{t.form.paymentSourceNone}</option>
+            {accounts.length > 0 ? (
+              <optgroup label={t.payment.accountGroup}>
+                {accounts.map((account) => <option key={account.id} value={"account:" + account.id}>{account.name}</option>)}
+              </optgroup>
+            ) : null}
+            {creditCards.length > 0 ? (
+              <optgroup label={t.payment.cardGroup}>
+                {creditCards.map((card) => <option key={card.id} value={"card:" + card.id}>{card.name}</option>)}
+              </optgroup>
+            ) : null}
+          </select>
+        </label>
+        <button type="submit" disabled={noSources} className="rounded-2xl border border-line bg-surface px-4 py-2.5 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary disabled:cursor-not-allowed disabled:opacity-60">
+          {t.nextCycleSourceLabel}
+        </button>
+      </form>
+      {pendingSource ? (
+        <form action={setNextSubscriptionSource}>
+          <input type="hidden" name="id" value={subscriptionId} />
+          <input type="hidden" name="locale" value={locale} />
+          <input type="hidden" name="next_payment_source" value="" />
+          <button type="submit" className="text-xs font-black text-danger transition hover:opacity-80">{t.nextCycleSourceClear}</button>
+        </form>
+      ) : null}
+    </div>
+  );
+}
+
 export default async function PlanningPage() {
   const supabase = await createClient();
   const {
@@ -73,7 +146,11 @@ export default async function PlanningPage() {
     user ? supabase.from("profiles").select("locale").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
     supabase.from("budgets").select("id,category_id,label,amount,cycle_start_date,active").eq("cycle_start_date", cycleStartDate).order("active", { ascending: false }).order("label"),
-    supabase.from("subscriptions").select("id,category_id,name,frequency,price,billing_day,payment_method,active").order("active", { ascending: false }).order("name"),
+    supabase
+      .from("subscriptions")
+      .select("id,category_id,name,frequency,price,billing_day,payment_method,source_account_id,source_card_id,next_source_account_id,next_source_card_id,next_source_effective_from,active")
+      .order("active", { ascending: false })
+      .order("name"),
     supabase.from("annual_expenses").select("id,category_id,name,annual_amount,monthly_reserve,due_date,reserve_account_id,active").order("active", { ascending: false }).order("name"),
     supabase.from("categories").select("id,name,kind,active").order("name"),
     supabase.from("transactions").select("id,category_id,type,amount,cycle_start_date,related_entity_id").eq("cycle_start_date", cycleStartDate),
@@ -92,6 +169,7 @@ export default async function PlanningPage() {
   const transactions = (transactionsResult.data ?? []) as TransactionRow[];
   const categoryNameById = new Map(categories.map((category) => [category.id, category.name]));
   const accountNameById = new Map(accounts.map((account) => [account.id, account.name]));
+  const cardNameById = new Map(((cardsResult.data ?? []) as CardRow[]).map((card) => [card.id, card.name]));
   const defaultAccountId = (appSettingsResult.data as { default_account_id: string | null } | null)?.default_account_id ?? null;
   const loadError = profileResult.error ?? accountsResult.error ?? budgetsResult.error ?? subscriptionsResult.error ?? annualResult.error ?? categoriesResult.error ?? transactionsResult.error ?? cardsResult.error;
   const expenseTransactions = transactions.filter((transaction) => transaction.type === "expense");
@@ -159,14 +237,17 @@ export default async function PlanningPage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-        <div>
-          <div className="mb-3 flex items-center gap-2">
+        <details className="rounded-panel border border-line bg-surface p-4 shadow-card">
+          <summary className="flex cursor-pointer items-center gap-2 text-xl font-black text-ink list-none [&::-webkit-details-marker]:hidden">
             <Banknote className="text-primary" size={20} aria-hidden="true" />
-            <h2 className="text-xl font-black text-ink">{t.addMonthlyBudget}</h2>
+            <span>{t.addMonthlyBudget}</span>
+            <Plus size={18} className="ml-auto text-primary" aria-hidden="true" />
+          </summary>
+          <div className="mt-4">
+            <BudgetForm cycleStartDate={cycleStartDate} locale={locale} />
+            <p className="mt-3 rounded-2xl border border-line bg-surface/80 p-4 text-sm font-bold text-muted">{t.budgetCycleHelpPrefix}: {cycle.label}. {t.budgetCycleHelpSuffix}</p>
           </div>
-          <BudgetForm cycleStartDate={cycleStartDate} locale={locale} />
-          <p className="mt-3 rounded-2xl border border-line bg-surface/80 p-4 text-sm font-bold text-muted">{t.budgetCycleHelpPrefix}: {cycle.label}. {t.budgetCycleHelpSuffix}</p>
-        </div>
+        </details>
 
         <div className="grid gap-3">
           <div className="flex items-center justify-between gap-4">
@@ -194,25 +275,30 @@ export default async function PlanningPage() {
                     </div>
                   </div>
                 </div>
-                <ToggleActiveForm id={budget.id} active={budget.active} action={setBudgetActive} locale={locale} />
+                <div className="flex flex-wrap items-center gap-2">
+                  <ToggleActiveForm id={budget.id} active={budget.active} action={setBudgetActive} locale={locale} />
+                  <DeletePlanningItemForm id={budget.id} action={deleteBudget} confirmText={t.deleteItemConfirm} label={t.deleteItem} locale={locale} />
+                </div>
               </div>
-              <details className="mt-4">
-                <summary className="cursor-pointer text-sm font-black text-primary">{t.editBudget}</summary>
+              <LazyDetails className="mt-4" summaryClassName="cursor-pointer text-sm font-black text-primary" summary={t.editBudget}>
                 <div className="mt-3"><BudgetForm budget={{ ...budget, category_name: budget.categoryName }} cycleStartDate={cycleStartDate} compact locale={locale} /></div>
-              </details>
+              </LazyDetails>
             </article>
           ))}
         </div>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-        <div>
-          <div className="mb-3 flex items-center gap-2">
+        <details className="rounded-panel border border-line bg-surface p-4 shadow-card">
+          <summary className="flex cursor-pointer items-center gap-2 text-xl font-black text-ink list-none [&::-webkit-details-marker]:hidden">
             <Repeat className="text-primary" size={20} aria-hidden="true" />
-            <h2 className="text-xl font-black text-ink">{t.addSubscription}</h2>
+            <span>{t.addSubscription}</span>
+            <Plus size={18} className="ml-auto text-primary" aria-hidden="true" />
+          </summary>
+          <div className="mt-4">
+            <SubscriptionForm accounts={cashLikeAccounts} creditCards={activeCards} locale={locale} />
           </div>
-          <SubscriptionForm locale={locale} />
-        </div>
+        </details>
 
         <div className="grid gap-3">
           <h2 className="text-xl font-black text-ink">{t.subscriptions}</h2>
@@ -223,6 +309,22 @@ export default async function PlanningPage() {
             const isReserved = reservedThisCycle(subscription.id);
             const isPaid = paidThisCycle(subscription.id);
             const paidOrReserved = isReserved || isPaid;
+            const boundSource = subscription.source_card_id
+              ? { kind: "card" as const, id: subscription.source_card_id, name: cardNameById.get(subscription.source_card_id) ?? common.other }
+              : subscription.source_account_id
+                ? { kind: "account" as const, id: subscription.source_account_id, name: accountNameById.get(subscription.source_account_id) ?? common.other }
+                : null;
+            const nextSource = subscription.next_source_card_id
+              ? { kind: "card" as const, id: subscription.next_source_card_id, name: cardNameById.get(subscription.next_source_card_id) ?? common.other }
+              : subscription.next_source_account_id
+                ? { kind: "account" as const, id: subscription.next_source_account_id, name: accountNameById.get(subscription.next_source_account_id) ?? common.other }
+                : null;
+            // Once handled this cycle (e.g. auto-charged), hide the matching manual
+            // action so it doesn't imply the item still needs attention. The green
+            // "paid/reserved this cycle" line above already communicates that.
+            const showReserveForm = subscription.frequency === "yearly" && !isReserved;
+            const showPayForm = !isPaid;
+            const showPayOrReserveBlock = subscription.active && (showReserveForm || showPayForm);
             return (
               <article key={subscription.id} className="rounded-panel border border-line bg-surface p-4 shadow-card">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -236,20 +338,26 @@ export default async function PlanningPage() {
                     <p className="mt-3 text-2xl font-black text-ink">{formatMoney(subscription.price)}</p>
                     <p className="mt-1 text-sm font-semibold text-muted">{subscription.frequency === "monthly" ? t.monthlyFixedObligation : t.yearlySinkingFundReserve + " " + formatMoney(reserveMonthly) + "/" + t.monthly} · {t.billingDay} {subscription.billing_day}</p>
                     {paidOrReserved ? <p className="mt-2 text-sm font-black text-income">{isPaid ? t.paidThisCycle : t.reservedThisCycle}</p> : null}
+                    {nextSource ? <p className="mt-2 text-xs font-bold text-muted">{t.nextCycleSourceHint} {nextSource.name} ({t.nextCycleEffective} {subscription.next_source_effective_from})</p> : null}
                   </div>
-                  <ToggleActiveForm id={subscription.id} active={subscription.active} action={setSubscriptionActive} locale={locale} />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ToggleActiveForm id={subscription.id} active={subscription.active} action={setSubscriptionActive} locale={locale} />
+                    <DeletePlanningItemForm id={subscription.id} action={deleteSubscription} confirmText={t.deleteItemConfirm} label={t.deleteItem} locale={locale} />
+                  </div>
                 </div>
-                {subscription.active ? (
+                {showPayOrReserveBlock ? (
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                    {subscription.frequency === "yearly" ? <ReserveSubscriptionForm subscriptionId={subscription.id} amount={reserveMonthly} locale={locale} /> : null}
-                    <PaySubscriptionForm subscriptionId={subscription.id} categoryId={subscription.category_id} amount={toNumber(subscription.price)} accounts={cashLikeAccounts} creditCards={activeCards} defaultAccountId={defaultAccountId} frequency={subscription.frequency} locale={locale} />
+                    {showReserveForm ? <ReserveSubscriptionForm subscriptionId={subscription.id} amount={reserveMonthly} locale={locale} /> : null}
+                    {showPayForm ? <PaySubscriptionForm subscriptionId={subscription.id} categoryId={subscription.category_id} amount={toNumber(subscription.price)} accounts={cashLikeAccounts} creditCards={activeCards} defaultAccountId={defaultAccountId} boundSource={boundSource} frequency={subscription.frequency} locale={locale} /> : null}
                   </div>
                 ) : null}
-                {subscription.active && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-warning/10 p-3 text-sm font-bold text-warning">{t.addCashLikeAccountSubscription}</p> : null}
-                <details className="mt-4">
-                  <summary className="cursor-pointer text-sm font-black text-primary">{t.editSubscription}</summary>
-                  <div className="mt-3"><SubscriptionForm subscription={{ ...subscription, category_name: categoryName }} compact locale={locale} /></div>
-                </details>
+                {subscription.active && showPayForm && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-warning/10 p-3 text-sm font-bold text-warning">{t.addCashLikeAccountSubscription}</p> : null}
+                <LazyDetails className="mt-4" summaryClassName="cursor-pointer text-sm font-black text-primary" summary={t.editSubscription}>
+                  <div className="mt-3 grid gap-3">
+                    <SubscriptionForm subscription={{ ...subscription, category_name: categoryName }} accounts={cashLikeAccounts} creditCards={activeCards} compact locale={locale} />
+                    <NextSourceForm subscriptionId={subscription.id} accounts={cashLikeAccounts} creditCards={activeCards} pendingSource={nextSource} locale={locale} />
+                  </div>
+                </LazyDetails>
               </article>
             );
           })}
@@ -257,13 +365,16 @@ export default async function PlanningPage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-        <div>
-          <div className="mb-3 flex items-center gap-2">
+        <details className="rounded-panel border border-line bg-surface p-4 shadow-card">
+          <summary className="flex cursor-pointer items-center gap-2 text-xl font-black text-ink list-none [&::-webkit-details-marker]:hidden">
             <PiggyBank className="text-primary" size={20} aria-hidden="true" />
-            <h2 className="text-xl font-black text-ink">{t.addSinkingFund}</h2>
+            <span>{t.addSinkingFund}</span>
+            <Plus size={18} className="ml-auto text-primary" aria-hidden="true" />
+          </summary>
+          <div className="mt-4">
+            <AnnualExpenseForm accounts={cashLikeAccounts} locale={locale} />
           </div>
-          <AnnualExpenseForm accounts={cashLikeAccounts} locale={locale} />
-        </div>
+        </details>
 
         <div className="grid gap-3">
           <h2 className="text-xl font-black text-ink">{t.annualExpenses}</h2>
@@ -293,7 +404,10 @@ export default async function PlanningPage() {
                       </div>
                     </div>
                   </div>
-                  <ToggleActiveForm id={expense.id} active={expense.active} action={setAnnualExpenseActive} locale={locale} />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ToggleActiveForm id={expense.id} active={expense.active} action={setAnnualExpenseActive} locale={locale} />
+                    <DeletePlanningItemForm id={expense.id} action={deleteAnnualExpense} confirmText={t.deleteItemConfirm} label={t.deleteItem} locale={locale} />
+                  </div>
                 </div>
                 {expense.active ? (
                   <div className="mt-4 grid gap-3 lg:grid-cols-2">
@@ -302,10 +416,9 @@ export default async function PlanningPage() {
                   </div>
                 ) : null}
                 {expense.active && cashLikeAccounts.length === 0 ? <p className="mt-3 rounded-2xl bg-warning/10 p-3 text-sm font-bold text-warning">{t.addCashLikeAccountAnnual}</p> : null}
-                <details className="mt-4">
-                  <summary className="cursor-pointer text-sm font-black text-primary">{t.editSinkingFund}</summary>
+                <LazyDetails className="mt-4" summaryClassName="cursor-pointer text-sm font-black text-primary" summary={t.editSinkingFund}>
                   <div className="mt-3"><AnnualExpenseForm annualExpense={{ ...expense, category_name: categoryName }} accounts={cashLikeAccounts} compact locale={locale} /></div>
-                </details>
+                </LazyDetails>
               </article>
             );
           })}

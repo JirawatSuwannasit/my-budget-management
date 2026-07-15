@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { dictionaries, isLocale } from "@/lib/i18n/dictionaries";
 import type { AccountType } from "@/lib/finance/types";
 
-type AccountRow = { id: string; name: string; type: AccountType; balance: number | string; active: boolean; is_cash_like: boolean };
+type AccountRow = { id: string; name: string; type: AccountType; balance: number | string; active: boolean; is_cash_like: boolean; low_balance_threshold: number | string | null };
 
 function formatMoney(value: number | string) {
   return new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(Number(value));
@@ -21,7 +21,7 @@ export default async function AccountsPage() {
   const t = dictionaries[locale].accounts;
   const common = dictionaries[locale].common;
 
-  const { data, error } = await supabase.from("accounts").select("id,name,type,balance,active,is_cash_like").order("active", { ascending: false }).order("name");
+  const { data, error } = await supabase.from("accounts").select("id,name,type,balance,active,is_cash_like,low_balance_threshold").order("active", { ascending: false }).order("name");
   const accounts = (data ?? []) as AccountRow[];
   const cashLikeTotal = accounts.filter((account) => account.active && account.is_cash_like).reduce((total, account) => total + Number(account.balance), 0);
   const savingsTotal = accounts.filter((account) => account.active && account.type === "savings").reduce((total, account) => total + Number(account.balance), 0);

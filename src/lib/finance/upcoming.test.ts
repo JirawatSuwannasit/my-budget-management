@@ -13,7 +13,7 @@ function rows(overrides: Partial<DashboardRows> = {}): DashboardRows {
     debts: [],
     debtPayments: [],
     creditCards: [],
-    creditCardStatements: [],
+    cardPayments: [],
     cardTransactions: [],
     ...overrides
   };
@@ -24,6 +24,18 @@ const cycleStart = new Date(2026, 6, 25, 12);
 const cycleEnd = new Date(2026, 7, 24, 12);
 const today = new Date(2026, 7, 5, 9);
 
+// All fixture cards below cut on the 25th; since today (Aug 5) is before the
+// 25th, the last cut is always Jul 25 and a transaction dated before it is
+// billed. That makes the derived due date exactly "2026-08-<paymentDueDay>"
+// (the due day rolls into the month after the cut), so paymentDueDay alone
+// controls the resulting due date for these tests.
+function billedCard(id: string, name: string, paymentDueDay: number, amount = "12000") {
+  return {
+    card: { id, name, billing_cut_day: 25, payment_due_day: paymentDueDay, active: true },
+    cardTransactions: [{ id: id + "-txn", card_id: id, amount, transaction_date: "2026-07-20" }]
+  };
+}
+
 describe("buildUpcomingItems", () => {
   it("reports all caught up when there is nothing to do", () => {
     const summary = buildUpcomingItems({ rows: rows(), cycleStart, cycleEnd, today });
@@ -33,16 +45,16 @@ describe("buildUpcomingItems", () => {
     expect(summary.urgentCount).toBe(0);
   });
 
-  it("classifies a card statement due date as overdue, due-soon, or pending", () => {
-    const baseStatement = { card_id: "card", statement_amount_due: "12000", paid_amount: "0", remaining_payable: "12000", status: "unpaid" as const };
+  it("classifies a card's billed due date as overdue, due-soon, or pending", () => {
+    // All three cards cut on the 25th (last cut = Jul 25, since today is Aug 5),
+    // so the derived due date is exactly "2026-08-<paymentDueDay>" for each.
+    const overdue = billedCard("overdue-card", "Overdue card", 1);
+    const soon = billedCard("soon-card", "Soon card", 10);
+    const later = billedCard("later-card", "Later card", 20);
     const summary = buildUpcomingItems({
       rows: rows({
-        creditCards: [{ id: "card", name: "Main card", active: true }],
-        creditCardStatements: [
-          { id: "overdue", ...baseStatement, due_date: "2026-08-01" },
-          { id: "soon", ...baseStatement, due_date: "2026-08-10" },
-          { id: "later", ...baseStatement, due_date: "2026-08-20" }
-        ]
+        creditCards: [overdue.card, soon.card, later.card],
+        cardTransactions: [...overdue.cardTransactions, ...soon.cardTransactions, ...later.cardTransactions]
       }),
       cycleStart,
       cycleEnd,
@@ -50,9 +62,9 @@ describe("buildUpcomingItems", () => {
     });
 
     const byId = new Map(summary.items.map((item) => [item.id, item.urgency]));
-    expect(byId.get("statement-overdue")).toBe("overdue");
-    expect(byId.get("statement-soon")).toBe("due-soon");
-    expect(byId.get("statement-later")).toBe("pending");
+    expect(byId.get("card-overdue-card")).toBe("overdue");
+    expect(byId.get("card-soon-card")).toBe("due-soon");
+    expect(byId.get("card-later-card")).toBe("pending");
     expect(summary.overdueCount).toBe(1);
     expect(summary.dueSoonCount).toBe(1);
     expect(summary.pendingCount).toBe(1);
@@ -60,12 +72,10 @@ describe("buildUpcomingItems", () => {
   });
 
   it("honors the due-soon window boundary", () => {
-    const boundaryDueDate = `2026-08-${String(5 + DUE_SOON_DAYS).padStart(2, "0")}`; // exactly DUE_SOON_DAYS ahead
+    const boundaryDueDay = 5 + DUE_SOON_DAYS; // exactly DUE_SOON_DAYS ahead of today (Aug 5)
+    const edge = billedCard("card", "Card", boundaryDueDay, "100");
     const summary = buildUpcomingItems({
-      rows: rows({
-        creditCards: [{ id: "card", name: "Card", active: true }],
-        creditCardStatements: [{ id: "edge", card_id: "card", statement_amount_due: "100", paid_amount: "0", remaining_payable: "100", status: "partial", due_date: boundaryDueDate }]
-      }),
+      rows: rows({ creditCards: [edge.card], cardTransactions: edge.cardTransactions }),
       cycleStart,
       cycleEnd,
       today
@@ -74,11 +84,13 @@ describe("buildUpcomingItems", () => {
     expect(summary.items[0].urgency).toBe("due-soon");
   });
 
-  it("excludes fully paid statements", () => {
+  it("excludes cards whose billed balance is fully paid", () => {
+    const card = billedCard("card", "Card", 1, "100");
     const summary = buildUpcomingItems({
       rows: rows({
-        creditCards: [{ id: "card", name: "Card", active: true }],
-        creditCardStatements: [{ id: "paid", card_id: "card", statement_amount_due: "100", paid_amount: "100", remaining_payable: "0", status: "paid", due_date: "2026-08-01" }]
+        creditCards: [card.card],
+        cardTransactions: card.cardTransactions,
+        cardPayments: [{ id: "pay", card_id: "card", amount: "100" }]
       }),
       cycleStart,
       cycleEnd,
@@ -175,14 +187,80 @@ describe("buildUpcomingItems", () => {
     expect(paid.allCaughtUp).toBe(true);
   });
 
-  it("sorts overdue before due-soon before pending", () => {
+  it("emits no section-5 debt reminder for a card-linked installment (its reminder comes from the card statement item instead)", () => {
     const summary = buildUpcomingItems({
       rows: rows({
-        creditCards: [{ id: "card", name: "Card", active: true }],
-        creditCardStatements: [
-          { id: "soon", card_id: "card", statement_amount_due: "100", paid_amount: "0", remaining_payable: "100", status: "unpaid", due_date: "2026-08-09" },
-          { id: "overdue", card_id: "card", statement_amount_due: "100", paid_amount: "0", remaining_payable: "100", status: "unpaid", due_date: "2026-08-01" }
-        ],
+        debts: [{ id: "installment", name: "Phone installment", type: "installment", card_id: "card-1", remaining_balance: "396", monthly_payment: "396", active: true }]
+      }),
+      cycleStart,
+      cycleEnd,
+      today
+    });
+
+    expect(summary.items.find((item) => item.id === "debt-installment")).toBeUndefined();
+    expect(summary.allCaughtUp).toBe(true);
+  });
+
+  it("surfaces a low-balance reminder when an active account's balance falls below its threshold", () => {
+    const summary = buildUpcomingItems({
+      rows: rows({
+        accounts: [{ id: "acct-1", name: "Main bank", type: "main_bank", balance: 32, low_balance_threshold: 50, active: true }]
+      }),
+      cycleStart,
+      cycleEnd,
+      today
+    });
+
+    expect(summary.items).toEqual([{ id: "low-balance-acct-1", type: "low_balance", title: "Main bank", amount: 32, dueDate: null, urgency: "due-soon", href: "/accounts" }]);
+    expect(summary.urgentByHref["/accounts"]).toBe(1);
+  });
+
+  it("does not surface a low-balance reminder when the balance is at or above the threshold", () => {
+    const summary = buildUpcomingItems({
+      rows: rows({
+        accounts: [{ id: "acct-1", name: "Main bank", type: "main_bank", balance: 80, low_balance_threshold: 50, active: true }]
+      }),
+      cycleStart,
+      cycleEnd,
+      today
+    });
+
+    expect(summary.allCaughtUp).toBe(true);
+  });
+
+  it("does not surface a low-balance reminder when the account has no threshold set", () => {
+    const summary = buildUpcomingItems({
+      rows: rows({
+        accounts: [{ id: "acct-1", name: "Main bank", type: "main_bank", balance: 32, low_balance_threshold: null, active: true }]
+      }),
+      cycleStart,
+      cycleEnd,
+      today
+    });
+
+    expect(summary.allCaughtUp).toBe(true);
+  });
+
+  it("does not surface a low-balance reminder for an inactive account below its threshold", () => {
+    const summary = buildUpcomingItems({
+      rows: rows({
+        accounts: [{ id: "acct-1", name: "Main bank", type: "main_bank", balance: 32, low_balance_threshold: 50, active: false }]
+      }),
+      cycleStart,
+      cycleEnd,
+      today
+    });
+
+    expect(summary.allCaughtUp).toBe(true);
+  });
+
+  it("sorts overdue before due-soon before pending", () => {
+    const soon = billedCard("soon-card", "Soon card", 9, "100");
+    const overdue = billedCard("overdue-card", "Overdue card", 1, "100");
+    const summary = buildUpcomingItems({
+      rows: rows({
+        creditCards: [soon.card, overdue.card],
+        cardTransactions: [...soon.cardTransactions, ...overdue.cardTransactions],
         debts: [{ id: "d1", name: "Debt", remaining_balance: "1000", monthly_payment: "500", active: true }]
       }),
       cycleStart,

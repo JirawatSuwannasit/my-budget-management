@@ -2159,3 +2159,31 @@ Changes (migration `008` required):
 - Debts page shows installments in "debt progress" with the linked card name and term (e.g. "12-month installment"); reuses existing progress/remaining logic.
 - i18n th+en for mode labels, installment fields, term display, and validation messages.
 - Constraints: RLS only; statement-payment, debt-payment, and `dashboard.ts` math untouched; all UI text via i18n.
+
+## 98. Card-Centric Credit Card Model (removes the manual statement rail)
+
+The manual "credit card statement" entry/edit workflow described in earlier phases (§7, §36, "Add statement", "Pay credit card statement", `credit_card_statements`) has been replaced. Card obligations are now **derived at read time** from `card_transactions` minus `card_payments` — nothing is manually entered or stored as a statement balance.
+
+### The model
+
+Per card, using its `billing_cut_day`:
+- `lastCut` = the most recent billing cut on/before today (`getLastBillingCutDate` in `src/lib/finance/cycle.ts`; clamps the cut day to short months, e.g. 31 in February).
+- A `card_transactions` row is **billed** if `transaction_date <= lastCut`, else it is **current/floating** (informational only, this cycle's spend so far).
+- `billedOutstanding = max(0, billedSpend - totalPaid)` — payments (`card_payments`) pay down the billed balance first.
+- Safe-to-spend subtracts `sum(billedOutstanding)` across active cards (`remainingCreditCardPayable`); current-cycle floating spend never reduces safe-to-spend (`currentCardCycleSpending` stays informational, same as before).
+
+`computeCardObligation` (`src/lib/finance/dashboard-data.ts`) is the single, pure, unit-tested implementation of this math — reused by the dashboard snapshot, the debts-cards page, and the Upcoming (ครบกำหนด) page, so all three always agree.
+
+### What changed
+
+- **Migration `010_drop_credit_card_statements.sql`** drops `credit_card_statements` and the now-orphaned `statement_id` columns on `card_payments`/`card_transactions`. Installments (§97) are unaffected — they remain debt rows and never create `card_transactions`.
+- **Paying a card** (`credit_card_payment`) now targets a card directly (`credit_card_id`), not a statement. Editing/deleting a card payment still reverses cleanly (refunds the cash account, deletes the `card_payments` row).
+- **Debts & cards page**: the "Add statement" form is gone. Each card shows **Amount due (billed)** and **This cycle's spend (floating)**, plus the installments linked to that card (moved out of the generic debt list, which now excludes `type=installment`). "Pay credit card" replaces "Pay credit card statement" and posts directly against a card.
+- **Upcoming (ครบกำหนด)**: a card's billed-outstanding balance surfaces as before, with its due date now derived from `payment_due_day` relative to the last cut instead of a stored statement due date.
+- Reset-all-data and the data export both drop `credit_card_statements` from their table lists (export gained `card_payments`, which had been missing).
+
+### Non-goals (unchanged)
+
+Installment safe-to-spend math is untouched (still flows through `plannedDebtPayments`, never added to card outstanding). No stored "outstanding" column — everything above is derived. The user's 25th-cycle logic is untouched; `billing_cycle_start` on `card_transactions` is still written but no longer read for this derivation (the model uses `transaction_date` vs. the card's own billing cut, not the user's budget cycle).
+
+**Note:** sections describing the old statement workflow (e.g. §7, §36, "Add statement" steps) are left as historical phase documentation and no longer reflect current behavior — this section is the current source of truth for the credit-card model.

@@ -22,6 +22,7 @@ export type Account = {
   name: string;
   type: AccountType;
   balance: number;
+  low_balance_threshold: number | null;
 };
 
 export type Obligation = {
@@ -39,12 +40,14 @@ export type ReservedBudget = {
   usedAmount: number;
 };
 
-export type CreditCardStatement = {
+// Card-centric obligation, derived at read time from card_transactions minus
+// card_payments (see computeCardObligation in dashboard-data.ts) rather than a
+// stored statement row.
+export type CreditCardObligation = {
   id: string;
   cardName: string;
+  billedOutstanding: number;
   currentCycleSpending: number;
-  statementAmountDue: number;
-  paidAmount: number;
 };
 
 export type PlannedDebtPayment = {
@@ -65,7 +68,7 @@ export type DashboardInput = {
   accounts: Account[];
   obligations: Obligation[];
   reservedBudgets: ReservedBudget[];
-  creditCardStatements: CreditCardStatement[];
+  creditCards: CreditCardObligation[];
   plannedDebtPayments: PlannedDebtPayment[];
   sinkingFundReserves: SinkingFundReserve[];
   cycleIncome: number;

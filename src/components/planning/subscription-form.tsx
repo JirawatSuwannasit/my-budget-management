@@ -12,8 +12,13 @@ export type SubscriptionFormValue = {
   price?: number | string;
   billing_day?: number | string;
   payment_method?: string | null;
+  source_account_id?: string | null;
+  source_card_id?: string | null;
   active?: boolean;
 };
+
+export type SubscriptionAccountOption = { id: string; name: string; type: string; active: boolean };
+export type SubscriptionCardOption = { id: string; name: string };
 
 const initialState: PlanningActionState = { status: "idle", message: "" };
 const subscriptionCategories = {
@@ -25,11 +30,28 @@ const subscriptionExamples = {
   en: ["ChatGPT", "Claude", "Premier League football streaming app", "Netflix", "Notion"]
 };
 
-export function SubscriptionForm({ subscription, compact = false, locale }: { subscription?: SubscriptionFormValue; compact?: boolean; locale: Locale }) {
+export function SubscriptionForm({
+  subscription,
+  accounts,
+  creditCards,
+  compact = false,
+  locale
+}: {
+  subscription?: SubscriptionFormValue;
+  accounts: SubscriptionAccountOption[];
+  creditCards: SubscriptionCardOption[];
+  compact?: boolean;
+  locale: Locale;
+}) {
   const [state, formAction, isPending] = useActionState(saveSubscription, initialState);
   const idPrefix = subscription?.id ?? "new";
   const t = dictionaries[locale].planning;
   const common = dictionaries[locale].common;
+  const defaultSource = subscription?.source_card_id
+    ? "card:" + subscription.source_card_id
+    : subscription?.source_account_id
+      ? "account:" + subscription.source_account_id
+      : "";
 
   return (
     <form action={formAction} className="grid gap-4 rounded-panel border border-line bg-surface p-4 shadow-card">
@@ -73,9 +95,21 @@ export function SubscriptionForm({ subscription, compact = false, locale }: { su
         </label>
       </div>
 
-      <label className="grid gap-2 text-sm font-black text-ink">
-        {t.form.paymentMethod}
-        <input name="payment_method" defaultValue={subscription?.payment_method ?? ""} placeholder={t.form.paymentMethodPlaceholder} className="rounded-2xl border border-line bg-elevated px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-surface" />
+      <label className="grid gap-2 text-sm font-black text-ink" htmlFor={"subscription-payment-source-" + idPrefix}>
+        {t.form.paymentSourceLabel}
+        <select id={"subscription-payment-source-" + idPrefix} name="payment_source" defaultValue={defaultSource} className="rounded-2xl border border-line bg-elevated px-4 py-3 text-sm font-semibold outline-none transition focus:border-primary/60 focus:bg-surface">
+          <option value="">{t.form.paymentSourceNone}</option>
+          {accounts.length > 0 ? (
+            <optgroup label={t.payment.accountGroup}>
+              {accounts.map((account) => <option key={account.id} value={"account:" + account.id}>{account.name}</option>)}
+            </optgroup>
+          ) : null}
+          {creditCards.length > 0 ? (
+            <optgroup label={t.payment.cardGroup}>
+              {creditCards.map((card) => <option key={card.id} value={"card:" + card.id}>{card.name}</option>)}
+            </optgroup>
+          ) : null}
+        </select>
       </label>
 
       <label className="flex items-center gap-3 rounded-2xl bg-elevated px-4 py-3 text-sm font-bold text-muted">

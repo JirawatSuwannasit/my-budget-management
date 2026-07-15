@@ -1,9 +1,11 @@
 ﻿"use client";
 
 import type { ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BellRing, CreditCard, Landmark, LayoutDashboard, LineChart, ListChecks, Settings, Tag, WalletCards } from "lucide-react";
+import { BarChart3, BellRing, CreditCard, Landmark, LayoutDashboard, LineChart, ListChecks, Settings, Tag, WalletCards, X } from "lucide-react";
+import { processDueInstallmentCharges, processDueSubscriptionCharges } from "@/app/(private)/planning/actions";
 import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/browser";
 
@@ -26,6 +28,25 @@ export function AppShell({ children, userEmail, locale, badges = {} }: Readonly<
   const pathname = usePathname();
   const dictionary = dictionaries[locale];
   const navItems = getNavItems(locale);
+  const hasTriggeredCharges = useRef(false);
+  const [autoChargedCount, setAutoChargedCount] = useState(0);
+
+  // Lazy materialization: no scheduler exists in this stack, so due subscription
+  // and card-linked installment charges are posted once per app-shell mount
+  // instead. Fire-and-forget; each server action revalidates the finance views
+  // itself on success. The two engines are independent (different tables), so
+  // they run in parallel.
+  useEffect(() => {
+    if (hasTriggeredCharges.current) return;
+    hasTriggeredCharges.current = true;
+    Promise.all([
+      processDueSubscriptionCharges().catch(() => ({ charged: 0, skipped: 0 })),
+      processDueInstallmentCharges().catch(() => ({ charged: 0, skipped: 0 }))
+    ]).then(([subscriptionResult, installmentResult]) => {
+      const total = subscriptionResult.charged + installmentResult.charged;
+      if (total > 0) setAutoChargedCount(total);
+    });
+  }, []);
 
   async function signOut() {
     const supabase = createClient();
@@ -47,6 +68,17 @@ export function AppShell({ children, userEmail, locale, badges = {} }: Readonly<
           <button onClick={signOut} className="rounded-full border border-line bg-surface px-4 py-2 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary">{dictionary.nav.signOut}</button>
         </div>
       </header>
+
+      {autoChargedCount > 0 ? (
+        <div className="mx-auto max-w-7xl px-4 pt-3 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-income/20 bg-income/10 px-4 py-2.5 text-xs font-bold text-income">
+            <span>{dictionary.nav.autoChargedNote.replace("{count}", String(autoChargedCount))}</span>
+            <button onClick={() => setAutoChargedCount(0)} aria-label={dictionary.nav.dismiss} className="text-income/70 transition hover:text-income">
+              <X size={14} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mx-auto grid max-w-7xl gap-6 px-4 py-5 sm:px-6 lg:grid-cols-[240px_1fr] lg:px-8">
         <aside className="hidden lg:block">

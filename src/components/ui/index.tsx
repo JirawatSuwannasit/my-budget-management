@@ -12,7 +12,8 @@ import clsx from "clsx";
 export const fieldClass =
   "rounded-2xl border border-line bg-elevated px-4 py-3 text-sm font-semibold text-ink outline-none transition placeholder:text-faint focus:border-primary/60 focus:bg-surface";
 
-type Tone = "neutral" | "income" | "expense" | "debt" | "warning" | "investment" | "primary";
+export type Tone = "neutral" | "income" | "expense" | "debt" | "warning" | "investment" | "primary";
+export type StatBlockTone = Tone;
 
 const TONE_SURFACE: Record<Tone, string> = {
   neutral: "border-line bg-surface text-ink",

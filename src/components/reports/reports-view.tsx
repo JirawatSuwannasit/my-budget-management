@@ -1,6 +1,10 @@
 import Link from "next/link";
-import { CalendarRange, LineChart, PieChart, ShieldCheck, TrendingDown } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, CalendarRange, Landmark, LineChart, Minus, Percent, PieChart, Scale, ShieldCheck, Tag, TrendingDown, TrendingUp } from "lucide-react";
 import type { ReportsData } from "@/lib/finance/reports";
+import { deriveReportInsights, savingsRateFor } from "@/lib/finance/reports-insights";
+import { Card, SectionHeader, StatBlock, type StatBlockTone } from "@/components/ui";
+import { CATEGORY_PALETTE } from "@/components/reports/chart-colors";
+import { CategoryDonut, DebtTrajectoryChart, SavingsRateChart, TrendChart } from "@/components/reports/reports-charts";
 import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 
 type ReportsViewProps = {
@@ -18,19 +22,18 @@ function formatPercent(value: number) {
   return new Intl.NumberFormat("en-US", { style: "percent", maximumFractionDigits: 0 }).format(value);
 }
 
+// spendTrend.percent already arrives in percentage-point units (not a 0..1 fraction).
+function formatPercentPoints(value: number) {
+  return Math.round(value) + "%";
+}
+
 function formatCycleChip(date: Date) {
   return new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric" }).format(date);
 }
 
-const BAR_COLORS = ["bg-primary", "bg-teal-500", "bg-blue-500", "bg-amber-500", "bg-emerald-500", "bg-rose-500", "bg-indigo-500", "bg-slate-500", "bg-fuchsia-500"];
-
-function SectionHeader({ icon: Icon, title }: { icon: typeof LineChart; title: string }) {
-  return (
-    <div className="mb-3 flex items-center gap-2">
-      <Icon className="text-primary" size={20} aria-hidden="true" />
-      <h2 className="text-xl font-black text-ink">{title}</h2>
-    </div>
-  );
+// Short axis tick, e.g. "Jul '26" — compact enough for several ticks on a 390px screen.
+function shortAxisLabel(date: Date) {
+  return new Intl.DateTimeFormat("en-GB", { month: "short" }).format(date) + " '" + String(date.getFullYear()).slice(-2);
 }
 
 export function ReportsView({ locale, data, hasRows, loadError }: ReportsViewProps) {
@@ -69,156 +72,218 @@ export function ReportsView({ locale, data, hasRows, loadError }: ReportsViewPro
 
 function ReportsBody({ locale, data }: { locale: Locale; data: ReportsData }) {
   const t = dictionaries[locale].reports;
-  const trendCycles = [...data.cycles].reverse();
-  const trendMax = Math.max(1, ...trendCycles.map((cycle) => Math.max(cycle.income, cycle.expenses)));
-  const debtMax = Math.max(1, ...data.debtTrajectory.map((point) => point.remaining));
+  const insights = deriveReportInsights(data);
+
+  // cycles arrive most-recent-first; charts read left-to-right chronologically.
+  const chronological = [...data.cycles].reverse();
+  const hasTrend = chronological.some((cycle) => cycle.income > 0 || cycle.expenses > 0);
+
+  const trendData = chronological.map((cycle) => ({
+    cycleStartDate: cycle.cycleStartDate,
+    axisLabel: shortAxisLabel(cycle.start),
+    fullLabel: formatCycleChip(cycle.start),
+    income: cycle.income,
+    expenses: cycle.expenses,
+    net: cycle.net
+  }));
+
+  const savingsData = chronological.map((cycle) => ({
+    cycleStartDate: cycle.cycleStartDate,
+    axisLabel: shortAxisLabel(cycle.start),
+    fullLabel: formatCycleChip(cycle.start),
+    ratePercent: Math.round(savingsRateFor(cycle.income, cycle.net) * 1000) / 10
+  }));
+
   const hasDebt = data.debtTrajectory.some((point) => point.remaining > 0);
-  const hasTrend = trendCycles.some((cycle) => cycle.income > 0 || cycle.expenses > 0);
+  const latestRemaining = data.debtTrajectory[data.debtTrajectory.length - 1]?.remaining ?? 0;
+  const debtChartData = data.debtTrajectory.map((point) => ({
+    cycleStartDate: point.cycleStartDate,
+    axisLabel: shortAxisLabel(point.start),
+    fullLabel: formatCycleChip(point.start),
+    remaining: point.remaining
+  }));
+
+  const netTone: StatBlockTone = insights.avgMonthlyNet >= 0 ? "income" : "expense";
+  const spendTrend = insights.spendTrend;
+  const SpendTrendIcon = spendTrend?.direction === "up" ? TrendingUp : spendTrend?.direction === "down" ? TrendingDown : Minus;
+  const spendTrendTone: StatBlockTone = spendTrend?.direction === "up" ? "warning" : spendTrend?.direction === "down" ? "income" : "neutral";
+  const spendTrendSign = spendTrend?.direction === "up" ? "+" : spendTrend?.direction === "down" ? "-" : "";
+  const spendTrendDeltaLabel = spendTrend?.direction === "up" ? t.spendTrendUp : spendTrend?.direction === "down" ? t.spendTrendDown : t.spendTrendFlat;
 
   return (
     <>
-      <section className="rounded-panel border border-line bg-surface p-5 shadow-card">
-        <SectionHeader icon={LineChart} title={t.incomeVsExpense} />
+      {/* Insights — one scannable number + short label per tile, only what the data supports. */}
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+        <StatBlock label={t.avgMonthlyIncome} value={formatMoney(insights.avgMonthlyIncome)} icon={ArrowDownLeft} tone="income" />
+        <StatBlock label={t.avgMonthlyExpense} value={formatMoney(insights.avgMonthlyExpense)} icon={ArrowUpRight} tone="expense" />
+        <StatBlock label={t.avgMonthlyNet} value={formatMoney(insights.avgMonthlyNet)} icon={Scale} tone={netTone} />
+        <StatBlock
+          label={t.currentSavingsRate}
+          value={formatPercent(insights.currentSavingsRate)}
+          icon={Percent}
+          tone="primary"
+          delta={{ value: t.avgLabel + " " + formatPercent(insights.avgSavingsRate), tone: "neutral" }}
+        />
+        {spendTrend ? (
+          <StatBlock
+            label={t.spendTrendLabel}
+            value={spendTrendSign + formatPercentPoints(spendTrend.percent)}
+            icon={SpendTrendIcon}
+            tone={spendTrendTone}
+            delta={{ value: spendTrendDeltaLabel, tone: spendTrendTone }}
+          />
+        ) : null}
+        {insights.topCategoryLabel ? (
+          <StatBlock
+            label={t.topCategoryLabel}
+            value={insights.topCategoryLabel}
+            icon={Tag}
+            tone="investment"
+            delta={{ value: formatPercent(insights.topCategoryShare) + " " + t.topCategoryShareSuffix, tone: "neutral" }}
+          />
+        ) : null}
+        {insights.totalDebtPaid > 0 ? (
+          <StatBlock
+            label={t.totalDebtPaidLabel}
+            value={formatMoney(insights.totalDebtPaid)}
+            icon={Landmark}
+            tone="debt"
+            delta={insights.debtProjection ? { value: t.estimatedPayoffLabel + " " + insights.debtProjection.projectedPayoffLabel + " " + t.estimateNote, tone: "neutral" } : undefined}
+          />
+        ) : null}
+      </section>
+
+      {/* Income vs expense vs net trend, and savings-rate trend. */}
+      <Card>
         {hasTrend ? (
-          <>
-            <div className="flex items-end gap-1.5 overflow-hidden sm:gap-3" style={{ height: "180px" }}>
-              {trendCycles.map((cycle) => (
-                <div key={cycle.cycleStartDate} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-1" style={{ height: "150px" }}>
-                  <div className="flex h-full w-full items-end justify-center gap-0.5">
-                    <div className="w-1/2 rounded-t bg-emerald-500" style={{ height: Math.round((cycle.income / trendMax) * 100) + "%" }} aria-hidden="true" />
-                    <div className="w-1/2 rounded-t bg-rose-400" style={{ height: Math.round((cycle.expenses / trendMax) * 100) + "%" }} aria-hidden="true" />
-                  </div>
-                  <span className="truncate text-[0.6rem] font-bold text-muted">{formatCycleChip(cycle.start)}</span>
-                </div>
-              ))}
+          <div className="grid gap-6 xl:grid-cols-2">
+            <div>
+              <SectionHeader icon={LineChart} title={t.incomeVsExpense} />
+              <div className="mt-4"><TrendChart data={trendData} labels={{ income: t.income, expenses: t.expenses, net: t.net }} /></div>
             </div>
-            <div className="mt-3 flex flex-wrap gap-4 text-xs font-bold text-muted">
-              <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-emerald-500" aria-hidden="true" />{t.income}</span>
-              <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded bg-rose-400" aria-hidden="true" />{t.expenses}</span>
-            </div>
-          </>
-        ) : (
-          <p className="rounded-2xl border border-dashed border-line bg-elevated p-4 text-sm font-bold text-muted">{t.noTrendData}</p>
-        )}
-      </section>
-
-      <section className="grid gap-3">
-        <div className="flex items-center justify-between gap-4">
-          <SectionHeader icon={CalendarRange} title={t.cycleHistory} />
-          <span className="rounded-full bg-surface px-3 py-1 text-xs font-black text-muted shadow-card">{data.cycles.length} {t.cyclesSuffix}</span>
-        </div>
-        <div className="grid gap-3">
-          {data.cycles.map((cycle) => (
-            <article key={cycle.cycleStartDate} className={"rounded-panel border p-4 shadow-card " + (cycle.isCurrent ? "border-primary/40 bg-primary/5" : "border-line bg-surface")}>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-base font-black text-ink">{cycle.label}</h3>
-                <div className="flex items-center gap-2">
-                  {cycle.isCurrent ? <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{t.currentCycle}</span> : null}
-                  <span className={"rounded-full px-2.5 py-1 text-xs font-black " + (cycle.net >= 0 ? "bg-income/10 text-income" : "bg-danger/10 text-danger")}>{t.net} {formatMoney(cycle.net)}</span>
-                </div>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-3 text-sm font-bold sm:grid-cols-3 lg:grid-cols-5">
-                <Metric label={t.income} value={formatMoney(cycle.income)} tone="text-income" />
-                <Metric label={t.expenses} value={formatMoney(cycle.expenses)} tone="text-danger" />
-                <Metric label={t.investmentTransfers} value={formatMoney(cycle.investmentTransfers)} tone="text-investment" />
-                <Metric label={t.debtPaid} value={formatMoney(cycle.debtPaid)} tone="text-debt" />
-                <Metric label={t.sinkingReserved} value={formatMoney(cycle.sinkingReserved)} tone="text-warning" />
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-2">
-        <div className="rounded-panel border border-line bg-surface p-5 shadow-card">
-          <SectionHeader icon={PieChart} title={t.spendingByCategory} />
-          <div className="mb-4 flex flex-col gap-2">
-            <span className="text-xs font-black uppercase tracking-normal text-muted">{t.selectCycle}</span>
-            <div className="flex flex-wrap gap-2">
-              {data.cycles.map((cycle) => {
-                const selected = cycle.cycleStartDate === data.selectedCycleStartDate;
-                return (
-                  <Link
-                    key={cycle.cycleStartDate}
-                    href={"/reports?cycle=" + cycle.cycleStartDate}
-                    scroll={false}
-                    className={"rounded-full px-3 py-1.5 text-xs font-black transition " + (selected ? "bg-primary text-canvas shadow-card" : "border border-line bg-surface text-muted hover:border-primary/40 hover:text-primary")}
-                  >
-                    {formatCycleChip(cycle.start)}
-                  </Link>
-                );
-              })}
+            <div>
+              <SectionHeader icon={Percent} title={t.savingsRate} />
+              <div className="mt-4"><SavingsRateChart data={savingsData} seriesLabel={t.savingsRate} /></div>
             </div>
           </div>
-          <p className="mb-3 text-sm font-black text-ink">{t.totalExpenses}: {formatMoney(data.categoryBreakdown.total)}</p>
-          {data.categoryBreakdown.slices.length === 0 ? (
-            <p className="rounded-2xl border border-dashed border-line bg-elevated p-4 text-sm font-bold text-muted">{t.noCategoryData}</p>
-          ) : (
+        ) : (
+          <>
+            <SectionHeader icon={LineChart} title={t.incomeVsExpense} />
+            <p className="mt-4 rounded-2xl border border-dashed border-line bg-elevated p-4 text-sm font-bold text-muted">{t.noTrendData}</p>
+          </>
+        )}
+      </Card>
+
+      {/* Cycle history — compact, scannable table. */}
+      <Card>
+        <SectionHeader
+          icon={CalendarRange}
+          title={t.cycleHistory}
+          action={<span className="rounded-full bg-surface px-3 py-1 text-xs font-black text-muted shadow-card">{data.cycles.length} {t.cyclesSuffix}</span>}
+        />
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full border-collapse text-sm sm:min-w-[560px]">
+            <thead>
+              <tr className="border-b border-line text-left text-caption font-black uppercase text-muted">
+                <th className="py-2 pr-3 font-black">{t.tableCycleHeader}</th>
+                <th className="px-3 py-2 text-right font-black">{t.income}</th>
+                <th className="px-3 py-2 text-right font-black">{t.expenses}</th>
+                <th className="px-3 py-2 text-right font-black">{t.net}</th>
+                <th className="hidden px-3 py-2 text-right font-black sm:table-cell">{t.investmentTransfers}</th>
+                <th className="hidden px-3 py-2 text-right font-black sm:table-cell">{t.debtPaid}</th>
+                <th className="hidden px-3 py-2 text-right font-black sm:table-cell">{t.sinkingReserved}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.cycles.map((cycle) => (
+                <tr key={cycle.cycleStartDate} className={"border-b border-line/60 " + (cycle.isCurrent ? "bg-primary/5" : "")}>
+                  <td className="py-2.5 pr-3 font-bold text-ink">
+                    {formatCycleChip(cycle.start)}
+                    {cycle.isCurrent ? <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[0.6rem] font-black uppercase text-primary">{t.currentCycle}</span> : null}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-income">{formatMoney(cycle.income)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-danger">{formatMoney(cycle.expenses)}</td>
+                  <td className={"px-3 py-2.5 text-right tabular-nums font-black " + (cycle.net >= 0 ? "text-income" : "text-danger")}>{formatMoney(cycle.net)}</td>
+                  <td className="hidden px-3 py-2.5 text-right tabular-nums text-investment sm:table-cell">{formatMoney(cycle.investmentTransfers)}</td>
+                  <td className="hidden px-3 py-2.5 text-right tabular-nums text-debt sm:table-cell">{formatMoney(cycle.debtPaid)}</td>
+                  <td className="hidden px-3 py-2.5 text-right tabular-nums text-warning sm:table-cell">{formatMoney(cycle.sinkingReserved)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* Category breakdown for the selected cycle — donut + ranked list, cycle chips select the cycle. */}
+      <Card>
+        <SectionHeader icon={PieChart} title={t.spendingByCategory} />
+        <div className="mt-4 flex flex-col gap-2">
+          <span className="text-caption font-black uppercase text-muted">{t.selectCycle}</span>
+          <div className="flex flex-wrap gap-2">
+            {data.cycles.map((cycle) => {
+              const selected = cycle.cycleStartDate === data.selectedCycleStartDate;
+              return (
+                <Link
+                  key={cycle.cycleStartDate}
+                  href={"/reports?cycle=" + cycle.cycleStartDate}
+                  scroll={false}
+                  className={"rounded-full px-3 py-1.5 text-xs font-black transition " + (selected ? "bg-primary text-canvas shadow-card" : "border border-line bg-surface text-muted hover:border-primary/40 hover:text-primary")}
+                >
+                  {formatCycleChip(cycle.start)}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+        {data.categoryBreakdown.slices.length === 0 ? (
+          <p className="mt-4 rounded-2xl border border-dashed border-line bg-elevated p-4 text-sm font-bold text-muted">{t.noCategoryData}</p>
+        ) : (
+          <div className="mt-4 grid gap-4 sm:grid-cols-[minmax(0,220px)_1fr] sm:items-center">
+            <CategoryDonut slices={data.categoryBreakdown.slices} centerLabel={t.totalExpenses} centerValue={formatMoney(data.categoryBreakdown.total)} />
             <div className="grid gap-3">
               {data.categoryBreakdown.slices.map((slice, index) => (
-                <div key={(slice.categoryId ?? "other") + index} className="grid gap-1.5">
-                  <div className="flex items-center justify-between gap-3 text-sm font-bold text-ink">
-                    <span className="min-w-0 truncate">{slice.label}</span>
-                    <span className="shrink-0 text-muted">{formatMoney(slice.amount)} · {formatPercent(slice.share)}</span>
-                  </div>
-                  <div className="h-2.5 overflow-hidden rounded-full bg-elevated">
-                    <div className={"h-full rounded-full " + BAR_COLORS[index % BAR_COLORS.length]} style={{ width: Math.max(2, Math.round(slice.share * 100)) + "%" }} aria-hidden="true" />
-                  </div>
+                <div key={(slice.categoryId ?? "other") + index} className="flex items-center justify-between gap-3 text-sm font-bold text-ink">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: CATEGORY_PALETTE[index % CATEGORY_PALETTE.length] }} aria-hidden="true" />
+                    <span className="truncate">{slice.label}</span>
+                  </span>
+                  <span className="shrink-0 text-muted">{formatMoney(slice.amount)} · {formatPercent(slice.share)}</span>
                 </div>
               ))}
             </div>
-          )}
-        </div>
+          </div>
+        )}
+      </Card>
 
-        <div className="rounded-panel border border-line bg-surface p-5 shadow-card">
-          <SectionHeader icon={TrendingDown} title={t.debtTrajectory} />
-          {hasDebt && data.debtTrajectory.length >= 2 ? (
-            <DebtChart points={data.debtTrajectory} max={debtMax} />
-          ) : hasDebt ? (
-            <p className="text-2xl font-black text-ink">{formatMoney(data.debtTrajectory[data.debtTrajectory.length - 1]?.remaining ?? 0)}</p>
-          ) : (
-            <p className="rounded-2xl border border-dashed border-line bg-elevated p-4 text-sm font-bold text-muted">{t.noDebtData}</p>
-          )}
-          {hasDebt ? (
-            <div className="mt-3 flex items-center justify-between text-xs font-bold text-muted">
-              <span>{formatCycleChip(data.debtTrajectory[0]?.start ?? new Date())}</span>
-              <span>{t.remainingBalance}</span>
+      {/* Debt payoff trajectory. */}
+      <Card>
+        <SectionHeader icon={TrendingDown} title={t.debtTrajectory} />
+        {hasDebt && data.debtTrajectory.length >= 2 ? (
+          <>
+            <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-caption font-black uppercase text-muted">{t.remainingBalance}</p>
+                <p className="mt-1 text-stat font-black tabular-nums text-ink">{formatMoney(latestRemaining)}</p>
+              </div>
+              {insights.debtProjection ? (
+                <p className="max-w-xs text-right text-xs font-bold text-muted">
+                  {t.estimatedPayoffLabel} <span className="font-black text-ink">{insights.debtProjection.projectedPayoffLabel}</span>
+                  <br />
+                  <span className="text-faint">{t.estimateNote}</span>
+                </p>
+              ) : null}
             </div>
-          ) : null}
-        </div>
-      </section>
+            <div className="mt-3"><DebtTrajectoryChart data={debtChartData} seriesLabel={t.remainingBalance} /></div>
+          </>
+        ) : hasDebt ? (
+          <div className="mt-4">
+            <p className="text-caption font-black uppercase text-muted">{t.remainingBalance}</p>
+            <p className="mt-1 text-stat font-black tabular-nums text-ink">{formatMoney(latestRemaining)}</p>
+          </div>
+        ) : (
+          <p className="mt-4 rounded-2xl border border-dashed border-line bg-elevated p-4 text-sm font-bold text-muted">{t.noDebtData}</p>
+        )}
+      </Card>
     </>
-  );
-}
-
-function Metric({ label, value, tone }: { label: string; value: string; tone: string }) {
-  return (
-    <div className="grid gap-1">
-      <span className="text-xs font-black uppercase tracking-normal text-muted">{label}</span>
-      <span className={"text-sm font-black " + tone}>{value}</span>
-    </div>
-  );
-}
-
-function DebtChart({ points, max }: { points: ReportsData["debtTrajectory"]; max: number }) {
-  const width = 100;
-  const height = 40;
-  const stepX = points.length > 1 ? width / (points.length - 1) : width;
-  const coords = points.map((point, index) => {
-    const x = index * stepX;
-    const y = height - (point.remaining / max) * (height - 4) - 2;
-    return { x, y };
-  });
-  const linePoints = coords.map((coord) => coord.x.toFixed(2) + "," + coord.y.toFixed(2)).join(" ");
-  const areaPoints = "0," + height + " " + linePoints + " " + width + "," + height;
-
-  return (
-    <svg viewBox={"0 0 " + width + " " + height} preserveAspectRatio="none" className="h-40 w-full" role="img" aria-label="debt payoff trajectory">
-      <polygon points={areaPoints} fill="rgb(244 63 94 / 0.12)" />
-      <polyline points={linePoints} fill="none" stroke="rgb(244 63 94)" strokeWidth={1.5} vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
-      {coords.map((coord, index) => (
-        <circle key={index} cx={coord.x} cy={coord.y} r={1.4} fill="rgb(244 63 94)" vectorEffect="non-scaling-stroke" />
-      ))}
-    </svg>
   );
 }
