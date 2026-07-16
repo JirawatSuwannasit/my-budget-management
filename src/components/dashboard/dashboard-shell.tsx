@@ -65,10 +65,34 @@ export function DashboardShell({ cycle, input, snapshot, upcoming, source, statu
   const healthText = health === "danger" ? "text-danger" : health === "warning" ? "text-warning" : "text-income";
 
   const sourceLabel = source === "supabase" ? t.sourceSupabase : t.sourceDemo;
-  const sinkingFunds = input.sinkingFundReserves.map((fund) => ({
-    ...fund,
-    used: fund.reservedThisCycle ? fund.monthlyReserve : 0
-  }));
+  const notice = notices[0];
+
+  // Safe-to-spend waterfall: cashLikeBalance minus each reservation, in the exact
+  // order of the realAvailableMoney formula, so the running balance lands on the hero.
+  const deductions: Array<{ label: string; value: number; toneText: string }> = [
+    { label: t.unpaidObligations, value: snapshot.unpaidObligations, toneText: "text-warning" },
+    { label: t.reservedBudgets, value: snapshot.unspentReservedBudgets, toneText: "text-muted" },
+    { label: t.cardPayable, value: snapshot.remainingCreditCardPayable, toneText: "text-danger" },
+    { label: t.plannedDebt, value: snapshot.plannedDebtPayments, toneText: "text-debt" },
+    { label: t.sinkingFunds, value: snapshot.monthlySinkingFundReserves, toneText: "text-warning" }
+  ];
+  let running = snapshot.cashLikeBalance;
+  const waterfall = deductions
+    .map((step) => {
+      running -= step.value;
+      return { ...step, running };
+    })
+    .filter((step) => step.value !== 0);
+
+  const sinkingFunds = input.sinkingFundReserves.map((fund) => ({ ...fund, used: fund.reservedThisCycle ? fund.monthlyReserve : 0 }));
+
+  const quickActions = [
+    { href: "/transactions", label: t.quickAdd, icon: Plus },
+    { href: "/planning", label: t.quickPlan, icon: BarChart3 },
+    { href: "/planning", label: t.quickReserve, icon: PiggyBank },
+    { href: "/debts-cards", label: t.quickPayCard, icon: CreditCard }
+  ];
+
   const usableBudgetRemaining = input.reservedBudgets.reduce((sum, b) => sum + (b.budgetAmount - b.usedAmount), 0);
 
   return (
