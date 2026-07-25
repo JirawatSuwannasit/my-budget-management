@@ -490,6 +490,8 @@ export const dictionaries = {
       installmentRemaining: "คงเหลือ",
       deleteInstallment: "ลบรายการผ่อน",
       deleteInstallmentConfirm: "ลบรายการผ่อนนี้? การกระทำนี้ย้อนกลับไม่ได้",
+      deleteCard: "ลบบัตร",
+      deleteCardConfirm: "ลบบัตรนี้ถาวร? รายการใช้บัตรและรายการจ่ายบัตรทั้งหมดของบัตรนี้ทุกรอบจะถูกลบและคืนยอดบัญชีให้ด้วย หากต้องการเก็บประวัติไว้ ให้ใช้ปิดใช้งานแทน",
       recentCardActivity: "กิจกรรมบัตรล่าสุด",
       noCardActivity: "ยังไม่มีกิจกรรมบัตร",
       expense: "รายจ่าย",
@@ -576,7 +578,9 @@ export const dictionaries = {
         installmentMonthsRange: "จำนวนงวดต้องอย่างน้อย 1 เดือน",
         installmentAdded: "เพิ่มรายการผ่อนแล้ว",
         saveInstallmentFailed: "บันทึกรายการผ่อนไม่สำเร็จ",
-        installmentHasPayments: "รายการผ่อนนี้มีประวัติการจ่ายแล้ว ลบไม่ได้ — ให้ปิดใช้งานแทนเพื่อเก็บประวัติและไม่ให้ยอดเงินเพี้ยน"
+        installmentHasPayments: "รายการผ่อนนี้มีประวัติการจ่ายแล้ว ลบไม่ได้ — ให้ปิดใช้งานแทนเพื่อเก็บประวัติและไม่ให้ยอดเงินเพี้ยน",
+        cardHasLinkedDebts: "บัตรนี้ยังผูกกับรายการผ่อนอยู่ ลบไม่ได้ — ให้ย้ายหรือลบรายการผ่อนก่อน หรือปิดใช้งานบัตรแทน",
+        cardHasLinkedSubscriptions: "บัตรนี้ยังถูกใช้เป็นช่องทางจ่ายของค่าสมาชิก ลบไม่ได้ — ให้เปลี่ยนช่องทางจ่ายของค่าสมาชิกก่อน หรือปิดใช้งานบัตรแทน"
       }
     },
     transactions: {
@@ -1157,6 +1161,8 @@ export const dictionaries = {
       installmentRemaining: "Remaining",
       deleteInstallment: "Delete installment",
       deleteInstallmentConfirm: "Delete this installment? This cannot be undone.",
+      deleteCard: "Delete card",
+      deleteCardConfirm: "Permanently delete this card? Every card expense and card payment on it, in every cycle, is also deleted and its effect on account balances is reversed. To keep the history, deactivate it instead.",
       recentCardActivity: "Recent card activity",
       noCardActivity: "No card activity yet.",
       expense: "Expense",
@@ -1243,7 +1249,9 @@ export const dictionaries = {
         installmentMonthsRange: "Term must be at least 1 month.",
         installmentAdded: "Installment added.",
         saveInstallmentFailed: "Could not save installment.",
-        installmentHasPayments: "This installment already has payments and can't be deleted — deactivate it instead to keep history and avoid balance drift."
+        installmentHasPayments: "This installment already has payments and can't be deleted — deactivate it instead to keep history and avoid balance drift.",
+        cardHasLinkedDebts: "This card still has installments linked to it and can't be deleted — move or delete those installments first, or deactivate the card instead.",
+        cardHasLinkedSubscriptions: "This card is still the payment source for a subscription and can't be deleted — change that subscription's payment source first, or deactivate the card instead."
       }
     },
     transactions: {

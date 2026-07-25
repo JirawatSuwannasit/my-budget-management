@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { deleteTransactionsForCard } from "@/app/(private)/transactions/actions";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/server";
 
@@ -17,6 +18,12 @@ function localeFromForm(formData: FormData): Locale {
 
 function getMessages(formData: FormData): DebtCardMessages {
   return dictionaries[localeFromForm(formData)].debtsCards.messages;
+}
+
+// The card cascade reports transaction-layer failures (missing child rows,
+// balance-below-zero), so it needs that namespace in the form's own locale.
+function getTransactionMessages(formData: FormData) {
+  return dictionaries[localeFromForm(formData)].transactions.messages;
 }
 
 async function getUserContext(messages: DebtCardMessages = dictionaries.th.debtsCards.messages) {
@@ -214,6 +221,40 @@ export async function setCreditCardActive(formData: FormData) {
   const active = formData.get("active") === "true";
   if (!id) throw new Error(messages.cardIdRequired);
   const { error } = await supabase.from("credit_cards").update({ active }).eq("id", id).eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  revalidateDebtCardViews();
+}
+
+// DELETE means "entered wrong, remove completely" — setCreditCardActive(false)
+// is the path for "card closed, keep history".
+//
+// Two hazards drive the order here. First, debts.card_id and
+// subscriptions.source_card_id / next_source_card_id are ON DELETE SET NULL, so
+// deleting a card still in use would silently unlink an installment or leave a
+// subscription sourceless, and its next auto-charge would skip with no
+// explanation — so bound entities block the delete and the user rebinds
+// deliberately. Second, card_transactions.card_id and card_payments.card_id are
+// ON DELETE CASCADE, so the card's transactions must be reversed and removed
+// through the transaction layer BEFORE the card row goes, or Postgres drops the
+// child rows and strands their parents.
+export async function deleteCreditCard(formData: FormData) {
+  const messages = getMessages(formData);
+  const { supabase, userId } = await getUserContext(messages);
+  const id = textValue(formData, "id");
+  if (!id) throw new Error(messages.cardIdRequired);
+
+  const [linkedDebts, linkedSubscriptions] = await Promise.all([
+    supabase.from("debts").select("id", { count: "exact", head: true }).eq("card_id", id).eq("user_id", userId),
+    supabase.from("subscriptions").select("id", { count: "exact", head: true }).eq("user_id", userId).or("source_card_id.eq." + id + ",next_source_card_id.eq." + id)
+  ]);
+  if (linkedDebts.error) throw new Error(linkedDebts.error.message);
+  if (linkedSubscriptions.error) throw new Error(linkedSubscriptions.error.message);
+  if ((linkedDebts.count ?? 0) > 0) throw new Error(messages.cardHasLinkedDebts);
+  if ((linkedSubscriptions.count ?? 0) > 0) throw new Error(messages.cardHasLinkedSubscriptions);
+
+  await deleteTransactionsForCard(id, getTransactionMessages(formData));
+
+  const { error } = await supabase.from("credit_cards").delete().eq("id", id).eq("user_id", userId);
   if (error) throw new Error(error.message);
   revalidateDebtCardViews();
 }
