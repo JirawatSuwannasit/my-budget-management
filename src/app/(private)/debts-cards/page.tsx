@@ -2,6 +2,7 @@ import { Banknote, CreditCard, Landmark, Plus, ReceiptText, TrendingDown } from 
 import type { ReactNode } from "react";
 import { CreditCardForm } from "@/components/debts-cards/card-form";
 import { DebtForm } from "@/components/debts-cards/debt-form";
+import { DeleteCardForm } from "@/components/debts-cards/delete-card-form";
 import { DeleteDebtForm } from "@/components/debts-cards/delete-debt-form";
 import { CardActivityForms, CardPaymentForm, DebtPaymentForm } from "@/components/debts-cards/payment-forms";
 import { LazyDetails } from "@/components/ui/lazy-details";
@@ -264,7 +265,10 @@ export default async function DebtsCardsPage() {
                       <div className="rounded-2xl bg-warning/10 p-3 text-warning"><p className="text-xs font-black opacity-70">{t.floatingThisCycle}</p><p className="mt-1 text-lg font-black">{formatMoney(obligation.currentCycleSpending)}</p></div>
                     </div>
                   </div>
-                  <ToggleActiveForm id={card.id} active={card.active} kind="card" locale={locale} />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ToggleActiveForm id={card.id} active={card.active} kind="card" locale={locale} />
+                    <DeleteCardForm id={card.id} locale={locale} />
+                  </div>
                 </div>
 
                 <div className="mt-4 grid gap-3 lg:grid-cols-2">
