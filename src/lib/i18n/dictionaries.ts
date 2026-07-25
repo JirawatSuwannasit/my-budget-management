@@ -366,6 +366,7 @@ export const dictionaries = {
       editSinkingFund: "แก้ไขเงินกัน",
       deleteItem: "ลบรายการ",
       deleteItemConfirm: "ลบรายการนี้ถาวร? ประวัติธุรกรรมที่บันทึกไว้จะยังอยู่",
+      deleteItemConfirmCascade: "ลบรายการนี้ถาวร? รายการเงินทั้งหมดที่ผูกกับรายการนี้ทุกรอบจะถูกลบและคืนยอดบัญชี/ยอดบัตรให้ด้วย หากต้องการเก็บประวัติไว้ ให้ใช้ปิดใช้งานแทน",
       dashboardLogic: "หมายเหตุการคำนวณ Dashboard",
       dashboardLogicText: "ค่าสมาชิกรายเดือนจะลดเงินใช้ได้จริงจนกว่าจะจ่ายในรอบปัจจุบัน ค่าสมาชิกรายปีและค่าใช้จ่ายรายปีจะลดเงินใช้ได้จริงเป็นเงินกันรายเดือนจนกว่าจะบันทึกรายการกันเงิน งบจะลดเฉพาะส่วนที่กันไว้แล้วยังไม่ได้ใช้ จึงไม่หักรายจ่ายซ้ำ",
       payment: {
@@ -1032,6 +1033,7 @@ export const dictionaries = {
       editSinkingFund: "Edit sinking fund",
       deleteItem: "Delete",
       deleteItemConfirm: "Permanently delete this item? Recorded transactions are kept.",
+      deleteItemConfirmCascade: "Permanently delete this item? Every linked transaction in every cycle is also deleted and its effect on account and card balances is reversed. To keep the history, deactivate it instead.",
       dashboardLogic: "Dashboard logic",
       dashboardLogicText: "Monthly subscriptions reduce real available money until paid in the current cycle. Yearly subscriptions and annual expenses reduce real available money as monthly reserves until marked with a sinking fund reserve transaction. Budgets reduce only their unspent reserved amount, so paid expenses are not double counted.",
       payment: {

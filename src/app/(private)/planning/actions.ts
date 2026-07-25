@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { saveTransaction } from "@/app/(private)/transactions/actions";
+import { deleteTransactionsForRelatedEntity, saveTransaction } from "@/app/(private)/transactions/actions";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
 import { selectDueInstallmentCharges, type ChargeableInstallment } from "@/lib/finance/installment-charges";
 import { selectDueSubscriptionCharges, type ChargeableSubscription, type CycleTransactionLink } from "@/lib/finance/subscription-charges";
@@ -25,6 +25,12 @@ function localeFromForm(formData: FormData): Locale {
 
 function getMessages(formData: FormData): PlanningMessages {
   return dictionaries[localeFromForm(formData)].planning.messages;
+}
+
+// The cascade delete reports transaction-layer failures (missing child rows,
+// balance-below-zero), so it needs that namespace in the form's own locale.
+function getTransactionMessages(formData: FormData) {
+  return dictionaries[localeFromForm(formData)].transactions.messages;
 }
 
 async function getUserContext(messages: PlanningMessages = dictionaries.th.planning.messages) {
@@ -215,11 +221,18 @@ export async function setSubscriptionActive(formData: FormData) {
   revalidatePlanningViews();
 }
 
+// DELETE means "this was entered wrong, remove it completely" — setSubscriptionActive(false)
+// is the path for "service ended, keep history". So every auto-charge this
+// subscription ever materialized is reversed and removed first; leaving them
+// behind would strand card float / account balances with no way to find the
+// transactions from this page. The cascade throws on any failed reversal, which
+// aborts before the subscription row is deleted.
 export async function deleteSubscription(formData: FormData) {
   const messages = getMessages(formData);
   const { supabase, userId } = await getUserContext(messages);
   const id = textValue(formData, "id");
   if (!id) throw new Error(messages.subscriptionIdRequired);
+  await deleteTransactionsForRelatedEntity(id, getTransactionMessages(formData));
   const { error } = await supabase.from("subscriptions").delete().eq("id", id).eq("user_id", userId);
   if (error) throw new Error(error.message);
   revalidatePlanningViews();
@@ -342,11 +355,16 @@ export async function setAnnualExpenseActive(formData: FormData) {
   revalidatePlanningViews();
 }
 
+// Same contract as deleteSubscription — setAnnualExpenseActive(false) keeps
+// history. The linked rows here are the sinking_fund_reserve transfers into the
+// bound reserve account; reversing them restores both the source and the reserve
+// account balance.
 export async function deleteAnnualExpense(formData: FormData) {
   const messages = getMessages(formData);
   const { supabase, userId } = await getUserContext(messages);
   const id = textValue(formData, "id");
   if (!id) throw new Error(messages.annualExpenseIdRequired);
+  await deleteTransactionsForRelatedEntity(id, getTransactionMessages(formData));
   const { error } = await supabase.from("annual_expenses").delete().eq("id", id).eq("user_id", userId);
   if (error) throw new Error(error.message);
   revalidatePlanningViews();
