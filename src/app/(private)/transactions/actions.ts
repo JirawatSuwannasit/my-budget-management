@@ -221,6 +221,46 @@ export async function saveTransaction(_previousState: TransactionActionState, fo
     return { status: "error", message: error instanceof Error ? error.message : messages.saveFailed };
   }
 }
+/**
+ * Cascade-deletes every transaction linked to a planning entity (subscription /
+ * annual expense) via `related_entity_id`, across all cycles, and returns how
+ * many were removed.
+ *
+ * Each transaction goes through the same `revertTransactionSideEffects` path
+ * `deleteTransaction` uses, so `card_transactions` / `card_payments` /
+ * `debt_payments` children are removed and account balances (plus
+ * `debts.remaining_balance`) are restored — a direct DELETE on `transactions`
+ * would strand all of that. Annual-expense `sinking_fund_reserve` rows are real
+ * source -> reserve transfers and reverse through the same generic path, which
+ * restores both sides.
+ *
+ * Reversals run sequentially, not in parallel: several linked transactions can
+ * touch the same account, and `applyAccountBalanceDeltas` is a read-modify-write,
+ * so concurrent reversals would lose updates. Each transaction's reversal fully
+ * completes before its own row is deleted, and any failure propagates so the
+ * caller aborts before deleting the parent row — a partial cascade is worse
+ * than none.
+ */
+export async function deleteTransactionsForRelatedEntity(relatedEntityId: string, messages: TransactionMessages = dictionaries.th.transactions.messages): Promise<number> {
+  const id = relatedEntityId.trim();
+  if (!id) throw new Error(messages.idRequired);
+  const { supabase, userId } = await getUserId(messages);
+
+  const { data: linked, error: linkedError } = await supabase.from("transactions").select("*").eq("related_entity_id", id).eq("user_id", userId);
+  if (linkedError) throw new Error(linkedError.message);
+  const transactions = (linked ?? []) as TransactionRow[];
+  if (transactions.length === 0) return 0;
+
+  for (const transaction of transactions) {
+    await revertTransactionSideEffects(supabase, userId, transaction, messages);
+    const { error } = await supabase.from("transactions").delete().eq("id", transaction.id).eq("user_id", userId);
+    if (error) throw new Error(error.message);
+  }
+
+  revalidateFinanceViews();
+  return transactions.length;
+}
+
 export async function deleteTransaction(formData: FormData) {
   const messages = getMessages(formData);
   const { supabase, userId } = await getUserId(messages);

@@ -342,7 +342,7 @@ export default async function PlanningPage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <ToggleActiveForm id={subscription.id} active={subscription.active} action={setSubscriptionActive} locale={locale} />
-                    <DeletePlanningItemForm id={subscription.id} action={deleteSubscription} confirmText={t.deleteItemConfirm} label={t.deleteItem} locale={locale} />
+                    <DeletePlanningItemForm id={subscription.id} action={deleteSubscription} confirmText={t.deleteItemConfirmCascade} label={t.deleteItem} locale={locale} />
                   </div>
                 </div>
                 {showPayOrReserveBlock ? (
@@ -406,7 +406,7 @@ export default async function PlanningPage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <ToggleActiveForm id={expense.id} active={expense.active} action={setAnnualExpenseActive} locale={locale} />
-                    <DeletePlanningItemForm id={expense.id} action={deleteAnnualExpense} confirmText={t.deleteItemConfirm} label={t.deleteItem} locale={locale} />
+                    <DeletePlanningItemForm id={expense.id} action={deleteAnnualExpense} confirmText={t.deleteItemConfirmCascade} label={t.deleteItem} locale={locale} />
                   </div>
                 </div>
                 {expense.active ? (
