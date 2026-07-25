@@ -1,250 +1,100 @@
 import { describe, expect, it } from "vitest";
+import { createSupabaseMock, asSupabaseClient } from "./__tests__/supabase-mock";
 import { applyAccountBalanceDeltas, reverseLinkedDebtPayments, type AccountBalanceDelta } from "./transaction-effects";
 
-type AccountRow = { id: string; balance: number };
-
 const BELOW_ZERO_MESSAGE = "balance would go below zero";
-const MISSING_ACCOUNT_ERROR = "missing account for this user";
+const MISSING_ACCOUNT_ERROR = "no rows found in accounts";
 
-/**
- * Minimal fluent mock of the Supabase query builder shape used by
- * applyAccountBalanceDeltas: a batched `.select().eq().in()` read, a
- * per-account `.select().eq().eq().single()` fallback read, and a
- * `.update().eq().eq()` write. No real network is involved.
- */
-function createSupabaseMock(rows: AccountRow[]) {
-  const updateCalls: Array<{ id: string; balance: number }> = [];
+type SupabaseArg = Parameters<typeof applyAccountBalanceDeltas>[0];
 
-  function selectBuilder() {
-    let single = false;
-    let idFilter: string | undefined;
-    const builder = {
-      eq(column: string, value: string) {
-        if (column === "id") idFilter = value;
-        return builder;
-      },
-      in() {
-        return builder;
-      },
-      single() {
-        single = true;
-        return builder;
-      },
-      then(resolve: (value: unknown) => void, reject: (reason: unknown) => void) {
-        const result = single
-          ? (() => {
-              const row = rows.find((item) => item.id === idFilter);
-              return row ? { data: { balance: row.balance }, error: null } : { data: null, error: { message: MISSING_ACCOUNT_ERROR } };
-            })()
-          : { data: rows, error: null };
-        return Promise.resolve(result).then(resolve, reject);
-      }
-    };
-    return builder;
-  }
-
-  function updateBuilder(payload: { balance: number }) {
-    let idFilter = "";
-    const builder = {
-      eq(column: string, value: string) {
-        if (column === "id") idFilter = value;
-        return builder;
-      },
-      then(resolve: (value: unknown) => void, reject: (reason: unknown) => void) {
-        updateCalls.push({ id: idFilter, balance: payload.balance });
-        return Promise.resolve({ error: null }).then(resolve, reject);
-      }
-    };
-    return builder;
-  }
-
-  const supabase = {
-    from(table: string) {
-      if (table !== "accounts") throw new Error("unexpected table: " + table);
-      return {
-        select: () => selectBuilder(),
-        update: (payload: { balance: number }) => updateBuilder(payload)
-      };
-    }
-  };
-
-  return { supabase, updateCalls };
-}
-
-function asSupabase(supabase: unknown) {
-  return supabase as Parameters<typeof applyAccountBalanceDeltas>[0];
+/** Balance writes recorded by the shared mock, in call order. */
+function balanceWrites(calls: ReturnType<typeof createSupabaseMock>["calls"]) {
+  return calls.filter((call) => call.op === "update" && call.table === "accounts").map((call) => ({ id: call.filters.id as string, balance: (call.payload as { balance: number }).balance }));
 }
 
 describe("applyAccountBalanceDeltas", () => {
   it("debits the source account for a single expense", async () => {
-    const { supabase, updateCalls } = createSupabaseMock([{ id: "cash", balance: 500 }]);
+    const { supabase, calls } = createSupabaseMock({ accounts: [{ id: "cash", user_id: "user-1", balance: 500 }] });
     const deltas: AccountBalanceDelta[] = [{ accountId: "cash", delta: -150 }];
 
-    await applyAccountBalanceDeltas(asSupabase(supabase), "user-1", deltas, BELOW_ZERO_MESSAGE);
+    await applyAccountBalanceDeltas(asSupabaseClient<SupabaseArg>(supabase), "user-1", deltas, BELOW_ZERO_MESSAGE);
 
-    expect(updateCalls).toEqual([{ id: "cash", balance: 350 }]);
+    expect(balanceWrites(calls)).toEqual([{ id: "cash", balance: 350 }]);
   });
 
   it("debits the source and credits the destination for a transfer, matching the old per-account result", async () => {
-    const { supabase, updateCalls } = createSupabaseMock([
-      { id: "main", balance: 1000 },
-      { id: "wallet", balance: 200 }
-    ]);
+    const { supabase, calls } = createSupabaseMock({ accounts: [{ id: "main", user_id: "user-1", balance: 1000 }, { id: "wallet", user_id: "user-1", balance: 200 }] });
     const deltas: AccountBalanceDelta[] = [
       { accountId: "main", delta: -500 },
       { accountId: "wallet", delta: 500 }
     ];
 
-    await applyAccountBalanceDeltas(asSupabase(supabase), "user-1", deltas, BELOW_ZERO_MESSAGE);
+    await applyAccountBalanceDeltas(asSupabaseClient<SupabaseArg>(supabase), "user-1", deltas, BELOW_ZERO_MESSAGE);
 
-    const byId = new Map(updateCalls.map((call) => [call.id, call.balance]));
+    const byId = new Map(balanceWrites(calls).map((call) => [call.id, call.balance]));
     expect(byId.get("main")).toBe(500);
     expect(byId.get("wallet")).toBe(700);
-    expect(updateCalls).toHaveLength(2);
+    expect(balanceWrites(calls)).toHaveLength(2);
   });
 
   it("throws the below-zero message and performs no balance update when any affected account would go negative", async () => {
-    const { supabase, updateCalls } = createSupabaseMock([{ id: "cash", balance: 100 }]);
+    const { supabase, calls } = createSupabaseMock({ accounts: [{ id: "cash", user_id: "user-1", balance: 100 }] });
     const deltas: AccountBalanceDelta[] = [{ accountId: "cash", delta: -150 }];
 
-    await expect(applyAccountBalanceDeltas(asSupabase(supabase), "user-1", deltas, BELOW_ZERO_MESSAGE)).rejects.toThrow(BELOW_ZERO_MESSAGE);
-    expect(updateCalls).toEqual([]);
+    await expect(applyAccountBalanceDeltas(asSupabaseClient<SupabaseArg>(supabase), "user-1", deltas, BELOW_ZERO_MESSAGE)).rejects.toThrow(BELOW_ZERO_MESSAGE);
+    expect(balanceWrites(calls)).toEqual([]);
   });
 
   it("throws the below-zero message for a transfer that would drain the source, writing no balances at all", async () => {
-    const { supabase, updateCalls } = createSupabaseMock([
-      { id: "main", balance: 100 },
-      { id: "wallet", balance: 0 }
-    ]);
+    const { supabase, calls } = createSupabaseMock({ accounts: [{ id: "main", user_id: "user-1", balance: 100 }, { id: "wallet", user_id: "user-1", balance: 0 }] });
     const deltas: AccountBalanceDelta[] = [
       { accountId: "main", delta: -500 },
       { accountId: "wallet", delta: 500 }
     ];
 
-    await expect(applyAccountBalanceDeltas(asSupabase(supabase), "user-1", deltas, BELOW_ZERO_MESSAGE)).rejects.toThrow(BELOW_ZERO_MESSAGE);
-    expect(updateCalls).toEqual([]);
+    await expect(applyAccountBalanceDeltas(asSupabaseClient<SupabaseArg>(supabase), "user-1", deltas, BELOW_ZERO_MESSAGE)).rejects.toThrow(BELOW_ZERO_MESSAGE);
+    expect(balanceWrites(calls)).toEqual([]);
   });
 
   it("throws the same error a missing account's .single() read would have produced, and writes nothing", async () => {
-    const { supabase, updateCalls } = createSupabaseMock([]);
+    const { supabase, calls } = createSupabaseMock({ accounts: [] });
     const deltas: AccountBalanceDelta[] = [{ accountId: "ghost", delta: -10 }];
 
-    await expect(applyAccountBalanceDeltas(asSupabase(supabase), "user-1", deltas, BELOW_ZERO_MESSAGE)).rejects.toThrow(MISSING_ACCOUNT_ERROR);
-    expect(updateCalls).toEqual([]);
+    await expect(applyAccountBalanceDeltas(asSupabaseClient<SupabaseArg>(supabase), "user-1", deltas, BELOW_ZERO_MESSAGE)).rejects.toThrow(MISSING_ACCOUNT_ERROR);
+    expect(balanceWrites(calls)).toEqual([]);
   });
 
   it("is a no-op for an empty delta list", async () => {
-    const { supabase, updateCalls } = createSupabaseMock([]);
+    const { supabase, calls } = createSupabaseMock({ accounts: [] });
 
-    await applyAccountBalanceDeltas(asSupabase(supabase), "user-1", [], BELOW_ZERO_MESSAGE);
+    await applyAccountBalanceDeltas(asSupabaseClient<SupabaseArg>(supabase), "user-1", [], BELOW_ZERO_MESSAGE);
 
-    expect(updateCalls).toEqual([]);
+    expect(balanceWrites(calls)).toEqual([]);
   });
 });
 
 describe("reverseLinkedDebtPayments", () => {
-  /**
-   * Minimal fluent mock covering the three operations reverseLinkedDebtPayments
-   * exercises: a select on debt_payments, a select+update on debts (via
-   * updateDebtRemaining), and a delete on debt_payments keyed by transaction_id.
-   */
-  function createDebtPaymentsMock({ debtPayments, debts }: { debtPayments: Array<{ id: string; debt_id: string; amount: number }>; debts: Record<string, number> }) {
-    const debtUpdates: Array<{ id: string; balance: number }> = [];
-    const deletedTransactionIds: string[] = [];
-
-    function selectBuilder(table: string) {
-      const filters: Record<string, string> = {};
-      let single = false;
-      const builder = {
-        eq(column: string, value: string) {
-          filters[column] = value;
-          return builder;
-        },
-        single() {
-          single = true;
-          return builder;
-        },
-        then(resolve: (value: unknown) => void, reject: (reason: unknown) => void) {
-          let result: { data: unknown; error: unknown };
-          if (table === "debt_payments") {
-            result = { data: debtPayments, error: null };
-          } else if (table === "debts" && single) {
-            const balance = debts[filters.id];
-            result = balance !== undefined ? { data: { remaining_balance: balance }, error: null } : { data: null, error: { message: "missing debt" } };
-          } else {
-            result = { data: null, error: { message: "unexpected read on " + table } };
-          }
-          return Promise.resolve(result).then(resolve, reject);
-        }
-      };
-      return builder;
-    }
-
-    function updateBuilder(table: string, payload: { remaining_balance: number }) {
-      const filters: Record<string, string> = {};
-      const builder = {
-        eq(column: string, value: string) {
-          filters[column] = value;
-          return builder;
-        },
-        then(resolve: (value: unknown) => void, reject: (reason: unknown) => void) {
-          if (table === "debts") debtUpdates.push({ id: filters.id, balance: payload.remaining_balance });
-          return Promise.resolve({ error: null }).then(resolve, reject);
-        }
-      };
-      return builder;
-    }
-
-    function deleteBuilder(table: string) {
-      const filters: Record<string, string> = {};
-      const builder = {
-        eq(column: string, value: string) {
-          filters[column] = value;
-          return builder;
-        },
-        then(resolve: (value: unknown) => void, reject: (reason: unknown) => void) {
-          if (table === "debt_payments") deletedTransactionIds.push(filters.transaction_id);
-          return Promise.resolve({ error: null }).then(resolve, reject);
-        }
-      };
-      return builder;
-    }
-
-    const supabase = {
-      from(table: string) {
-        return {
-          select: () => selectBuilder(table),
-          update: (payload: { remaining_balance: number }) => updateBuilder(table, payload),
-          delete: () => deleteBuilder(table)
-        };
-      }
-    };
-
-    return { supabase, debtUpdates, deletedTransactionIds };
-  }
-
-  function asDebtPaymentsSupabase(supabase: unknown) {
-    return supabase as Parameters<typeof reverseLinkedDebtPayments>[0];
-  }
+  type ReverseSupabaseArg = Parameters<typeof reverseLinkedDebtPayments>[0];
 
   it("restores remaining_balance and deletes the linked debt_payments row for a reversed card-linked installment charge", async () => {
-    const { supabase, debtUpdates, deletedTransactionIds } = createDebtPaymentsMock({
-      debtPayments: [{ id: "dp-1", debt_id: "debt-1", amount: 396 }],
-      debts: { "debt-1": 396 } // remaining_balance after the charge being reversed
+    const { supabase, tables, calls } = createSupabaseMock({
+      debt_payments: [{ id: "dp-1", user_id: "user-1", transaction_id: "txn-1", debt_id: "debt-1", amount: 396 }],
+      // remaining_balance as it stands after the charge being reversed
+      debts: [{ id: "debt-1", user_id: "user-1", remaining_balance: 396 }]
     });
 
-    await reverseLinkedDebtPayments(asDebtPaymentsSupabase(supabase), "user-1", "txn-1");
+    await reverseLinkedDebtPayments(asSupabaseClient<ReverseSupabaseArg>(supabase), "user-1", "txn-1");
 
-    expect(debtUpdates).toEqual([{ id: "debt-1", balance: 792 }]);
-    expect(deletedTransactionIds).toEqual(["txn-1"]);
+    expect(tables.debts[0].remaining_balance).toBe(792);
+    expect(tables.debt_payments).toEqual([]);
+    expect(calls.some((call) => call.op === "delete" && call.table === "debt_payments" && call.filters.transaction_id === "txn-1")).toBe(true);
   });
 
   it("is a no-op when no debt_payments row is linked to the transaction (a plain, non-installment card expense)", async () => {
-    const { supabase, debtUpdates, deletedTransactionIds } = createDebtPaymentsMock({ debtPayments: [], debts: {} });
+    const { supabase, calls } = createSupabaseMock({ debt_payments: [], debts: [] });
 
-    await reverseLinkedDebtPayments(asDebtPaymentsSupabase(supabase), "user-1", "txn-2");
+    await reverseLinkedDebtPayments(asSupabaseClient<ReverseSupabaseArg>(supabase), "user-1", "txn-2");
 
-    expect(debtUpdates).toEqual([]);
-    expect(deletedTransactionIds).toEqual([]);
+    expect(calls.filter((call) => call.op === "update" || call.op === "delete")).toEqual([]);
   });
 });

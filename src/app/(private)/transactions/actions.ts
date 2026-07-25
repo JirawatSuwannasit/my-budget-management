@@ -3,13 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
-import { addDelta, applyAccountBalanceDeltas, getAccountBalanceDeltas, getReverseAccountBalanceDeltas, reverseLinkedDebtPayments, updateDebtRemaining, type AccountBalanceDelta } from "@/lib/finance/transaction-effects";
+import { findTransactionsForCard, findTransactionsForRelatedEntity, revertAndDeleteTransactions, revertTransactionSideEffects, type TransactionRow } from "@/lib/finance/cascade-delete";
+import { applyAccountBalanceDeltas, getAccountBalanceDeltas, updateDebtRemaining, type AccountBalanceDelta } from "@/lib/finance/transaction-effects";
 import type { TransactionType } from "@/lib/finance/types";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 
 export type TransactionActionState = { status: "idle" | "success" | "error"; message: string; transactionId?: string };
 type SupabaseServer = Awaited<ReturnType<typeof createClient>>;
-type TransactionRow = { id: string; account_id: string | null; destination_account_id: string | null; type: TransactionType; amount: number | string; transaction_date: string; cycle_start_date: string; related_entity_id: string | null; notes: string | null };
 type TransactionMessages = Record<keyof typeof dictionaries.en.transactions.messages, string>;
 const transactionTypes: TransactionType[] = ["income", "expense", "transfer", "credit_card_expense", "credit_card_payment", "debt_payment", "investment_transfer", "sinking_fund_reserve"];
 
@@ -140,51 +140,6 @@ async function insertChildRow(supabase: SupabaseServer, userId: string, transact
 async function applyTransactionSideEffects(supabase: SupabaseServer, userId: string, transactionId: string, payload: ReturnType<typeof buildPayload>, messages: TransactionMessages) {
   await Promise.all([applyAccountAndDebtEffects(supabase, userId, payload, messages), insertChildRow(supabase, userId, transactionId, payload, messages)]);
 }
-async function deleteChildRows(supabase: SupabaseServer, userId: string, table: "card_transactions" | "card_payments" | "debt_payments", transactionId: string) {
-  const { error } = await supabase.from(table).delete().eq("transaction_id", transactionId).eq("user_id", userId);
-  if (error) throw new Error(error.message);
-}
-async function revertTransactionSideEffects(supabase: SupabaseServer, userId: string, transaction: TransactionRow, messages: TransactionMessages) {
-  const amount = Number(transaction.amount);
-  if (transaction.type === "credit_card_expense") {
-    const { data, error } = await supabase.from("card_transactions").select("id").eq("transaction_id", transaction.id).eq("user_id", userId);
-    if (error) throw new Error(error.message);
-    if (!data || data.length === 0) throw new Error(messages.unsafeCardExpense);
-    // A card-linked installment's auto-charge is a credit_card_expense that also
-    // carries a linked debt_payments paydown row (account_id null, written
-    // directly by processDueInstallmentCharges rather than through this
-    // module's own debt_payment path). reverseLinkedDebtPayments restores
-    // remaining_balance for it; it's a no-op for a plain card expense with no
-    // linked debt_payments row.
-    await Promise.all([deleteChildRows(supabase, userId, "card_transactions", transaction.id), reverseLinkedDebtPayments(supabase, userId, transaction.id)]);
-    return;
-  }
-  if (transaction.type === "credit_card_payment") {
-    const { data, error } = await supabase.from("card_payments").select("id,account_id,amount").eq("transaction_id", transaction.id).eq("user_id", userId);
-    if (error) throw new Error(error.message);
-    if (!data || data.length === 0) throw new Error(messages.unsafeCardPayment);
-    const deltas: AccountBalanceDelta[] = [];
-    for (const payment of data) addDelta(deltas, payment.account_id, Number(payment.amount));
-    // The delete is independent of the balance write (different tables), so
-    // both can run in parallel once we know the child rows exist.
-    await Promise.all([applyAccountDeltas(supabase, userId, deltas, messages), deleteChildRows(supabase, userId, "card_payments", transaction.id)]);
-    return;
-  }
-  if (transaction.type === "debt_payment") {
-    const { data, error } = await supabase.from("debt_payments").select("id,account_id,debt_id,amount").eq("transaction_id", transaction.id).eq("user_id", userId);
-    if (error) throw new Error(error.message);
-    if (!data || data.length === 0) throw new Error(messages.unsafeDebtPayment);
-    const deltas: AccountBalanceDelta[] = [];
-    for (const payment of data) addDelta(deltas, payment.account_id, Number(payment.amount));
-    await Promise.all([
-      applyAccountDeltas(supabase, userId, deltas, messages),
-      ...data.map((payment) => updateDebtRemaining(supabase, userId, payment.debt_id, Number(payment.amount))),
-      deleteChildRows(supabase, userId, "debt_payments", transaction.id)
-    ]);
-    return;
-  }
-  await applyAccountDeltas(supabase, userId, getReverseAccountBalanceDeltas({ type: transaction.type, amount, accountId: transaction.account_id, destinationAccountId: transaction.destination_account_id }), messages);
-}
 export async function saveTransaction(_previousState: TransactionActionState, formData: FormData): Promise<TransactionActionState> {
   const messages = getMessages(formData);
   try {
@@ -222,96 +177,36 @@ export async function saveTransaction(_previousState: TransactionActionState, fo
   }
 }
 /**
- * Shared core of every cascade delete: reverses each transaction through the
- * same `revertTransactionSideEffects` path `deleteTransaction` uses — so
- * `card_transactions` / `card_payments` / `debt_payments` children are removed
- * and account balances (plus `debts.remaining_balance`) are restored, which a
- * direct DELETE on `transactions` would strand — then deletes its row.
- *
- * Reversals run sequentially, not in parallel: several linked transactions can
- * touch the same account, and `applyAccountBalanceDeltas` is a read-modify-write,
- * so concurrent reversals would lose updates. Each transaction's reversal fully
- * completes before its own row is deleted, and any failure propagates so the
- * caller aborts before deleting the parent row — a partial cascade is worse
- * than none.
- */
-async function revertAndDeleteTransactions(supabase: SupabaseServer, userId: string, transactions: TransactionRow[], messages: TransactionMessages): Promise<number> {
-  for (const transaction of transactions) {
-    await revertTransactionSideEffects(supabase, userId, transaction, messages);
-    const { error } = await supabase.from("transactions").delete().eq("id", transaction.id).eq("user_id", userId);
-    if (error) throw new Error(error.message);
-  }
-  if (transactions.length > 0) revalidateFinanceViews();
-  return transactions.length;
-}
-
-/**
  * Cascade-deletes every transaction linked to a planning entity (subscription /
  * annual expense) via `related_entity_id`, across all cycles, and returns how
- * many were removed. Annual-expense `sinking_fund_reserve` rows are real
- * source -> reserve transfers and reverse through the same generic path, which
- * restores both sides.
+ * many were removed. Orchestration lives in `cascade-delete.ts`; this wrapper
+ * only resolves the session and revalidates.
  */
 export async function deleteTransactionsForRelatedEntity(relatedEntityId: string, messages: TransactionMessages = dictionaries.th.transactions.messages): Promise<number> {
   const id = relatedEntityId.trim();
   if (!id) throw new Error(messages.idRequired);
   const { supabase, userId } = await getUserId(messages);
 
-  const { data: linked, error: linkedError } = await supabase.from("transactions").select("*").eq("related_entity_id", id).eq("user_id", userId);
-  if (linkedError) throw new Error(linkedError.message);
-
-  return revertAndDeleteTransactions(supabase, userId, (linked ?? []) as TransactionRow[], messages);
+  const transactions = await findTransactionsForRelatedEntity(supabase, userId, id);
+  const removed = await revertAndDeleteTransactions(supabase, userId, transactions, messages);
+  if (removed > 0) revalidateFinanceViews();
+  return removed;
 }
 
 /**
- * Cascade-deletes every transaction booked on a credit card, reversing each one
- * first, and returns how many were removed.
- *
- * Matching on `related_entity_id` alone is NOT enough here. `buildPayload` only
- * sets `related_entity_id` to the card id for a standalone card expense and for
- * a card payment; a card-bound subscription's auto-charge carries the
- * subscription id and a card-linked installment's carries the debt id. All of
- * them still own a `card_transactions` / `card_payments` row on this card, so
- * the child tables are the authoritative linkage and are unioned with the
- * `related_entity_id` match.
- *
- * This matters because `card_transactions.card_id` and `card_payments.card_id`
- * are ON DELETE CASCADE: deleting the card row would silently drop those child
- * rows while their parent `transactions` rows survived, stranding card float and
- * never restoring the cash accounts behind any card payment — the same orphan
- * class this cascade exists to prevent.
- *
- * `transaction_id` on both child tables is nullable (rows not written by this
- * app), so unlinked rows are skipped; they carry no transaction or balance
- * effect to reverse and the FK cascade may drop them safely.
+ * Cascade-deletes every transaction booked on a credit card and returns how many
+ * were removed. Orchestration lives in `cascade-delete.ts`; this wrapper only
+ * resolves the session and revalidates.
  */
 export async function deleteTransactionsForCard(cardId: string, messages: TransactionMessages = dictionaries.th.transactions.messages): Promise<number> {
   const id = cardId.trim();
   if (!id) throw new Error(messages.idRequired);
   const { supabase, userId } = await getUserId(messages);
 
-  const [cardExpenses, cardPayments, relatedDirect] = await Promise.all([
-    supabase.from("card_transactions").select("transaction_id").eq("card_id", id).eq("user_id", userId),
-    supabase.from("card_payments").select("transaction_id").eq("card_id", id).eq("user_id", userId),
-    supabase.from("transactions").select("id").eq("related_entity_id", id).eq("user_id", userId)
-  ]);
-  if (cardExpenses.error) throw new Error(cardExpenses.error.message);
-  if (cardPayments.error) throw new Error(cardPayments.error.message);
-  if (relatedDirect.error) throw new Error(relatedDirect.error.message);
-
-  const transactionIds = [
-    ...new Set([
-      ...(cardExpenses.data ?? []).map((row) => row.transaction_id),
-      ...(cardPayments.data ?? []).map((row) => row.transaction_id),
-      ...(relatedDirect.data ?? []).map((row) => row.id)
-    ].filter((value): value is string => Boolean(value)))
-  ];
-  if (transactionIds.length === 0) return 0;
-
-  const { data: linked, error: linkedError } = await supabase.from("transactions").select("*").in("id", transactionIds).eq("user_id", userId);
-  if (linkedError) throw new Error(linkedError.message);
-
-  return revertAndDeleteTransactions(supabase, userId, (linked ?? []) as TransactionRow[], messages);
+  const transactions = await findTransactionsForCard(supabase, userId, id);
+  const removed = await revertAndDeleteTransactions(supabase, userId, transactions, messages);
+  if (removed > 0) revalidateFinanceViews();
+  return removed;
 }
 
 export async function deleteTransaction(formData: FormData) {

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { deleteTransactionsForCard } from "@/app/(private)/transactions/actions";
+import { cascadeDeleteCreditCard } from "@/lib/finance/cascade-delete";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/server";
 
@@ -243,18 +243,9 @@ export async function deleteCreditCard(formData: FormData) {
   const id = textValue(formData, "id");
   if (!id) throw new Error(messages.cardIdRequired);
 
-  const [linkedDebts, linkedSubscriptions] = await Promise.all([
-    supabase.from("debts").select("id", { count: "exact", head: true }).eq("card_id", id).eq("user_id", userId),
-    supabase.from("subscriptions").select("id", { count: "exact", head: true }).eq("user_id", userId).or("source_card_id.eq." + id + ",next_source_card_id.eq." + id)
-  ]);
-  if (linkedDebts.error) throw new Error(linkedDebts.error.message);
-  if (linkedSubscriptions.error) throw new Error(linkedSubscriptions.error.message);
-  if ((linkedDebts.count ?? 0) > 0) throw new Error(messages.cardHasLinkedDebts);
-  if ((linkedSubscriptions.count ?? 0) > 0) throw new Error(messages.cardHasLinkedSubscriptions);
+  await cascadeDeleteCreditCard(supabase, userId, id, { ...getTransactionMessages(formData), cardHasLinkedDebts: messages.cardHasLinkedDebts, cardHasLinkedSubscriptions: messages.cardHasLinkedSubscriptions });
 
-  await deleteTransactionsForCard(id, getTransactionMessages(formData));
-
-  const { error } = await supabase.from("credit_cards").delete().eq("id", id).eq("user_id", userId);
-  if (error) throw new Error(error.message);
   revalidateDebtCardViews();
+  revalidatePath("/accounts");
+  revalidatePath("/planning");
 }
