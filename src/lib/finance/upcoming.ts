@@ -169,6 +169,14 @@ export function buildUpcomingItems({ rows, cycleStart, cycleEnd, today = new Dat
   // 3. Active monthly subscriptions not yet paid this cycle.
   for (const subscription of rows.subscriptions) {
     if (!isActive(subscription) || subscription.frequency !== "monthly") continue;
+    // Card-bound subscriptions are auto-charged on their billing day by
+    // processDueSubscriptionCharges with no user action, and unlike an
+    // account-bound charge there is no balance guard that can skip them. The
+    // charge posts as a credit_card_expense, so it moves no cash — what the
+    // user actually acts on is paying the card statement, which section 1
+    // already surfaces via computeCardObligation once the amount bills. Same
+    // rule as card-linked installments in section 5.
+    if (subscription.source_card_id) continue;
     if (linkedThisCycle(subscription.id)) continue;
     const dueDate = billingDayDueDate(subscription.billing_day, cycleStart, cycleEnd, startKey, endKey);
     items.push({

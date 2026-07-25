@@ -51,6 +51,10 @@ type SubscriptionRow = {
   price: number | string | null;
   billing_day: number;
   active: boolean | null;
+  // Present when the subscription is bound to a credit card as its payment
+  // source. Optional so fixtures and narrower selects stay valid; the dashboard
+  // loader selects "*", so it is populated at runtime.
+  source_card_id?: string | null;
 };
 
 type AnnualExpenseRow = {

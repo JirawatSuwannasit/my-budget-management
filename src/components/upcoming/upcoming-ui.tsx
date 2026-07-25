@@ -65,7 +65,11 @@ export function UpcomingPanel({ summary, locale, maxItems = 4 }: { summary: Upco
         <div className="flex items-center gap-2">
           <BellRing className="text-primary" size={20} aria-hidden="true" />
           <h2 className="text-xl font-black text-ink">{t.panelTitle}</h2>
-          {summary.totalCount > 0 ? <span className="grid h-6 min-w-6 place-items-center rounded-full bg-rose-500 px-1.5 text-xs font-black text-white">{summary.totalCount}</span> : null}
+          {/* Urgent (overdue + due-soon) only, matching the navigation badges —
+              the same red pill must not mean "needs attention now" in the nav
+              and "total items, mostly pending" here. Pending items still show
+              in the list below and on /upcoming. */}
+          {summary.urgentCount > 0 ? <span className="grid h-6 min-w-6 place-items-center rounded-full bg-rose-500 px-1.5 text-xs font-black text-white" aria-label={summary.urgentCount + " " + t.itemsSuffix}>{summary.urgentCount}</span> : null}
         </div>
         <Link href="/upcoming" className="rounded-full border border-line bg-surface px-3 py-1.5 text-xs font-black text-muted shadow-card transition hover:border-primary/40 hover:text-primary">{t.viewAll}</Link>
       </div>

@@ -118,6 +118,65 @@ describe("buildUpcomingItems", () => {
     expect(item?.href).toBe("/planning");
   });
 
+  it("suppresses a card-bound monthly subscription, whose charge is auto-materialized and needs no user action", () => {
+    const summary = buildUpcomingItems({
+      rows: rows({
+        subscriptions: [{ id: "ai", name: "AI tools", frequency: "monthly", price: "2200", billing_day: 5, active: true, source_card_id: "card-1" }]
+      }),
+      cycleStart,
+      cycleEnd,
+      today
+    });
+
+    expect(summary.items.find((entry) => entry.id === "subscription-ai")).toBeUndefined();
+    expect(summary.allCaughtUp).toBe(true);
+  });
+
+  it("still lists an account-bound monthly subscription, which can be skipped by the balance guard", () => {
+    const summary = buildUpcomingItems({
+      rows: rows({
+        subscriptions: [{ id: "ai", name: "AI tools", frequency: "monthly", price: "2200", billing_day: 5, active: true, source_card_id: null }]
+      }),
+      cycleStart,
+      cycleEnd,
+      today
+    });
+
+    expect(summary.items.find((entry) => entry.id === "subscription-ai")?.type).toBe("subscription");
+  });
+
+  it("still lists a card-bound YEARLY subscription's reserve, which processDueSubscriptionCharges never auto-charges", () => {
+    const summary = buildUpcomingItems({
+      rows: rows({
+        subscriptions: [{ id: "football", name: "Football", frequency: "yearly", price: "4200", billing_day: 1, active: true, source_card_id: "card-1" }]
+      }),
+      cycleStart,
+      cycleEnd,
+      today
+    });
+
+    expect(summary.items.find((entry) => entry.id === "reserve-sub-football")?.type).toBe("sinking_fund");
+  });
+
+  it("keeps the card statement reminder for a card carrying a suppressed subscription's charge", () => {
+    const card = billedCard("card-1", "Main card", 10);
+    const summary = buildUpcomingItems({
+      rows: rows({
+        creditCards: [card.card],
+        cardTransactions: card.cardTransactions,
+        subscriptions: [{ id: "ai", name: "AI tools", frequency: "monthly", price: "2200", billing_day: 5, active: true, source_card_id: "card-1" }]
+      }),
+      cycleStart,
+      cycleEnd,
+      today
+    });
+
+    // The subscription reminder is gone, but the obligation it feeds is still
+    // reported once billed — via the card statement item.
+    expect(summary.items.find((entry) => entry.id === "subscription-ai")).toBeUndefined();
+    expect(summary.items.find((entry) => entry.id === "card-card-1")?.type).toBe("card_statement");
+  });
+
   it("drops a monthly subscription once it has been paid this cycle", () => {
     const summary = buildUpcomingItems({
       rows: rows({
