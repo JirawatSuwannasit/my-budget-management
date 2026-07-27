@@ -51,9 +51,10 @@ type SubscriptionRow = {
   price: number | string | null;
   billing_day: number;
   active: boolean | null;
-  // Present when the subscription is bound to a credit card as its payment
-  // source. Optional so fixtures and narrower selects stay valid; the dashboard
-  // loader selects "*", so it is populated at runtime.
+  // The bound payment source, at most one of the two. Optional so fixtures and
+  // narrower selects stay valid; the dashboard loader selects "*", so both are
+  // populated at runtime.
+  source_account_id?: string | null;
   source_card_id?: string | null;
 };
 
@@ -191,10 +192,25 @@ export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, c
     low_balance_threshold: account.low_balance_threshold === null || account.low_balance_threshold === undefined ? null : toNumber(account.low_balance_threshold)
   }));
 
+  // Card-bound monthly subscriptions are deliberately excluded: they ride the
+  // card rail, never the cash rail. Their charge auto-materializes as a
+  // credit_card_expense, joins currentCycleSpending, and only becomes a claim on
+  // cash at the statement cut, when it moves into billedOutstanding — which
+  // realAvailableMoney already subtracts. Reserving them from cash on top of
+  // that would both double-count after the charge lands and, before it lands,
+  // hold cash back weeks earlier than an identical manual swipe on the same
+  // card would. Account-bound and unbound subscriptions stay: the former spends
+  // real cash and its auto-charge can be skipped for insufficient balance, the
+  // latter is paid by hand, so in both cases the reservation is what tracks it.
+  //
+  // Same principle as upcoming.ts section 5 (card-linked installments) and
+  // section 3 (card-bound subscription reminders): card-bound recurring items
+  // are reported on the card rail, never on the cash rail.
   const monthlySubscriptionObligations = rows.subscriptions
     .filter(active)
     .filter((subscription) => categoryActiveOrMissing(subscription.category_id ?? null))
     .filter((subscription) => subscription.frequency === "monthly")
+    .filter((subscription) => !subscription.source_card_id)
     .map((subscription) => ({
       id: subscription.id,
       label: subscription.name,
