@@ -359,6 +359,85 @@ describe("Supabase dashboard row mapping", () => {
     expect(input.sinkingFundReserves).toEqual([{ id: "football", label: "Football app", monthlyReserve: 350, reservedThisCycle: false }]);
   });
 
+  // Card-bound monthly subscriptions ride the card rail: their charge is only a
+  // claim on cash once the statement cuts. See the reasoning in dashboard-data.ts.
+  describe("card-bound monthly subscriptions", () => {
+    it("keeps a card-bound monthly subscription out of obligations, raising real available money by its price", () => {
+      const subscription = { id: "ai", name: "AI tools", frequency: "monthly" as const, price: "699", billing_day: 22, active: true };
+      const accounts = [{ id: "main", name: "Main", type: "main_bank" as const, balance: "10000", active: true, low_balance_threshold: null }];
+
+      const accountBound = calculateDashboardSnapshot(mapDashboardRowsToInput(rows({ accounts, subscriptions: [{ ...subscription, source_account_id: "main", source_card_id: null }] }), cycleStart, cycleEnd));
+      const cardBound = calculateDashboardSnapshot(mapDashboardRowsToInput(rows({ accounts, subscriptions: [{ ...subscription, source_account_id: null, source_card_id: "card-1" }] }), cycleStart, cycleEnd));
+
+      expect(accountBound.unpaidObligations).toBe(699);
+      expect(cardBound.unpaidObligations).toBe(0);
+      expect(cardBound.realAvailableMoney).toBe(accountBound.realAvailableMoney + 699);
+    });
+
+    it("still reserves an account-bound monthly subscription, whose auto-charge can be skipped on insufficient balance", () => {
+      const input = mapDashboardRowsToInput(
+        rows({ subscriptions: [{ id: "ai", name: "AI tools", frequency: "monthly", price: "699", billing_day: 22, active: true, source_account_id: "main", source_card_id: null }] }),
+        cycleStart,
+        cycleEnd
+      );
+
+      expect(input.obligations).toEqual([{ id: "ai", label: "AI tools", amount: 699, paid: false, kind: "subscription" }]);
+    });
+
+    it("still reserves a monthly subscription with no bound source, which is paid by hand", () => {
+      const input = mapDashboardRowsToInput(
+        rows({ subscriptions: [{ id: "ai", name: "AI tools", frequency: "monthly", price: "699", billing_day: 22, active: true, source_account_id: null, source_card_id: null }] }),
+        cycleStart,
+        cycleEnd
+      );
+
+      expect(input.obligations).toEqual([{ id: "ai", label: "AI tools", amount: 699, paid: false, kind: "subscription" }]);
+    });
+
+    it("does not leak into the yearly reserve flow for a card-bound yearly subscription", () => {
+      const input = mapDashboardRowsToInput(
+        rows({ subscriptions: [{ id: "football", name: "Football app", frequency: "yearly", price: "4200", billing_day: 1, active: true, source_account_id: null, source_card_id: "card-1" }] }),
+        cycleStart,
+        cycleEnd
+      );
+
+      expect(input.sinkingFundReserves).toEqual([{ id: "football", label: "Football app", monthlyReserve: 350, reservedThisCycle: false }]);
+    });
+
+    // The invariant that matters: across the whole waterfall the 699 is counted
+    // exactly once at any point in time, and never twice.
+    it("counts the charge exactly once as it moves from unbilled to billed", () => {
+      // Card cuts on the 21st. "Today" is 1 Sep, so the last cut is 21 Aug and a
+      // charge dated 22 Aug is current-cycle spend; moving today past 21 Sep
+      // makes that same charge billed.
+      const card = { id: "card-1", name: "Main card", billing_cut_day: 21, payment_due_day: 5, active: true };
+      const subscriptions = [{ id: "ai", name: "AI tools", frequency: "monthly" as const, price: "699", billing_day: 22, active: true, source_account_id: null, source_card_id: "card-1" }];
+      const accounts = [{ id: "main", name: "Main", type: "main_bank" as const, balance: "10000", active: true, low_balance_threshold: null }];
+      const charge = { id: "sub-charge", card_id: "card-1", amount: "699", transaction_date: "2026-08-22" };
+
+      const beforeCharge = calculateDashboardSnapshot(mapDashboardRowsToInput(rows({ accounts, subscriptions, creditCards: [card] }), cycleStart, cycleEnd, new Date(2026, 8, 1, 12)));
+      const afterCharge = calculateDashboardSnapshot(mapDashboardRowsToInput(rows({ accounts, subscriptions, creditCards: [card], cardTransactions: [charge] }), cycleStart, cycleEnd, new Date(2026, 8, 1, 12)));
+      const afterCut = calculateDashboardSnapshot(mapDashboardRowsToInput(rows({ accounts, subscriptions, creditCards: [card], cardTransactions: [charge] }), cycleStart, cycleEnd, new Date(2026, 9, 1, 12)));
+
+      // (a) Not yet charged — the 699 exists nowhere in the waterfall.
+      expect(beforeCharge.unpaidObligations).toBe(0);
+      expect(beforeCharge.currentCardCycleSpending).toBe(0);
+      expect(beforeCharge.remainingCreditCardPayable).toBe(0);
+
+      // (b) Charged, pre-cut — float only, still no claim on cash.
+      expect(afterCharge.unpaidObligations).toBe(0);
+      expect(afterCharge.currentCardCycleSpending).toBe(699);
+      expect(afterCharge.remainingCreditCardPayable).toBe(0);
+      expect(afterCharge.realAvailableMoney).toBe(beforeCharge.realAvailableMoney);
+
+      // (c) Post-cut — billed exactly once, and only now does cash drop.
+      expect(afterCut.unpaidObligations).toBe(0);
+      expect(afterCut.currentCardCycleSpending).toBe(0);
+      expect(afterCut.remainingCreditCardPayable).toBe(699);
+      expect(afterCut.realAvailableMoney).toBe(beforeCharge.realAvailableMoney - 699);
+    });
+  });
+
   it("treats current-cycle sinking fund reserve transactions as already reserved", () => {
     const input = mapDashboardRowsToInput(
       rows({
