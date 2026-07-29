@@ -1,4 +1,3 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { getLastBillingCutDate } from "./cycle";
 import type { Account, CreditCardObligation, DashboardInput } from "./types";
 
@@ -309,28 +308,4 @@ export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, c
 
 export function hasRealDashboardRows(rows: DashboardRows) {
   return rows.accounts.length > 0 || rows.transactions.length > 0 || rows.budgets.length > 0 || rows.subscriptions.length > 0 || rows.annualExpenses.length > 0 || rows.debts.length > 0 || rows.creditCards.length > 0 || rows.cardPayments.length > 0 || rows.cardTransactions.length > 0;
-}
-
-async function selectTable<T>(supabase: SupabaseClient, table: string, columns = "*") {
-  const { data, error } = await supabase.from(table).select(columns);
-  if (error) throw new Error(error.message);
-  return (data ?? []) as T[];
-}
-
-export async function loadDashboardRows(supabase: SupabaseClient): Promise<DashboardRows> {
-  const [accounts, categories, transactions, budgets, subscriptions, annualExpenses, debts, debtPayments, creditCards, cardPayments, cardTransactions] = await Promise.all([
-    selectTable<AccountRow>(supabase, "accounts"),
-    selectTable<CategoryRow>(supabase, "categories", "id,active"),
-    selectTable<TransactionRow>(supabase, "transactions"),
-    selectTable<BudgetRow>(supabase, "budgets"),
-    selectTable<SubscriptionRow>(supabase, "subscriptions"),
-    selectTable<AnnualExpenseRow>(supabase, "annual_expenses"),
-    selectTable<DebtRow>(supabase, "debts"),
-    selectTable<DebtPaymentRow>(supabase, "debt_payments"),
-    selectTable<CreditCardRow>(supabase, "credit_cards"),
-    selectTable<CardPaymentRow>(supabase, "card_payments"),
-    selectTable<CardTransactionRow>(supabase, "card_transactions")
-  ]);
-
-  return { accounts, categories, transactions, budgets, subscriptions, annualExpenses, debts, debtPayments, creditCards, cardPayments, cardTransactions };
 }

@@ -1,20 +1,16 @@
 import { DashboardShell } from "@/components/dashboard/dashboard-shell";
 import { calculateDashboardSnapshot } from "@/lib/finance/dashboard";
-import { getFinancialCycle, getSalaryPaymentForCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
-import { hasRealDashboardRows, loadDashboardRows, mapDashboardRowsToInput, type DashboardDataSource } from "@/lib/finance/dashboard-data";
-import { buildUpcomingItems, emptyUpcomingSummary, type UpcomingSummary } from "@/lib/finance/upcoming";
-import { isLocale } from "@/lib/i18n/dictionaries";
+import { getSalaryPaymentForCycle } from "@/lib/finance/cycle";
+import { mapDashboardRowsToInput, type DashboardDataSource } from "@/lib/finance/dashboard-data";
+import { emptyUpcomingSummary, type UpcomingSummary } from "@/lib/finance/upcoming";
 import { sampleDashboardInput } from "@/lib/finance/sample-data";
-import { createClient } from "@/lib/supabase/server";
+import { loadDashboardFeatureRows } from "@/lib/finance/dashboard-query";
+import { loadUpcomingSummaryForRequest } from "@/lib/finance/upcoming-query";
+import { getPrivateCycleContext, todayDateKey } from "@/lib/server/private-context";
 
 export default async function DashboardPage() {
-  const today = new Date();
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  const { data: profile } = user ? await supabase.from("profiles").select("locale").eq("user_id", user.id).maybeSingle() : { data: null };
-  const locale = isLocale(profile?.locale) ? profile.locale : "th";
-  const startDay = user ? await getUserCycleStartDay(supabase, user.id) : undefined;
-  const cycle = getFinancialCycle(today, startDay);
+  const asOfDate = todayDateKey();
+  const { user, locale, cycle } = await getPrivateCycleContext(asOfDate);
   const salaryPayment = getSalaryPaymentForCycle(cycle.start);
 
   let source: DashboardDataSource = "demo";
@@ -25,10 +21,15 @@ export default async function DashboardPage() {
   let upcoming: UpcomingSummary = emptyUpcomingSummary();
 
   try {
-    const rows = await loadDashboardRows(supabase);
-    upcoming = buildUpcomingItems({ rows, cycleStart: cycle.start, cycleEnd: cycle.end, today });
+    if (!user) throw new Error("Authentication required.");
+    const [dashboardResult, upcomingResult] = await Promise.all([
+      loadDashboardFeatureRows(user.id, cycle.start.toISOString().slice(0, 10), cycle.end.toISOString().slice(0, 10)),
+      loadUpcomingSummaryForRequest(user.id, asOfDate)
+    ]);
+    const { rows, hasRows } = dashboardResult;
+    upcoming = upcomingResult;
 
-    if (hasRealDashboardRows(rows)) {
+    if (hasRows) {
       dashboardInput = mapDashboardRowsToInput(rows, cycle.start, cycle.end);
       source = "supabase";
       status = "ready";
