@@ -1,22 +1,17 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
-import { isLocale } from "@/lib/i18n/dictionaries";
-import { loadUpcomingSummary } from "@/lib/finance/upcoming-data";
-import { createClient } from "@/lib/supabase/server";
+import { loadUpcomingSummaryForRequest } from "@/lib/finance/upcoming-query";
+import { getPrivateContext, todayDateKey } from "@/lib/server/private-context";
 
 export default async function PrivateLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { user, locale } = await getPrivateContext();
 
   if (!user) {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase.from("profiles").select("locale").eq("user_id", user.id).maybeSingle();
-  const locale = isLocale(profile?.locale) ? profile.locale : "th";
-
   // Surface urgent (overdue + due-soon) counts as navigation badges.
-  const upcoming = await loadUpcomingSummary(supabase, user.id);
+  const upcoming = await loadUpcomingSummaryForRequest(user.id, todayDateKey());
   const badges: Record<string, number> = {
     "/upcoming": upcoming.urgentCount,
     "/planning": upcoming.urgentByHref["/planning"],
