@@ -1,12 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { deleteTransactionsForRelatedEntity, saveTransaction } from "@/app/(private)/transactions/actions";
+import { deleteTransactionsForRelatedEntity } from "@/app/(private)/transactions/actions";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
 import { selectDueInstallmentCharges, type ChargeableInstallment } from "@/lib/finance/installment-charges";
 import { selectDueSubscriptionCharges, type ChargeableSubscription, type CycleTransactionLink } from "@/lib/finance/subscription-charges";
 import { selectSubscriptionSourcePromotions, type ScheduledSourceSubscription } from "@/lib/finance/subscription-source-promotion";
-import { updateDebtRemaining } from "@/lib/finance/transaction-effects";
 import type { CategoryKind } from "@/lib/finance/types";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/server";
@@ -371,6 +370,7 @@ export async function deleteAnnualExpense(formData: FormData) {
 }
 
 export type SubscriptionChargeResult = { charged: number; skipped: number };
+type AutomatedChargeRpcResult = { status: "created" | "already_processed"; transaction_id: string | null };
 
 // Lazy materialization: triggered once per app-shell mount (client one-shot effect),
 // not by a scheduler. Idempotent — re-running mid-cycle after a successful charge
@@ -439,20 +439,14 @@ export async function processDueSubscriptionCharges(): Promise<SubscriptionCharg
     }
 
     try {
-      const chargeFormData = new FormData();
-      chargeFormData.set("locale", "th");
-      chargeFormData.set("type", charge.sourceKind === "card" ? "credit_card_expense" : "expense");
-      chargeFormData.set("amount", String(charge.amount));
-      chargeFormData.set("category_id", charge.categoryId ?? "");
-      chargeFormData.set("expense_related_entity_id", charge.subscriptionId);
-      chargeFormData.set("transaction_date", toDateInput(todayAtNoon()));
-      chargeFormData.set("notes", "Auto-charged subscription (lazy materialization)");
-      if (charge.sourceKind === "card") chargeFormData.set("credit_card_id", charge.sourceId);
-      else chargeFormData.set("account_id", charge.sourceId);
-
-      const result = await saveTransaction({ status: "idle", message: "" }, chargeFormData);
-      if (result.status === "success") charged += 1;
-      else skipped += 1;
+      const { data, error } = await supabase.rpc("materialize_due_subscription_charge", {
+        p_subscription_id: charge.subscriptionId,
+        p_cycle_start_date: cycleStartKey,
+        p_transaction_date: toDateInput(todayAtNoon())
+      });
+      const result = data as AutomatedChargeRpcResult | null;
+      if (!error && result?.status === "created") charged += 1;
+      else skipped += 1; // already_processed is an expected, silent no-op.
     } catch {
       skipped += 1;
     }
@@ -465,11 +459,8 @@ export async function processDueSubscriptionCharges(): Promise<SubscriptionCharg
 export type InstallmentChargeResult = { charged: number; skipped: number };
 
 // Lazy materialization mirror of processDueSubscriptionCharges, but for
-// card-linked installments: each cycle posts a credit_card_expense (the float,
-// exactly like a card-bound subscription) via saveTransaction, then separately
-// draws down the debt with a null-account debt_payments row written directly
-// (never through saveTransaction's debt_payment path, which requires a cash
-// account). Charging stops once remaining_balance reaches zero.
+// card-linked installments: each cycle atomically posts the card float and its
+// linked debt paydown through one idempotent RPC. Selection/timing stays here.
 export async function processDueInstallmentCharges(): Promise<InstallmentChargeResult> {
   const supabase = await createClient();
   const {
@@ -507,40 +498,16 @@ export async function processDueInstallmentCharges(): Promise<InstallmentChargeR
   let skipped = 0;
   for (const charge of dueCharges) {
     try {
-      const chargeFormData = new FormData();
-      chargeFormData.set("locale", "th");
-      chargeFormData.set("type", "credit_card_expense");
-      chargeFormData.set("amount", String(charge.amount));
-      chargeFormData.set("category_id", charge.categoryId ?? "");
-      chargeFormData.set("expense_related_entity_id", charge.debtId);
-      chargeFormData.set("credit_card_id", charge.cardId);
-      chargeFormData.set("transaction_date", toDateInput(todayAtNoon()));
-      chargeFormData.set("notes", "Auto-charged installment (lazy materialization)");
-
-      const result = await saveTransaction({ status: "idle", message: "" }, chargeFormData);
-      if (result.status !== "success" || !result.transactionId) {
-        skipped += 1;
-        continue;
-      }
-
-      // Links back to the card-charge transaction so deleting it cleanly
-      // restores remaining_balance via the existing debt_payments-by-
-      // transaction_id reversal (see revertTransactionSideEffects).
-      const { error: paymentError } = await supabase.from("debt_payments").insert({
-        user_id: userId,
-        debt_id: charge.debtId,
-        account_id: null,
-        amount: charge.amount,
-        paid_date: toDateInput(todayAtNoon()),
-        source: "installment_auto",
-        transaction_id: result.transactionId
+      const { data, error } = await supabase.rpc("materialize_due_installment_charge", {
+        p_debt_id: charge.debtId,
+        p_cycle_start_date: cycleStartKey,
+        p_transaction_date: toDateInput(todayAtNoon())
       });
-      if (paymentError) {
+      const result = data as AutomatedChargeRpcResult | null;
+      if (error || result?.status !== "created") {
         skipped += 1;
         continue;
       }
-
-      await updateDebtRemaining(supabase, userId, charge.debtId, -charge.amount);
       charged += 1;
     } catch {
       skipped += 1;

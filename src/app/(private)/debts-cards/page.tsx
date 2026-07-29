@@ -5,6 +5,7 @@ import { DebtForm } from "@/components/debts-cards/debt-form";
 import { DeleteCardForm } from "@/components/debts-cards/delete-card-form";
 import { DeleteDebtForm } from "@/components/debts-cards/delete-debt-form";
 import { CardActivityForms, CardPaymentForm, DebtPaymentForm } from "@/components/debts-cards/payment-forms";
+import { CreditCardActiveForm } from "@/components/debts-cards/card-active-form";
 import { LazyDetails } from "@/components/ui/lazy-details";
 import { computeCardObligation } from "@/lib/finance/dashboard-data";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
@@ -12,7 +13,7 @@ import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import type { AccountType } from "@/lib/finance/types";
 import { isCashLikeType } from "@/lib/finance/types";
 import { createClient } from "@/lib/supabase/server";
-import { setCreditCardActive, setDebtActive } from "./actions";
+import { setDebtActive } from "./actions";
 
 type AccountRow = { id: string; name: string; type: string; active: boolean };
 type DebtRow = {
@@ -66,9 +67,10 @@ function StatusPill({ active, locale }: { active: boolean; locale: Locale }) {
 }
 
 function ToggleActiveForm({ id, active, kind, locale }: { id: string; active: boolean; kind: "debt" | "card"; locale: Locale }) {
+  if (kind === "card") return <CreditCardActiveForm id={id} active={active} locale={locale} />;
   const common = dictionaries[locale].common;
   return (
-    <form action={kind === "debt" ? setDebtActive : setCreditCardActive}>
+    <form action={setDebtActive}>
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="active" value={active ? "false" : "true"} />
