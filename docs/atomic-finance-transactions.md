@@ -21,10 +21,11 @@ balance, child-row, or ownership check fails.
 ## Scope boundary
 
 Manual creates, edits, and deletes use the three RPCs introduced by migration
-`015_add_atomic_finance_transaction_rpcs.sql`. Subscription and installment
-lazy auto-charging deliberately set an internal marker and retain the legacy
-write path for this phase. Dashboard, card-cut, safe-to-spend, subscription,
-installment, and financial-cycle calculations were not changed.
+`015_add_atomic_finance_transaction_rpcs.sql`. Migration 016 subsequently moves
+only the write portion of subscription and installment lazy materialization into
+focused atomic/idempotent RPCs; their TypeScript timing and selection logic stay
+unchanged. Dashboard, card-cut, safe-to-spend, subscription, installment, and
+financial-cycle calculations were not changed.
 
 The RPCs are `SECURITY DEFINER` because their non-public helper functions have
 no execute grant for application roles and must still be callable as one unit.

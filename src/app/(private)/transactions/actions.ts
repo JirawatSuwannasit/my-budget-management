@@ -3,13 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
-import { findTransactionsForCard, findTransactionsForRelatedEntity, revertAndDeleteTransactions, revertTransactionSideEffects, type TransactionRow } from "@/lib/finance/cascade-delete";
-import { applyAccountBalanceDeltas, getAccountBalanceDeltas, updateDebtRemaining, type AccountBalanceDelta } from "@/lib/finance/transaction-effects";
+import { findTransactionsForCard, findTransactionsForRelatedEntity, revertAndDeleteTransactions } from "@/lib/finance/cascade-delete";
 import type { TransactionType } from "@/lib/finance/types";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 
 export type TransactionActionState = { status: "idle" | "success" | "error"; message: string; transactionId?: string };
-type SupabaseServer = Awaited<ReturnType<typeof createClient>>;
 type TransactionMessages = Record<keyof typeof dictionaries.en.transactions.messages, string>;
 const transactionTypes: TransactionType[] = ["income", "expense", "transfer", "credit_card_expense", "credit_card_payment", "debt_payment", "investment_transfer", "sinking_fund_reserve"];
 
@@ -51,12 +49,6 @@ async function getUserId(messages: TransactionMessages = dictionaries.th.transac
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) throw new Error(messages.loginAgain);
   return { supabase, userId: user.id };
-}
-// Single source of truth for writing account balance deltas: one batched
-// read, in-memory below-zero validation for every affected account, then
-// parallel per-account writes. See transaction-effects.ts for details.
-async function applyAccountDeltas(supabase: SupabaseServer, userId: string, deltas: AccountBalanceDelta[], messages: TransactionMessages) {
-  await applyAccountBalanceDeltas(supabase, userId, deltas, messages.balanceBelowZero);
 }
 function revalidateFinanceViews() {
   revalidatePath("/transactions");
@@ -101,81 +93,6 @@ function buildPayload(formData: FormData, userId: string, messages: TransactionM
   const destinationAccountId = type === "transfer" || type === "investment_transfer" || type === "sinking_fund_reserve" ? rawDestinationAccountId : null;
   return { transaction: { user_id: userId, account_id: accountId, destination_account_id: destinationAccountId, category_id: categoryId, type, amount, transaction_date: transactionDate, cycle_start_date: toDateInput(cycleStart), related_entity_id: relatedEntityId, notes }, extras: { creditCardId, debtId } };
 }
-// Phase A: account balance + debt-remaining effects. Needs only `payload`, not
-// a transaction id, so callers can run it concurrently with the transaction
-// INSERT itself (the id is only needed by phase B below).
-async function applyAccountAndDebtEffects(supabase: SupabaseServer, userId: string, payload: ReturnType<typeof buildPayload>, messages: TransactionMessages) {
-  const tx = payload.transaction;
-  const debtId = payload.extras.debtId;
-  if (tx.type === "debt_payment" && !debtId) throw new Error(messages.debtAndAccountRequired);
-  const deltas = getAccountBalanceDeltas({ type: tx.type, amount: tx.amount, accountId: tx.account_id, destinationAccountId: tx.destination_account_id });
-  const tasks: Array<Promise<void>> = [applyAccountDeltas(supabase, userId, deltas, messages)];
-  if (tx.type === "debt_payment" && debtId) tasks.push(updateDebtRemaining(supabase, userId, debtId, -tx.amount));
-  await Promise.all(tasks);
-}
-
-// Phase B: the child-row insert that references transaction_id, so it must
-// run only after the transaction row (insert or update) exists.
-async function insertChildRow(supabase: SupabaseServer, userId: string, transactionId: string, payload: ReturnType<typeof buildPayload>, messages: TransactionMessages) {
-  const tx = payload.transaction;
-  if (tx.type === "credit_card_expense") {
-    if (!payload.extras.creditCardId) throw new Error(messages.creditCardRequired);
-    const { error } = await supabase.from("card_transactions").insert({ user_id: userId, transaction_id: transactionId, card_id: payload.extras.creditCardId, category_id: tx.category_id, amount: tx.amount, transaction_date: tx.transaction_date, billing_cycle_start: tx.cycle_start_date, notes: tx.notes });
-    if (error) throw new Error(error.message);
-  }
-  if (tx.type === "credit_card_payment") {
-    if (!payload.extras.creditCardId || !tx.account_id) throw new Error(messages.cardAndAccountRequired);
-    const { error } = await supabase.from("card_payments").insert({ user_id: userId, transaction_id: transactionId, card_id: payload.extras.creditCardId, account_id: tx.account_id, amount: tx.amount, payment_date: tx.transaction_date });
-    if (error) throw new Error(error.message);
-  }
-  if (tx.type === "debt_payment") {
-    if (!payload.extras.debtId || !tx.account_id) throw new Error(messages.debtAndAccountRequired);
-    const { error } = await supabase.from("debt_payments").insert({ user_id: userId, transaction_id: transactionId, debt_id: payload.extras.debtId, account_id: tx.account_id, amount: tx.amount, paid_date: tx.transaction_date, source: "manual" });
-    if (error) throw new Error(error.message);
-  }
-}
-
-// Used by the edit path, where the transaction id is already known: phase A
-// and phase B are independent (different tables), so they run concurrently.
-async function applyTransactionSideEffects(supabase: SupabaseServer, userId: string, transactionId: string, payload: ReturnType<typeof buildPayload>, messages: TransactionMessages) {
-  await Promise.all([applyAccountAndDebtEffects(supabase, userId, payload, messages), insertChildRow(supabase, userId, transactionId, payload, messages)]);
-}
-async function saveTransactionLegacy(_previousState: TransactionActionState, formData: FormData): Promise<TransactionActionState> {
-  const messages = getMessages(formData);
-  try {
-    const { supabase, userId } = await getUserId(messages);
-    const id = String(formData.get("id") ?? "").trim();
-
-    if (id) {
-      // Both reads only need userId, so run them concurrently.
-      const [startDay, existingResult] = await Promise.all([getUserCycleStartDay(supabase, userId), supabase.from("transactions").select("*").eq("id", id).eq("user_id", userId).single()]);
-      const { data: existing, error: existingError } = existingResult;
-      if (existingError) throw new Error(existingError.message);
-      const payload = buildPayload(formData, userId, messages, startDay);
-      // Revert phase fully completes before the apply phase begins.
-      await revertTransactionSideEffects(supabase, userId, existing as TransactionRow, messages);
-      const { error } = await supabase.from("transactions").update(payload.transaction).eq("id", id).eq("user_id", userId);
-      if (error) throw new Error(error.message);
-      await applyTransactionSideEffects(supabase, userId, id, payload, messages);
-      revalidateFinanceViews();
-      return { status: "success", message: messages.updated, transactionId: id };
-    }
-
-    const startDay = await getUserCycleStartDay(supabase, userId);
-    const payload = buildPayload(formData, userId, messages, startDay);
-    // Account/debt effects don't depend on the transaction id, so they run
-    // concurrently with the INSERT; the child-row insert (phase B) needs the
-    // new id and so must wait for it.
-    const [insertResult] = await Promise.all([supabase.from("transactions").insert(payload.transaction).select("id").single(), applyAccountAndDebtEffects(supabase, userId, payload, messages)]);
-    const { data: inserted, error } = insertResult;
-    if (error) throw new Error(error.message);
-    await insertChildRow(supabase, userId, inserted.id, payload, messages);
-    revalidateFinanceViews();
-    return { status: "success", message: messages.added, transactionId: inserted.id };
-  } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : messages.saveFailed };
-  }
-}
 type FinanceRpcResult = { transaction_id: string; status: "created" | "updated" };
 
 function rpcErrorMessage(error: { message?: string } | null, messages: TransactionMessages, fallback: string) {
@@ -199,10 +116,6 @@ function rpcErrorMessage(error: { message?: string } | null, messages: Transacti
 }
 
 export async function saveTransaction(_previousState: TransactionActionState, formData: FormData): Promise<TransactionActionState> {
-  // Recurring engines deliberately remain on the pre-Phase-A path. Their
-  // internal callers set this marker immediately before invoking the action.
-  if (formData.get("_automated_charge") === "1") return saveTransactionLegacy(_previousState, formData);
-
   const messages = getMessages(formData);
   try {
     const { supabase, userId } = await getUserId(messages);
