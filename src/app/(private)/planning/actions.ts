@@ -440,6 +440,7 @@ export async function processDueSubscriptionCharges(): Promise<SubscriptionCharg
 
     try {
       const chargeFormData = new FormData();
+      chargeFormData.set("_automated_charge", "1");
       chargeFormData.set("locale", "th");
       chargeFormData.set("type", charge.sourceKind === "card" ? "credit_card_expense" : "expense");
       chargeFormData.set("amount", String(charge.amount));
@@ -508,6 +509,7 @@ export async function processDueInstallmentCharges(): Promise<InstallmentChargeR
   for (const charge of dueCharges) {
     try {
       const chargeFormData = new FormData();
+      chargeFormData.set("_automated_charge", "1");
       chargeFormData.set("locale", "th");
       chargeFormData.set("type", "credit_card_expense");
       chargeFormData.set("amount", String(charge.amount));

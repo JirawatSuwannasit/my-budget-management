@@ -140,7 +140,7 @@ async function insertChildRow(supabase: SupabaseServer, userId: string, transact
 async function applyTransactionSideEffects(supabase: SupabaseServer, userId: string, transactionId: string, payload: ReturnType<typeof buildPayload>, messages: TransactionMessages) {
   await Promise.all([applyAccountAndDebtEffects(supabase, userId, payload, messages), insertChildRow(supabase, userId, transactionId, payload, messages)]);
 }
-export async function saveTransaction(_previousState: TransactionActionState, formData: FormData): Promise<TransactionActionState> {
+async function saveTransactionLegacy(_previousState: TransactionActionState, formData: FormData): Promise<TransactionActionState> {
   const messages = getMessages(formData);
   try {
     const { supabase, userId } = await getUserId(messages);
@@ -176,6 +176,63 @@ export async function saveTransaction(_previousState: TransactionActionState, fo
     return { status: "error", message: error instanceof Error ? error.message : messages.saveFailed };
   }
 }
+type FinanceRpcResult = { transaction_id: string; status: "created" | "updated" };
+
+function rpcErrorMessage(error: { message?: string } | null, messages: TransactionMessages, fallback: string) {
+  const code = error?.message ?? "";
+  const mappings: Array<[string, string]> = [
+    ["FINANCE_LOGIN_REQUIRED", messages.loginAgain],
+    ["FINANCE_AMOUNT_POSITIVE", messages.amountPositive],
+    ["FINANCE_SOURCE_REQUIRED", messages.chooseCashAccount],
+    ["FINANCE_DESTINATION_REQUIRED", messages.chooseTransferDestination],
+    ["FINANCE_SAME_ACCOUNT", messages.reserveSameAccount],
+    ["FINANCE_INSUFFICIENT_BALANCE", messages.balanceBelowZero],
+    ["FINANCE_CARD_REQUIRED", messages.creditCardRequired],
+    ["FINANCE_DEBT_REQUIRED", messages.debtAndAccountRequired],
+    ["FINANCE_TRANSACTION_NOT_FOUND", messages.saveFailed],
+    ["FINANCE_INVALID_REFERENCE", messages.saveFailed],
+    ["FINANCE_UNSAFE_CARD_EXPENSE", messages.unsafeCardExpense],
+    ["FINANCE_UNSAFE_CARD_PAYMENT", messages.unsafeCardPayment],
+    ["FINANCE_UNSAFE_DEBT_PAYMENT", messages.unsafeDebtPayment]
+  ];
+  return mappings.find(([marker]) => code.includes(marker))?.[1] ?? fallback;
+}
+
+export async function saveTransaction(_previousState: TransactionActionState, formData: FormData): Promise<TransactionActionState> {
+  // Recurring engines deliberately remain on the pre-Phase-A path. Their
+  // internal callers set this marker immediately before invoking the action.
+  if (formData.get("_automated_charge") === "1") return saveTransactionLegacy(_previousState, formData);
+
+  const messages = getMessages(formData);
+  try {
+    const { supabase, userId } = await getUserId(messages);
+    const startDay = await getUserCycleStartDay(supabase, userId);
+    const payload = buildPayload(formData, userId, messages, startDay);
+    const id = String(formData.get("id") ?? "").trim();
+    const args = {
+      p_type: payload.transaction.type,
+      p_amount: payload.transaction.amount,
+      p_account_id: payload.transaction.account_id,
+      p_destination_account_id: payload.transaction.destination_account_id,
+      p_category_id: payload.transaction.category_id,
+      p_transaction_date: payload.transaction.transaction_date,
+      p_cycle_start_date: payload.transaction.cycle_start_date,
+      p_related_entity_id: payload.transaction.related_entity_id,
+      p_notes: payload.transaction.notes,
+      p_credit_card_id: payload.extras.creditCardId,
+      p_debt_id: payload.extras.debtId
+    };
+    const rpcName = id ? "update_finance_transaction" : "create_finance_transaction";
+    const { data, error } = await supabase.rpc(rpcName, id ? { p_transaction_id: id, ...args } : args);
+    if (error) return { status: "error", message: rpcErrorMessage(error, messages, messages.saveFailed) };
+    const result = data as FinanceRpcResult;
+    revalidateFinanceViews();
+    return { status: "success", message: id ? messages.updated : messages.added, transactionId: result.transaction_id };
+  } catch (error) {
+    return { status: "error", message: error instanceof Error ? error.message : messages.saveFailed };
+  }
+}
+
 /**
  * Cascade-deletes every transaction linked to a planning entity (subscription /
  * annual expense) via `related_entity_id`, across all cycles, and returns how
@@ -211,13 +268,10 @@ export async function deleteTransactionsForCard(cardId: string, messages: Transa
 
 export async function deleteTransaction(formData: FormData) {
   const messages = getMessages(formData);
-  const { supabase, userId } = await getUserId(messages);
+  const { supabase } = await getUserId(messages);
   const id = String(formData.get("id") ?? "").trim();
   if (!id) throw new Error(messages.idRequired);
-  const { data: existing, error: existingError } = await supabase.from("transactions").select("*").eq("id", id).eq("user_id", userId).single();
-  if (existingError) throw new Error(existingError.message);
-  await revertTransactionSideEffects(supabase, userId, existing as TransactionRow, messages);
-  const { error } = await supabase.from("transactions").delete().eq("id", id).eq("user_id", userId);
-  if (error) throw new Error(error.message);
+  const { error } = await supabase.rpc("delete_finance_transaction", { p_transaction_id: id });
+  if (error) throw new Error(rpcErrorMessage(error, messages, messages.saveFailed));
   revalidateFinanceViews();
 }
