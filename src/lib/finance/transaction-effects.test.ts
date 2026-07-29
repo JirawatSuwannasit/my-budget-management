@@ -1,11 +1,39 @@
 import { describe, expect, it } from "vitest";
 import { createSupabaseMock, asSupabaseClient } from "./__tests__/supabase-mock";
-import { applyAccountBalanceDeltas, reverseLinkedDebtPayments, type AccountBalanceDelta } from "./transaction-effects";
+import { applyAccountBalanceDeltas, getAccountBalanceDeltas, getReverseAccountBalanceDeltas, reverseLinkedDebtPayments, type AccountBalanceDelta } from "./transaction-effects";
 
 const BELOW_ZERO_MESSAGE = "balance would go below zero";
 const MISSING_ACCOUNT_ERROR = "no rows found in accounts";
 
 type SupabaseArg = Parameters<typeof applyAccountBalanceDeltas>[0];
+
+describe("approved transaction effect contract", () => {
+  it.each([
+    ["income", [{ accountId: "source", delta: 100 }]],
+    ["expense", [{ accountId: "source", delta: -100 }]],
+    ["transfer", [{ accountId: "source", delta: -100 }, { accountId: "destination", delta: 100 }]],
+    ["investment_transfer", [{ accountId: "source", delta: -100 }, { accountId: "destination", delta: 100 }]],
+    ["credit_card_expense", []],
+    ["credit_card_payment", [{ accountId: "source", delta: -100 }]],
+    ["debt_payment", [{ accountId: "source", delta: -100 }]],
+    ["sinking_fund_reserve", [{ accountId: "source", delta: -100 }, { accountId: "destination", delta: 100 }]]
+  ] as const)("preserves %s create deltas", (type, expected) => {
+    expect(getAccountBalanceDeltas({ type, amount: 100, accountId: "source", destinationAccountId: "destination" })).toEqual(expected);
+  });
+
+  it("makes every generic reversal the exact inverse, so edit applies old and new effects once", () => {
+    const oldEffect = getAccountBalanceDeltas({ type: "transfer", amount: 100, accountId: "old-source", destinationAccountId: "old-destination" });
+    const reversed = getReverseAccountBalanceDeltas({ type: "transfer", amount: 100, accountId: "old-source", destinationAccountId: "old-destination" });
+    const newEffect = getAccountBalanceDeltas({ type: "investment_transfer", amount: 250, accountId: "new-source", destinationAccountId: "new-destination" });
+    expect(reversed).toEqual(oldEffect.map(({ accountId, delta }) => ({ accountId, delta: -delta })));
+    expect([...reversed, ...newEffect]).toEqual([
+      { accountId: "old-source", delta: 100 },
+      { accountId: "old-destination", delta: -100 },
+      { accountId: "new-source", delta: -250 },
+      { accountId: "new-destination", delta: 250 }
+    ]);
+  });
+});
 
 /** Balance writes recorded by the shared mock, in call order. */
 function balanceWrites(calls: ReturnType<typeof createSupabaseMock>["calls"]) {
