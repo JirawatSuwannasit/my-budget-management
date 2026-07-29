@@ -184,4 +184,70 @@ describe.skipIf(!enabled)("atomic finance RPCs (local Supabase)", () => {
     expect(cardRows.count).toBe(2);
     expect(payments.count).toBe(2);
   });
+
+  async function createActiveCard(name: string, billingCutDay = 1) {
+    const card = await admin.from("credit_cards").insert({
+      user_id: userId, name, billing_cut_day: billingCutDay, payment_due_day: 25, active: true
+    }).select("id").single();
+    if (card.error) throw card.error;
+    return card.data.id;
+  }
+
+  it("guards only card deactivation when billed or current-cycle obligations exist", async () => {
+    const billedCard = await createActiveCard("Billed guard");
+    const billedCharge = await client.rpc("create_finance_transaction", {
+      p_type: "credit_card_expense", p_amount: 100, p_credit_card_id: billedCard,
+      p_transaction_date: "2000-01-01", p_cycle_start_date: "2000-01-01"
+    });
+    expect(billedCharge.error).toBeNull();
+    const billedResult = await client.from("credit_cards").update({ active: false }).eq("id", billedCard);
+    expect(billedResult.error?.message).toContain("CARD_DEACTIVATE_BILLED_OUTSTANDING");
+
+    const currentCard = await createActiveCard("Current guard", 1);
+    const currentCharge = await client.rpc("create_finance_transaction", {
+      p_type: "credit_card_expense", p_amount: 75, p_credit_card_id: currentCard,
+      p_transaction_date: "2099-01-01", p_cycle_start_date: "2099-01-01"
+    });
+    expect(currentCharge.error).toBeNull();
+    const currentResult = await client.from("credit_cards").update({ active: false }).eq("id", currentCard);
+    expect(currentResult.error?.message).toContain("CARD_DEACTIVATE_CURRENT_SPENDING");
+  });
+
+  it("blocks deactivation for active and scheduled linked payment sources", async () => {
+    const subscriptionCard = await createActiveCard("Subscription guard");
+    await admin.from("subscriptions").insert({
+      user_id: userId, name: "Active card source", frequency: "monthly", price: 10,
+      billing_day: 1, source_card_id: subscriptionCard, active: true
+    });
+    const subscriptionResult = await client.from("credit_cards").update({ active: false }).eq("id", subscriptionCard);
+    expect(subscriptionResult.error?.message).toContain("CARD_DEACTIVATE_ACTIVE_SUBSCRIPTION");
+
+    const installmentCard = await createActiveCard("Installment guard");
+    await admin.from("debts").insert({
+      user_id: userId, name: "Active linked installment", type: "installment",
+      original_amount: 100, remaining_balance: 100, monthly_payment: 10,
+      card_id: installmentCard, active: true
+    });
+    const installmentResult = await client.from("credit_cards").update({ active: false }).eq("id", installmentCard);
+    expect(installmentResult.error?.message).toContain("CARD_DEACTIVATE_ACTIVE_INSTALLMENT");
+
+    const scheduledCard = await createActiveCard("Scheduled guard");
+    await admin.from("subscriptions").insert({
+      user_id: userId, name: "Scheduled card source", frequency: "monthly", price: 10,
+      billing_day: 1, next_source_card_id: scheduledCard,
+      next_source_effective_from: "2099-01-01", active: false
+    });
+    const scheduledResult = await client.from("credit_cards").update({ active: false }).eq("id", scheduledCard);
+    expect(scheduledResult.error?.message).toContain("CARD_DEACTIVATE_NEXT_SUBSCRIPTION_SOURCE");
+  });
+
+  it("allows clean deactivation, ordinary inactive edits, and reactivation", async () => {
+    const cardId = await createActiveCard("Clean deactivation");
+    const deactivated = await client.from("credit_cards").update({ active: false }).eq("id", cardId);
+    expect(deactivated.error).toBeNull();
+    const edited = await client.from("credit_cards").update({ name: "Edited while inactive", billing_cut_day: 2 }).eq("id", cardId);
+    expect(edited.error).toBeNull();
+    const reactivated = await client.from("credit_cards").update({ active: true }).eq("id", cardId);
+    expect(reactivated.error).toBeNull();
+  });
 });
