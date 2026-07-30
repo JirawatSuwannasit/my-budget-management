@@ -4,32 +4,23 @@ import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BellRing, CreditCard, Landmark, LayoutDashboard, LineChart, ListChecks, Settings, Tag, WalletCards, X } from "lucide-react";
+import { Landmark, Menu, X } from "lucide-react";
 import { processDueInstallmentCharges, processDueSubscriptionCharges } from "@/app/(private)/planning/actions";
 import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/browser";
-
-function getNavItems(locale: Locale) {
-  const nav = dictionaries[locale].nav;
-  return [
-    { href: "/dashboard", label: nav.dashboard, short: nav.shortDashboard, icon: LayoutDashboard },
-    { href: "/accounts", label: nav.accounts, short: nav.shortAccounts, icon: WalletCards },
-    { href: "/transactions", label: nav.transactions, short: nav.shortTransactions, icon: ListChecks },
-    { href: "/planning", label: nav.planning, short: nav.shortPlanning, icon: BarChart3 },
-    { href: "/categories", label: nav.categories, short: nav.shortCategories, icon: Tag },
-    { href: "/debts-cards", label: nav.debtsCards, short: nav.shortDebtsCards, icon: CreditCard },
-    { href: "/upcoming", label: nav.upcoming, short: nav.shortUpcoming, icon: BellRing },
-    { href: "/reports", label: nav.reports, short: nav.shortReports, icon: LineChart },
-    { href: "/settings", label: nav.settings, short: nav.shortSettings, icon: Settings }
-  ];
-}
+import { getNavigationItems } from "./navigation";
 
 export function AppShell({ children, userEmail, locale, badges = {} }: Readonly<{ children: ReactNode; userEmail: string; locale: Locale; badges?: Record<string, number> }>) {
   const pathname = usePathname();
   const dictionary = dictionaries[locale];
-  const navItems = getNavItems(locale);
+  const navItems = getNavigationItems(locale);
+  const mobilePrimaryItems = navItems.filter((item) => item.mobilePrimary);
+  const mobileMoreItems = navItems.filter((item) => !item.mobilePrimary).sort((a, b) => (a.mobileMoreOrder ?? 0) - (b.mobileMoreOrder ?? 0));
   const hasTriggeredCharges = useRef(false);
   const [autoChargedCount, setAutoChargedCount] = useState(0);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreActive = mobileMoreItems.some((item) => pathname === item.href || pathname.startsWith(item.href + "/"));
+  const moreBadge = mobileMoreItems.reduce((total, item) => total + (badges[item.href] ?? 0), 0);
 
   // Lazy materialization: no scheduler exists in this stack, so due subscription
   // and card-linked installment charges are posted once per app-shell mount
@@ -47,6 +38,22 @@ export function AppShell({ children, userEmail, locale, badges = {} }: Readonly<
       if (total > 0) setAutoChargedCount(total);
     });
   }, []);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMoreOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [moreOpen]);
+
+  useEffect(() => setMoreOpen(false), [pathname]);
 
   async function signOut() {
     const supabase = createClient();
@@ -100,20 +107,52 @@ export function AppShell({ children, userEmail, locale, badges = {} }: Readonly<
         <main>{children}</main>
       </div>
 
+      {moreOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden" role="presentation">
+          <button type="button" aria-label={dictionary.nav.dismiss} className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={() => setMoreOpen(false)} />
+          <section id="mobile-more-menu" role="dialog" aria-modal="true" aria-labelledby="mobile-more-title" className="safe-bottom absolute inset-x-0 bottom-0 rounded-t-[28px] border border-line bg-surface p-4 pb-6 shadow-[0_-18px_50px_rgba(0,0,0,0.45)]">
+            <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-line" />
+            <div className="mb-3 flex items-center justify-between gap-4">
+              <h2 id="mobile-more-title" className="text-lg font-black text-ink">{dictionary.nav.moreMenu}</h2>
+              <button type="button" onClick={() => setMoreOpen(false)} aria-label={dictionary.nav.dismiss} className="grid h-10 w-10 place-items-center rounded-full bg-elevated text-muted transition hover:text-ink"><X size={20} aria-hidden="true" /></button>
+            </div>
+            <nav className="grid gap-2">
+              {mobileMoreItems.map((item) => {
+                const Icon = item.icon;
+                const active = pathname === item.href || pathname.startsWith(item.href + "/");
+                const badge = badges[item.href] ?? 0;
+                return (
+                  <Link key={item.href} href={item.href} onClick={() => setMoreOpen(false)} className={"flex min-h-14 items-center gap-3 rounded-2xl px-4 py-3 text-sm font-black transition " + (active ? "bg-primary text-canvas" : "bg-elevated text-ink hover:bg-primary/10 hover:text-primary")}>
+                    <Icon size={20} aria-hidden="true" />
+                    <span>{item.label}</span>
+                    {badge > 0 ? <span className={"ml-auto grid h-5 min-w-5 place-items-center rounded-full px-1.5 text-xs font-black " + (active ? "bg-surface text-primary" : "bg-rose-500 text-white")} aria-label={badge + " " + dictionary.upcoming.itemsSuffix}>{badge}</span> : null}
+                  </Link>
+                );
+              })}
+            </nav>
+          </section>
+        </div>
+      ) : null}
+
       <nav className="safe-bottom fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/94 px-3 pt-2 shadow-[0_-12px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl lg:hidden">
-        <div className="mx-auto grid max-w-lg grid-cols-9 gap-0.5">
-          {navItems.map((item) => {
+        <div className="mx-auto grid max-w-lg grid-cols-5 gap-1">
+          {mobilePrimaryItems.map((item) => {
             const Icon = item.icon;
             const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
             const badge = badges[item.href] ?? 0;
             return (
-              <Link key={item.href} href={item.href} className={"relative grid min-h-14 place-items-center gap-0.5 rounded-2xl px-0.5 text-[0.58rem] font-black transition " + (active ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/25" : "text-muted hover:text-ink")}>
-                {badge > 0 ? <span className="absolute right-1 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-rose-500 px-1 text-[0.55rem] font-black text-white" aria-label={badge + " " + dictionary.upcoming.itemsSuffix}>{badge}</span> : null}
-                <Icon size={18} aria-hidden="true" />
+              <Link key={item.href} href={item.href} className={"relative grid min-h-14 place-items-center gap-0.5 rounded-2xl px-1 text-[0.68rem] font-black transition " + (active ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/25" : "text-muted hover:text-ink")}>
+                {badge > 0 ? <span className="absolute right-2 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-rose-500 px-1 text-[0.55rem] font-black text-white" aria-label={badge + " " + dictionary.upcoming.itemsSuffix}>{badge}</span> : null}
+                <Icon size={20} aria-hidden="true" />
                 <span>{item.short}</span>
               </Link>
             );
           })}
+          <button type="button" aria-expanded={moreOpen} aria-controls="mobile-more-menu" onClick={() => setMoreOpen(true)} className={"relative grid min-h-14 place-items-center gap-0.5 rounded-2xl px-1 text-[0.68rem] font-black transition " + (moreActive || moreOpen ? "bg-primary/10 text-primary ring-1 ring-inset ring-primary/25" : "text-muted hover:text-ink")}>
+            {moreBadge > 0 ? <span className="absolute right-2 top-1 grid h-4 min-w-4 place-items-center rounded-full bg-rose-500 px-1 text-[0.55rem] font-black text-white" aria-label={moreBadge + " " + dictionary.upcoming.itemsSuffix}>{moreBadge}</span> : null}
+            <Menu size={20} aria-hidden="true" />
+            <span>{dictionary.nav.more}</span>
+          </button>
         </div>
       </nav>
     </div>

@@ -33,6 +33,8 @@ export const dictionaries = {
       shortUpcoming: "เตือน",
       shortReports: "รายงาน",
       shortSettings: "ตั้งค่า",
+      more: "เพิ่มเติม",
+      moreMenu: "เมนูเพิ่มเติม",
       signOut: "ออกจากระบบ",
       autoChargedNote: "ตัดค่าสมาชิกอัตโนมัติแล้ว {count} รายการ",
       dismiss: "ปิด"
@@ -709,6 +711,8 @@ export const dictionaries = {
       shortUpcoming: "Due",
       shortReports: "Reports",
       shortSettings: "Settings",
+      more: "More",
+      moreMenu: "More destinations",
       signOut: "Log out",
       autoChargedNote: "{count} subscription(s) auto-charged.",
       dismiss: "Dismiss"
