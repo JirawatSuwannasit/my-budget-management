@@ -20,6 +20,18 @@ function getMessages(formData: FormData): DebtCardMessages {
   return dictionaries[localeFromForm(formData)].debtsCards.messages;
 }
 
+function cardSaveError(error: unknown, messages: DebtCardMessages) {
+  const raw = error instanceof Error ? error.message : "";
+  const mappings: Array<[string, string]> = [
+    ["CARD_DEACTIVATE_BILLED_OUTSTANDING", messages.cardDeactivateBilledOutstanding],
+    ["CARD_DEACTIVATE_CURRENT_SPENDING", messages.cardDeactivateCurrentSpending],
+    ["CARD_DEACTIVATE_ACTIVE_SUBSCRIPTION", messages.cardDeactivateActiveSubscription],
+    ["CARD_DEACTIVATE_ACTIVE_INSTALLMENT", messages.cardDeactivateActiveInstallment],
+    ["CARD_DEACTIVATE_NEXT_SUBSCRIPTION_SOURCE", messages.cardDeactivateNextSubscriptionSource]
+  ];
+  return mappings.find(([marker]) => raw.includes(marker))?.[1] ?? messages.saveCardFailed;
+}
+
 // The card cascade reports transaction-layer failures (missing child rows,
 // balance-below-zero), so it needs that namespace in the form's own locale.
 function getTransactionMessages(formData: FormData) {
@@ -210,19 +222,24 @@ export async function saveCreditCard(_previousState: DebtCardActionState, formDa
     revalidateDebtCardViews();
     return { status: "success", message: messages.cardAdded };
   } catch (error) {
-    return { status: "error", message: error instanceof Error ? error.message : messages.saveCardFailed };
+    return { status: "error", message: cardSaveError(error, messages) };
   }
 }
 
-export async function setCreditCardActive(formData: FormData) {
+export async function setCreditCardActive(_previousState: DebtCardActionState, formData: FormData): Promise<DebtCardActionState> {
   const messages = getMessages(formData);
-  const { supabase, userId } = await getUserContext(messages);
-  const id = textValue(formData, "id");
-  const active = formData.get("active") === "true";
-  if (!id) throw new Error(messages.cardIdRequired);
-  const { error } = await supabase.from("credit_cards").update({ active }).eq("id", id).eq("user_id", userId);
-  if (error) throw new Error(error.message);
-  revalidateDebtCardViews();
+  try {
+    const { supabase, userId } = await getUserContext(messages);
+    const id = textValue(formData, "id");
+    const active = formData.get("active") === "true";
+    if (!id) throw new Error(messages.cardIdRequired);
+    const { error } = await supabase.from("credit_cards").update({ active }).eq("id", id).eq("user_id", userId);
+    if (error) throw new Error(error.message);
+    revalidateDebtCardViews();
+    return { status: "success", message: messages.cardUpdated };
+  } catch (error) {
+    return { status: "error", message: cardSaveError(error, messages) };
+  }
 }
 
 // DELETE means "entered wrong, remove completely" — setCreditCardActive(false)
