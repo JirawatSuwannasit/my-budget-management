@@ -17,9 +17,9 @@ export type TransactionType =
   | "investment_transfer"
   | "sinking_fund_reserve";
 
-export type QuickTransactionType = Extract<TransactionType, "expense" | "income" | "credit_card_expense">;
+export type QuickTransactionType = Extract<TransactionType, "expense" | "income">;
 export type QuickTransactionTemplate = {
-  id: string; name: string; type: QuickTransactionType; amount: number | string | null;
+  id: string; name: string; type: TransactionType; amount: number | string | null;
   account_id: string | null; category_id: string | null; related_entity_id: string | null;
   notes: string | null; icon_key: string | null; sort_order: number; active: boolean;
 };

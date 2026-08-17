@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { resolveQuickAmount } from "./quick-templates";
+import { isQuickTransactionType, resolveQuickAmount } from "./quick-templates";
 
 describe("quick transaction templates", () => {
+  it("supports only expense and income", () => {
+    expect(isQuickTransactionType("expense")).toBe(true);
+    expect(isQuickTransactionType("income")).toBe(true);
+    expect(isQuickTransactionType("credit_card_expense")).toBe(false);
+  });
   it("uses a positive fixed amount for one tap", () => expect(resolveQuickAmount({ active: true, amount: 45 }, null)).toBe(45));
   it("requires entered amount for quick fill", () => expect(() => resolveQuickAmount({ active: true, amount: null }, null)).toThrow("QUICK_AMOUNT_REQUIRED"));
   it("uses an entered amount for quick fill", () => expect(resolveQuickAmount({ active: true, amount: null }, "80")).toBe(80));

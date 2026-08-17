@@ -1,4 +1,10 @@
-import type { QuickTransactionTemplate } from "./types";
+import type { QuickTransactionTemplate, QuickTransactionType } from "./types";
+
+export const QUICK_TRANSACTION_TYPES = ["expense", "income"] as const;
+
+export function isQuickTransactionType(value: unknown): value is QuickTransactionType {
+  return typeof value === "string" && (QUICK_TRANSACTION_TYPES as readonly string[]).includes(value);
+}
 
 /** Pure validation shared by quick execution and unit tests; ownership is also enforced by RLS/query filters. */
 export function resolveQuickAmount(template: Pick<QuickTransactionTemplate, "active" | "amount">, enteredAmount: string | number | null) {

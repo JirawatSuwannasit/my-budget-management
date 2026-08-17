@@ -26,6 +26,5 @@ function QuickItem({ template, locale }: { template: QuickTransactionTemplate; l
 }
 export function QuickAddList({ templates, locale }: { templates: QuickTransactionTemplate[]; locale: Locale }) {
   const t = dictionaries[locale].transactions.quickAdd;
-  if (!templates.length) return null;
-  return <section className="rounded-panel border border-line bg-elevated/60 p-4"><h2 className="text-xl font-black text-ink">{t.title}</h2><p className="mt-1 text-sm font-semibold text-muted">{t.description}</p><div className="mt-3 flex gap-3 overflow-x-auto pb-2">{templates.map(x => <QuickItem key={x.id} template={x} locale={locale}/>)}</div></section>;
+  return <section className="rounded-panel border border-line bg-elevated/60 p-4"><h2 className="text-xl font-black text-ink">{t.title}</h2><p className="mt-1 text-sm font-semibold text-muted">{t.description}</p>{templates.length ? <div className="mt-3 flex gap-3 overflow-x-auto pb-2">{templates.map(x => <QuickItem key={x.id} template={x} locale={locale}/>)}</div> : <p className="mt-3 rounded-2xl border border-dashed border-line px-4 py-3 text-sm font-bold text-muted">{t.empty}</p>}</section>;
 }
