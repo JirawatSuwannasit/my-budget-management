@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { isLocale, type Locale } from "@/lib/i18n/dictionaries";
+import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import { THEME_COOKIE, resolveTheme } from "@/lib/theme";
 import { RESET_CONFIRM_WORD, RESET_TABLE_ORDER } from "@/lib/reset";
 
@@ -23,6 +23,7 @@ export async function setTheme(formData: FormData): Promise<void> {
 }
 
 export type SettingsActionState = { status: "idle" | "success" | "error"; message: string };
+const quickTypes = ["expense", "income", "credit_card_expense"] as const;
 
 async function getUserContext() {
   const supabase = await createClient();
@@ -136,4 +137,50 @@ export async function resetAllData(_previousState: SettingsActionState, formData
   } catch (error) {
     return { status: "error", message: error instanceof Error ? error.message : (locale === "th" ? "ลบข้อมูลไม่สำเร็จ" : "Could not reset your data.") };
   }
+}
+
+export async function saveQuickTemplate(_previousState: SettingsActionState, formData: FormData): Promise<SettingsActionState> {
+  const locale = parseLocale(formData.get("locale"));
+  const t = dictionaries[locale].settings.quickAdd;
+  try {
+    const { supabase, userId } = await getUserContext();
+    const id = textValue(formData, "id");
+    const name = textValue(formData, "name");
+    const type = String(formData.get("type") ?? "");
+    const amountText = String(formData.get("amount") ?? "").trim();
+    const amount = amountText ? Number(amountText) : null;
+    if (!name) throw new Error(t.name);
+    if (!quickTypes.includes(type as (typeof quickTypes)[number])) throw new Error(t.invalidReference);
+    if (amount !== null && (!Number.isFinite(amount) || amount <= 0)) throw new Error(dictionaries[locale].transactions.messages.amountPositive);
+    const accountId = textValue(formData, "account_id");
+    const categoryId = textValue(formData, "category_id");
+    const cardId = textValue(formData, "related_entity_id");
+    if (accountId) {
+      const { data } = await supabase.from("accounts").select("id").eq("id", accountId).eq("user_id", userId).eq("active", true).maybeSingle();
+      if (!data) throw new Error(t.invalidReference);
+    }
+    if (categoryId) {
+      const { data } = await supabase.from("categories").select("id").eq("id", categoryId).eq("user_id", userId).eq("active", true).maybeSingle();
+      if (!data) throw new Error(t.invalidReference);
+    }
+    if (type === "credit_card_expense") {
+      const { data } = cardId ? await supabase.from("credit_cards").select("id").eq("id", cardId).eq("user_id", userId).eq("active", true).maybeSingle() : { data: null };
+      if (!data) throw new Error(t.invalidReference);
+    }
+    const values = { user_id: userId, name, type, amount, account_id: accountId, category_id: categoryId, related_entity_id: type === "credit_card_expense" ? cardId : null, notes: textValue(formData, "notes"), icon_key: textValue(formData, "icon_key"), sort_order: Number(formData.get("sort_order") ?? 0) || 0, active: formData.get("active") === "on" };
+    const query = id ? supabase.from("quick_transaction_templates").update(values).eq("id", id).eq("user_id", userId) : supabase.from("quick_transaction_templates").insert(values);
+    const { error } = await query;
+    if (error) throw new Error(error.message);
+    revalidatePath("/settings"); revalidatePath("/transactions");
+    return { status: "success", message: t.saved };
+  } catch (error) { return { status: "error", message: error instanceof Error ? error.message : t.invalidReference }; }
+}
+
+export async function deleteQuickTemplate(formData: FormData) {
+  const { supabase, userId } = await getUserContext();
+  const id = textValue(formData, "id");
+  if (!id) return;
+  const { error } = await supabase.from("quick_transaction_templates").delete().eq("id", id).eq("user_id", userId);
+  if (error) throw new Error(error.message);
+  revalidatePath("/settings"); revalidatePath("/transactions");
 }

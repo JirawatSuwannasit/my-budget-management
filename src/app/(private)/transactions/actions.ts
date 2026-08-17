@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getFinancialCycle, getUserCycleStartDay } from "@/lib/finance/cycle";
 import { findTransactionsForCard, findTransactionsForRelatedEntity, revertAndDeleteTransactions } from "@/lib/finance/cascade-delete";
 import type { TransactionType } from "@/lib/finance/types";
+import { resolveQuickAmount } from "@/lib/finance/quick-templates";
 import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 
 export type TransactionActionState = { status: "idle" | "success" | "error"; message: string; transactionId?: string };
@@ -187,4 +188,51 @@ export async function deleteTransaction(formData: FormData) {
   const { error } = await supabase.rpc("delete_finance_transaction", { p_transaction_id: id });
   if (error) throw new Error(rpcErrorMessage(error, messages, messages.saveFailed));
   revalidateFinanceViews();
+}
+
+export async function executeQuickTemplate(_previousState: TransactionActionState, formData: FormData): Promise<TransactionActionState> {
+  const messages = getMessages(formData);
+  const locale = localeFromForm(formData);
+  const quick = dictionaries[locale].transactions.quickAdd;
+  try {
+    const { supabase, userId } = await getUserId(messages);
+    const templateId = textValue(formData, "template_id");
+    if (!templateId) throw new Error(quick.notFound);
+    const { data: template } = await supabase.from("quick_transaction_templates").select("id,user_id,name,type,amount,account_id,category_id,related_entity_id,notes,active").eq("id", templateId).eq("user_id", userId).maybeSingle();
+    if (!template) throw new Error(quick.notFound);
+    let amount: number;
+    try { amount = resolveQuickAmount(template, textValue(formData, "amount")); } catch (error) {
+      throw new Error(error instanceof Error && error.message === "QUICK_TEMPLATE_INACTIVE" ? quick.inactive : messages.amountPositive);
+    }
+    let accountId = template.account_id as string | null;
+    if (template.type !== "credit_card_expense") {
+      if (accountId) {
+        const { data } = await supabase.from("accounts").select("id").eq("id", accountId).eq("user_id", userId).eq("active", true).maybeSingle();
+        if (!data) throw new Error(quick.invalidReference);
+      } else {
+        const { data: settings } = await supabase.from("app_settings").select("default_account_id").eq("user_id", userId).maybeSingle();
+        const fallback = settings?.default_account_id as string | null;
+        const { data } = fallback ? await supabase.from("accounts").select("id").eq("id", fallback).eq("user_id", userId).eq("active", true).maybeSingle() : { data: null };
+        accountId = data?.id ?? null;
+      }
+      if (!accountId) throw new Error(messages.chooseCashAccount);
+    }
+    if (template.category_id) {
+      const { data } = await supabase.from("categories").select("id").eq("id", template.category_id).eq("user_id", userId).eq("active", true).maybeSingle();
+      if (!data) throw new Error(quick.invalidReference);
+    }
+    if (template.type === "credit_card_expense") {
+      const { data } = template.related_entity_id ? await supabase.from("credit_cards").select("id").eq("id", template.related_entity_id).eq("user_id", userId).eq("active", true).maybeSingle() : { data: null };
+      if (!data) throw new Error(quick.invalidReference);
+    }
+    const payload = new FormData();
+    payload.set("locale", locale); payload.set("type", template.type); payload.set("amount", String(amount));
+    payload.set("transaction_date", String(formData.get("transaction_date") ?? ""));
+    if (accountId) payload.set("account_id", accountId);
+    if (template.category_id) payload.set("category_id", template.category_id);
+    if (template.related_entity_id) payload.set("credit_card_id", template.related_entity_id);
+    if (template.notes) payload.set("notes", template.notes);
+    const result = await saveTransaction({ status: "idle", message: "" }, payload);
+    return result.status === "success" ? { ...result, message: `${template.name} · ฿${Number(amount).toLocaleString()} ${quick.added}` } : result;
+  } catch (error) { return { status: "error", message: error instanceof Error ? error.message : quick.invalidReference }; }
 }
