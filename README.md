@@ -2187,3 +2187,9 @@ Per card, using its `billing_cut_day`:
 Installment safe-to-spend math is untouched (still flows through `plannedDebtPayments`, never added to card outstanding). No stored "outstanding" column — everything above is derived. The user's 25th-cycle logic is untouched; `billing_cycle_start` on `card_transactions` is still written but no longer read for this derivation (the model uses `transaction_date` vs. the card's own billing cut, not the user's budget cycle).
 
 **Note:** sections describing the old statement workflow (e.g. §7, §36, "Add statement" steps) are left as historical phase documentation and no longer reflect current behavior — this section is the current source of truth for the credit-card model.
+
+## Quick Add transaction templates
+
+Quick Add lets each signed-in user save frequently used income or expense details from the collapsible **Quick Add Settings** area on the Transactions page. A template with an amount is a one-tap transaction; a template without an amount opens a compact, amount-focused Quick Fill control. Both modes use today's local date and the existing `create_finance_transaction` RPC, so balance, cycle, and validation behavior remains identical to the normal transaction form. Template references are ownership-checked and must remain active; a missing template account falls back only to the user's valid active default account. Credit-card entries remain available through the normal Transaction form, not Quick Add.
+
+Apply `supabase/migrations/018_add_quick_transaction_templates.sql` before deploying the UI. The migration creates the RLS-protected shortcut table; templates are not linked to historical transactions, so deleting a shortcut never deletes financial history.

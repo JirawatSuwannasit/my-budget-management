@@ -607,6 +607,9 @@ export const dictionaries = {
       deleteLabel: "ลบถ้าปลอดภัย",
       deleteConfirm: "ลบรายการนี้? ระบบจะย้อนผลกระทบยอดเงินที่เชื่อมโยงเมื่อปลอดภัย",
       editTransaction: "แก้ไขรายการ",
+      quickAdd: {
+        title: "รายการด่วน", description: "บันทึกรายรับหรือรายจ่ายที่ใช้บ่อย", settings: "ตั้งค่ารายการด่วน", add: "เพิ่มรายการด่วน", edit: "แก้ไข", name: "ชื่อรายการ", amount: "จำนวนเงิน", added: "เพิ่มรายการสำเร็จ", delete: "ลบ", disable: "ปิดใช้งาน", enable: "เปิดใช้งาน", save: "บันทึก", saving: "กำลังบันทึก...", icon: "ไอคอน", account: "บัญชี", category: "หมวดหมู่", choose: "เลือก", enterAmount: "กรอกจำนวนเงิน", enterWhenUsed: "กรอกจำนวนตอนใช้", execute: "เพิ่มรายการ", inactive: "รายการด่วนนี้ปิดใช้งาน", unsupported: "รายการเดิมประเภทบัตรเครดิตไม่รองรับรายการด่วนแล้ว ลบได้อย่างปลอดภัย", notFound: "ไม่พบรายการด่วน", invalidReference: "บัญชีหรือหมวดหมู่ไม่ถูกต้องหรือปิดใช้งาน", saved: "บันทึกรายการด่วนแล้ว", empty: "ยังไม่มีรายการด่วน เปิด ‘ตั้งค่ารายการด่วน’ เพื่อสร้างรายการแรก"
+      },
       types: {
         income: "รายรับ",
         expense: "รายจ่าย",
@@ -1285,6 +1288,9 @@ export const dictionaries = {
       deleteLabel: "Delete if safe",
       deleteConfirm: "Delete this transaction? Linked balance effects will be reversed when safe.",
       editTransaction: "Edit transaction",
+      quickAdd: {
+        title: "Quick Add", description: "Record frequently used income and expenses.", settings: "Quick Add Settings", add: "Add Quick Item", edit: "Edit", name: "Template name", amount: "Amount", added: "Transaction added", delete: "Delete", disable: "Disable", enable: "Enable", save: "Save", saving: "Saving...", icon: "Icon", account: "Account", category: "Category", choose: "Choose", enterAmount: "Enter amount", enterWhenUsed: "Enter amount when used", execute: "Add transaction", inactive: "This quick item is disabled.", unsupported: "Legacy credit-card quick items are no longer supported. You can safely delete this shortcut.", notFound: "Quick item not found.", invalidReference: "An account or category is invalid or inactive.", saved: "Quick item saved.", empty: "No quick items yet. Open Quick Add Settings to create your first one."
+      },
       types: {
         income: "Income",
         expense: "Expense",
