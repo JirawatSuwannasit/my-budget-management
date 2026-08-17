@@ -2,10 +2,11 @@ import Link from "next/link";
 import { ListChecks } from "lucide-react";
 import { DeleteTransactionForm } from "@/components/transactions/delete-transaction-form";
 import { TransactionForm } from "@/components/transactions/transaction-form";
+import { QuickAddList } from "@/components/transactions/quick-add-list";
 import { LazyDetails } from "@/components/ui/lazy-details";
 import { createClient } from "@/lib/supabase/server";
 import { dictionaries, isLocale } from "@/lib/i18n/dictionaries";
-import type { AccountType, CategoryKind, TransactionType } from "@/lib/finance/types";
+import type { AccountType, CategoryKind, QuickTransactionTemplate, TransactionType } from "@/lib/finance/types";
 
 const RECENT_PAGE_SIZE = 25;
 const RECENT_MAX = 500;
@@ -35,7 +36,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   const locale = isLocale(profile?.locale) ? profile.locale : "th";
   const t = dictionaries[locale].transactions;
 
-  const [accountsResult, categoriesResult, debtsResult, cardsResult, annualResult, subscriptionsResult, transactionsResult, appSettingsResult] = await Promise.all([
+  const [accountsResult, categoriesResult, debtsResult, cardsResult, annualResult, subscriptionsResult, transactionsResult, appSettingsResult, quickResult] = await Promise.all([
     supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
     supabase.from("categories").select("id,name,kind,active").order("name"),
     supabase.from("debts").select("id,name,active").order("active", { ascending: false }).order("name"),
@@ -43,7 +44,8 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
     supabase.from("annual_expenses").select("id,name,active").order("name"),
     supabase.from("subscriptions").select("id,name,frequency,active").order("name"),
     supabase.from("transactions").select("id,account_id,destination_account_id,category_id,type,amount,transaction_date,cycle_start_date,related_entity_id,notes,created_at").order("transaction_date", { ascending: false }).order("created_at", { ascending: false }).limit(recentLimit),
-    user ? supabase.from("app_settings").select("default_account_id").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null })
+    user ? supabase.from("app_settings").select("default_account_id").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    supabase.from("quick_transaction_templates").select("id,name,type,amount,account_id,category_id,related_entity_id,notes,icon_key,sort_order,active").eq("active", true).order("sort_order").order("created_at")
   ]);
 
   const accounts = (accountsResult.data ?? []) as AccountRow[];
@@ -53,6 +55,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
   const annualExpenses = (annualResult.data ?? []) as AnnualExpenseRow[];
   const subscriptions = (subscriptionsResult.data ?? []) as SubscriptionRow[];
   const transactions = (transactionsResult.data ?? []) as TransactionRow[];
+  const quickTemplates = (quickResult.data ?? []) as QuickTransactionTemplate[];
   const reserves = [
     ...annualExpenses.filter((item) => item.active).map((item) => ({ id: item.id, label: item.name, kind: "annual" as const })),
     ...subscriptions.filter((item) => item.active && item.frequency === "yearly").map((item) => ({ id: item.id, label: item.name, kind: "subscription" as const }))
@@ -81,6 +84,8 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
 
       {loadError ? <p className="rounded-panel border border-danger/30 bg-danger/10 p-4 text-sm font-bold text-danger">{t.loadError}: {loadError.message}</p> : null}
       {accounts.length === 0 ? <p className="rounded-panel border border-warning/30 bg-warning/10 p-4 text-sm font-bold text-warning">{t.needAccount}</p> : null}
+
+      <QuickAddList templates={quickTemplates} locale={locale} />
 
       <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
         <div>

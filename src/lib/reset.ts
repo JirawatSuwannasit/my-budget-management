@@ -19,6 +19,7 @@ export const RESET_TABLE_ORDER = [
   "debt_payments",
   "debts",
   "transactions",
+  "quick_transaction_templates",
   "budgets",
   "subscriptions",
   "annual_expenses",

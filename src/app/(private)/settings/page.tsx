@@ -4,6 +4,8 @@ import { DangerZone } from "@/components/settings/danger-zone";
 import { LogoutButton } from "@/components/settings/logout-button";
 import { SettingsForm } from "@/components/settings/settings-form";
 import { ThemeToggle } from "@/components/settings/theme-toggle";
+import { QuickTransactionTemplates } from "@/components/settings/quick-transaction-templates";
+import type { QuickTransactionTemplate } from "@/lib/finance/types";
 import { dictionaries, isLocale } from "@/lib/i18n/dictionaries";
 import { createClient } from "@/lib/supabase/server";
 import { THEME_COOKIE, resolveTheme } from "@/lib/theme";
@@ -31,15 +33,21 @@ export default async function SettingsPage() {
     data: { user }
   } = await supabase.auth.getUser();
 
-  const [profileResult, appSettingsResult, accountsResult] = await Promise.all([
+  const [profileResult, appSettingsResult, accountsResult, categoriesResult, cardsResult, quickResult] = await Promise.all([
     supabase.from("profiles").select("locale,currency,financial_cycle_start_day").eq("user_id", user?.id ?? "").maybeSingle(),
     supabase.from("app_settings").select("bonus_months,default_account_id").eq("user_id", user?.id ?? "").maybeSingle(),
-    supabase.from("accounts").select("id,name,active").order("active", { ascending: false }).order("name")
+    supabase.from("accounts").select("id,name,active").order("active", { ascending: false }).order("name"),
+    supabase.from("categories").select("id,name,active").order("name"),
+    supabase.from("credit_cards").select("id,name,active").order("name"),
+    supabase.from("quick_transaction_templates").select("id,name,type,amount,account_id,category_id,related_entity_id,notes,icon_key,sort_order,active").order("sort_order").order("created_at")
   ]);
 
   const profile = (profileResult.data ?? null) as ProfileRow | null;
   const appSettings = (appSettingsResult.data ?? null) as AppSettingsRow | null;
   const accounts = (accountsResult.data ?? []) as AccountRow[];
+  const categories = (categoriesResult.data ?? []) as AccountRow[];
+  const cards = (cardsResult.data ?? []) as AccountRow[];
+  const quickTemplates = (quickResult.data ?? []) as QuickTransactionTemplate[];
   const locale = isLocale(profile?.locale) ? profile.locale : "th";
   const t = dictionaries[locale].settings;
   const loadError = profileResult.error ?? appSettingsResult.error ?? accountsResult.error;
@@ -148,6 +156,8 @@ export default async function SettingsPage() {
           </article>
         </div>
       </section>
+
+      <QuickTransactionTemplates templates={quickTemplates} locale={locale} accounts={accounts} categories={categories} cards={cards} />
 
       <section>
         <DangerZone locale={locale} />

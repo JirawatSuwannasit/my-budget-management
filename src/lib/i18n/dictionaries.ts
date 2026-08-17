@@ -134,6 +134,9 @@ export const dictionaries = {
       exportJson: "ดาวน์โหลด JSON ทั้งหมด",
       exportCsv: "ดาวน์โหลดรายการเงิน (CSV)",
       importFutureNote: "การนำเข้าข้อมูลจะรองรับในเวอร์ชันถัดไป เวอร์ชันนี้รองรับเฉพาะการส่งออก",
+      quickAdd: {
+        title: "รายการด่วน", description: "สร้างรายการที่ใช้บ่อยเพื่อบันทึกรายรับหรือรายจ่ายได้เร็วขึ้น", add: "เพิ่มรายการด่วน", edit: "แก้ไขรายการด่วน", name: "ชื่อรายการ", amount: "จำนวนเงิน", noAmount: "ไม่กำหนดจำนวน", oneTap: "กดครั้งเดียวเพื่อบันทึก", quickFill: "กรอกจำนวนก่อนบันทึก", added: "เพิ่มรายการสำเร็จ", disabled: "ปิดใช้งาน", needsAttention: "ต้องแก้ไขบัญชี หมวดหมู่ หรือบัตรที่ปิดใช้งาน", delete: "ลบ", save: "บันทึก", saving: "กำลังบันทึก...", notes: "หมายเหตุ", icon: "ไอคอน", order: "ลำดับ", account: "บัญชี", category: "หมวดหมู่", card: "บัตรเครดิต", choose: "เลือก", normal: "เพิ่มรายการปกติ", enterAmount: "กรอกจำนวนเงิน", execute: "เพิ่มรายการ", inactive: "รายการด่วนนี้ปิดใช้งาน", notFound: "ไม่พบรายการด่วน", invalidReference: "บัญชี หมวดหมู่ หรือบัตรไม่ถูกต้องหรือปิดใช้งาน", saved: "บันทึกรายการด่วนแล้ว", deleted: "ลบรายการด่วนแล้ว"
+      },
       logout: "ออกจากระบบ"
     },
     accounts: {
@@ -607,6 +610,9 @@ export const dictionaries = {
       deleteLabel: "ลบถ้าปลอดภัย",
       deleteConfirm: "ลบรายการนี้? ระบบจะย้อนผลกระทบยอดเงินที่เชื่อมโยงเมื่อปลอดภัย",
       editTransaction: "แก้ไขรายการ",
+      quickAdd: {
+        title: "รายการด่วน", description: "สร้างรายการที่ใช้บ่อยเพื่อบันทึกรายรับหรือรายจ่ายได้เร็วขึ้น", add: "เพิ่มรายการด่วน", edit: "แก้ไขรายการด่วน", name: "ชื่อรายการ", amount: "จำนวนเงิน", noAmount: "ไม่กำหนดจำนวน", oneTap: "กดครั้งเดียวเพื่อบันทึก", quickFill: "กรอกจำนวนก่อนบันทึก", added: "เพิ่มรายการสำเร็จ", disabled: "ปิดใช้งาน", needsAttention: "ต้องแก้ไขบัญชี หมวดหมู่ หรือบัตรที่ปิดใช้งาน", delete: "ลบ", save: "บันทึก", saving: "กำลังบันทึก...", notes: "หมายเหตุ", icon: "ไอคอน", order: "ลำดับ", account: "บัญชี", category: "หมวดหมู่", card: "บัตรเครดิต", choose: "เลือก", normal: "เพิ่มรายการปกติ", enterAmount: "กรอกจำนวนเงิน", execute: "เพิ่มรายการ", inactive: "รายการด่วนนี้ปิดใช้งาน", notFound: "ไม่พบรายการด่วน", invalidReference: "บัญชี หมวดหมู่ หรือบัตรไม่ถูกต้องหรือปิดใช้งาน", saved: "บันทึกรายการด่วนแล้ว", deleted: "ลบรายการด่วนแล้ว"
+      },
       types: {
         income: "รายรับ",
         expense: "รายจ่าย",
@@ -812,6 +818,9 @@ export const dictionaries = {
       exportJson: "Download full JSON",
       exportCsv: "Download transactions (CSV)",
       importFutureNote: "Data import is planned for a future version. This version supports export only.",
+      quickAdd: {
+        title: "Quick Add", description: "Create reusable transaction shortcuts for frequently recorded income and expenses.", add: "Add quick item", edit: "Edit quick item", name: "Template name", amount: "Amount", noAmount: "No fixed amount", oneTap: "One-tap add", quickFill: "Enter amount before saving", added: "Transaction added", disabled: "Disabled", needsAttention: "Account, category, or card needs attention", delete: "Delete", save: "Save", saving: "Saving...", notes: "Notes", icon: "Icon", order: "Display order", account: "Account", category: "Category", card: "Credit card", choose: "Choose", normal: "Normal transaction", enterAmount: "Enter amount", execute: "Add transaction", inactive: "This quick item is disabled.", notFound: "Quick item not found.", invalidReference: "An account, category, or card is invalid or inactive.", saved: "Quick item saved.", deleted: "Quick item deleted."
+      },
       logout: "Log out"
     },
     accounts: {
@@ -1285,6 +1294,9 @@ export const dictionaries = {
       deleteLabel: "Delete if safe",
       deleteConfirm: "Delete this transaction? Linked balance effects will be reversed when safe.",
       editTransaction: "Edit transaction",
+      quickAdd: {
+        title: "Quick Add", description: "Create reusable transaction shortcuts for frequently recorded income and expenses.", add: "Add quick item", edit: "Edit quick item", name: "Template name", amount: "Amount", noAmount: "No fixed amount", oneTap: "One-tap add", quickFill: "Enter amount before saving", added: "Transaction added", disabled: "Disabled", needsAttention: "Account, category, or card needs attention", delete: "Delete", save: "Save", saving: "Saving...", notes: "Notes", icon: "Icon", order: "Display order", account: "Account", category: "Category", card: "Credit card", choose: "Choose", normal: "Normal transaction", enterAmount: "Enter amount", execute: "Add transaction", inactive: "This quick item is disabled.", notFound: "Quick item not found.", invalidReference: "An account, category, or card is invalid or inactive.", saved: "Quick item saved.", deleted: "Quick item deleted."
+      },
       types: {
         income: "Income",
         expense: "Expense",
