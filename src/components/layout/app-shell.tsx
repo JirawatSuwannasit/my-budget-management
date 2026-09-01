@@ -18,24 +18,27 @@ export function AppShell({ children, userEmail, locale, badges = {} }: Readonly<
   const mobileMoreItems = navItems.filter((item) => !item.mobilePrimary).sort((a, b) => (a.mobileMoreOrder ?? 0) - (b.mobileMoreOrder ?? 0));
   const hasTriggeredCharges = useRef(false);
   const [autoChargedCount, setAutoChargedCount] = useState(0);
+  const [autoChargeSkippedCount, setAutoChargeSkippedCount] = useState(0);
   const [moreOpen, setMoreOpen] = useState(false);
   const moreActive = mobileMoreItems.some((item) => pathname === item.href || pathname.startsWith(item.href + "/"));
   const moreBadge = mobileMoreItems.reduce((total, item) => total + (badges[item.href] ?? 0), 0);
 
   // Lazy materialization: no scheduler exists in this stack, so due subscription
-  // and card-linked installment charges are posted once per app-shell mount
-  // instead. Fire-and-forget; each server action revalidates the finance views
-  // itself on success. The two engines are independent (different tables), so
-  // they run in parallel.
+  // and card-linked installment charges are posted once per app-shell mount.
+  // Successful charges are announced. Any skipped/failed processing is surfaced
+  // as a warning instead of being silently swallowed, so schema/RPC failures are
+  // visible to the user and can be investigated before balances drift.
   useEffect(() => {
     if (hasTriggeredCharges.current) return;
     hasTriggeredCharges.current = true;
     Promise.all([
-      processDueSubscriptionCharges().catch(() => ({ charged: 0, skipped: 0 })),
-      processDueInstallmentCharges().catch(() => ({ charged: 0, skipped: 0 }))
+      processDueSubscriptionCharges().catch(() => ({ charged: 0, skipped: 1 })),
+      processDueInstallmentCharges().catch(() => ({ charged: 0, skipped: 1 }))
     ]).then(([subscriptionResult, installmentResult]) => {
-      const total = subscriptionResult.charged + installmentResult.charged;
-      if (total > 0) setAutoChargedCount(total);
+      const totalCharged = subscriptionResult.charged + installmentResult.charged;
+      const totalSkipped = subscriptionResult.skipped + installmentResult.skipped;
+      if (totalCharged > 0) setAutoChargedCount(totalCharged);
+      if (totalSkipped > 0) setAutoChargeSkippedCount(totalSkipped);
     });
   }, []);
 
@@ -81,6 +84,21 @@ export function AppShell({ children, userEmail, locale, badges = {} }: Readonly<
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-income/20 bg-income/10 px-4 py-2.5 text-xs font-bold text-income">
             <span>{dictionary.nav.autoChargedNote.replace("{count}", String(autoChargedCount))}</span>
             <button onClick={() => setAutoChargedCount(0)} aria-label={dictionary.nav.dismiss} className="text-income/70 transition hover:text-income">
+              <X size={14} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {autoChargeSkippedCount > 0 ? (
+        <div className="mx-auto max-w-7xl px-4 pt-3 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-2.5 text-xs font-bold text-warning" role="alert">
+            <span>
+              {locale === "th"
+                ? `ระบบตัดรายการอัตโนมัติข้าม ${autoChargeSkippedCount} รายการ โปรดตรวจสอบยอด หากไม่ถูกต้องให้รีเฟรชหน้าเพื่อลองใหม่`
+                : `Automatic charging skipped ${autoChargeSkippedCount} item(s). Please review the balances and refresh to retry if anything looks wrong.`}
+            </span>
+            <button onClick={() => setAutoChargeSkippedCount(0)} aria-label={dictionary.nav.dismiss} className="text-warning/70 transition hover:text-warning">
               <X size={14} aria-hidden="true" />
             </button>
           </div>
