@@ -180,6 +180,27 @@ export async function setDebtActive(formData: FormData) {
   revalidateDebtCardViews();
 }
 
+export async function setDebtPaused(formData: FormData) {
+  const messages = getMessages(formData);
+  const { supabase, userId } = await getUserContext(messages);
+  const id = textValue(formData, "id");
+  const paused = formData.get("paused") === "true";
+  if (!id) throw new Error(messages.debtIdRequired);
+
+  // Pause only suspends the recurring obligation. We intentionally do not
+  // create missed-payment rows or move remaining_balance. On resume, the normal
+  // current-cycle calculation immediately asks for one monthly payment, while
+  // cycles that elapsed during the pause remain ignored.
+  const { error } = await supabase
+    .from("debts")
+    .update({ paused, paused_at: paused ? new Date().toISOString() : null })
+    .eq("id", id)
+    .eq("user_id", userId);
+
+  if (error) throw new Error(error.message);
+  revalidateDebtCardViews();
+}
+
 export async function deleteDebt(formData: FormData) {
   const messages = getMessages(formData);
   const { supabase, userId } = await getUserContext(messages);
