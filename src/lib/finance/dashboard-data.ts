@@ -75,6 +75,7 @@ type DebtRow = {
   remaining_balance: number | string | null;
   monthly_payment: number | string | null;
   active: boolean | null;
+  paused?: boolean | null;
 };
 
 type DebtPaymentRow = {
@@ -262,6 +263,7 @@ export function mapDashboardRowsToInput(rows: DashboardRows, cycleStart: Date, c
   // time, immediately, before the card has even cut.
   const plannedDebtPayments = rows.debts
     .filter(active)
+    .filter((debt) => debt.paused !== true)
     .filter((debt) => !(debt.type === "installment" && debt.card_id))
     .map((debt) => ({
       id: debt.id,

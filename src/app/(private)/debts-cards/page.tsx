@@ -13,7 +13,7 @@ import { dictionaries, isLocale, type Locale } from "@/lib/i18n/dictionaries";
 import type { AccountType } from "@/lib/finance/types";
 import { isCashLikeType } from "@/lib/finance/types";
 import { createClient } from "@/lib/supabase/server";
-import { setDebtActive } from "./actions";
+import { setDebtActive, setDebtPaused } from "./actions";
 
 type AccountRow = { id: string; name: string; type: string; active: boolean };
 type DebtRow = {
@@ -29,6 +29,7 @@ type DebtRow = {
   card_id: string | null;
   installment_months: number | null;
   active: boolean;
+  paused: boolean;
 };
 type DebtPaymentRow = { id: string; debt_id: string; account_id: string | null; amount: number | string; paid_date: string; source: string | null; notes: string | null; created_at: string };
 type CardRow = { id: string; name: string; billing_cut_day: number; payment_due_day: number; active: boolean };
@@ -61,20 +62,37 @@ function ProgressBar({ percent, color = "bg-primary" }: { percent: number; color
   );
 }
 
-function StatusPill({ active, locale }: { active: boolean; locale: Locale }) {
+function StatusPill({ active, paused = false, locale }: { active: boolean; paused?: boolean; locale: Locale }) {
   const common = dictionaries[locale].common;
-  return <span className={"rounded-full px-2.5 py-1 text-xs font-black " + (active ? "bg-income/10 text-income" : "bg-elevated text-muted")}>{active ? common.active : common.inactive}</span>;
+  const debtCopy = dictionaries[locale].debtsCards;
+  if (!active) return <span className="rounded-full bg-elevated px-2.5 py-1 text-xs font-black text-muted">{common.inactive}</span>;
+  if (paused) return <span className="rounded-full bg-warning/10 px-2.5 py-1 text-xs font-black text-warning">{debtCopy.debtPaused}</span>;
+  return <span className="rounded-full bg-income/10 px-2.5 py-1 text-xs font-black text-income">{common.active}</span>;
 }
 
-function ToggleActiveForm({ id, active, kind, locale }: { id: string; active: boolean; kind: "debt" | "card"; locale: Locale }) {
+function ToggleActiveForm({ id, active, paused = false, kind, locale }: { id: string; active: boolean; paused?: boolean; kind: "debt" | "card"; locale: Locale }) {
   if (kind === "card") return <CreditCardActiveForm id={id} active={active} locale={locale} />;
+
   const common = dictionaries[locale].common;
+  const debtCopy = dictionaries[locale].debtsCards;
+
+  if (!active) {
+    return (
+      <form action={setDebtActive}>
+        <input type="hidden" name="id" value={id} />
+        <input type="hidden" name="locale" value={locale} />
+        <input type="hidden" name="active" value="true" />
+        <button className="rounded-full border border-line bg-surface px-4 py-2 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary">{common.activate}</button>
+      </form>
+    );
+  }
+
   return (
-    <form action={setDebtActive}>
+    <form action={setDebtPaused}>
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="locale" value={locale} />
-      <input type="hidden" name="active" value={active ? "false" : "true"} />
-      <button className="rounded-full border border-line bg-surface px-4 py-2 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary">{active ? common.deactivate : common.activate}</button>
+      <input type="hidden" name="paused" value={paused ? "false" : "true"} />
+      <button className="rounded-full border border-line bg-surface px-4 py-2 text-xs font-black text-ink shadow-card transition hover:border-primary/40 hover:text-primary">{paused ? debtCopy.resumeDebt : debtCopy.pauseDebt}</button>
     </form>
   );
 }
@@ -96,7 +114,7 @@ export default async function DebtsCardsPage() {
   const [profileResult, accountsResult, debtsResult, debtPaymentsResult, cardsResult, cardTransactionsResult, cardPaymentsResult, categoriesResult, appSettingsResult] = await Promise.all([
     user ? supabase.from("profiles").select("locale").eq("user_id", user.id).maybeSingle() : Promise.resolve({ data: null, error: null }),
     supabase.from("accounts").select("id,name,type,active").order("active", { ascending: false }).order("name"),
-    supabase.from("debts").select("id,name,type,original_amount,remaining_balance,interest_rate,monthly_payment,bonus_payment_amount,target_payoff_date,card_id,installment_months,active").order("active", { ascending: false }).order("name"),
+    supabase.from("debts").select("id,name,type,original_amount,remaining_balance,interest_rate,monthly_payment,bonus_payment_amount,target_payoff_date,card_id,installment_months,active,paused").order("active", { ascending: false }).order("name"),
     supabase.from("debt_payments").select("id,debt_id,account_id,amount,paid_date,source,notes,created_at").order("paid_date", { ascending: false }).limit(80),
     supabase.from("credit_cards").select("id,name,billing_cut_day,payment_due_day,active").order("active", { ascending: false }).order("name"),
     supabase.from("card_transactions").select("id,card_id,amount,transaction_date,notes").order("transaction_date", { ascending: false }).limit(120),
@@ -117,6 +135,7 @@ export default async function DebtsCardsPage() {
   const loadError = profileResult.error ?? accountsResult.error ?? debtsResult.error ?? debtPaymentsResult.error ?? cardsResult.error ?? cardTransactionsResult.error ?? cardPaymentsResult.error ?? categoriesResult.error;
 
   const activeDebts = debts.filter((debt) => debt.active);
+  const scheduledDebts = activeDebts.filter((debt) => !debt.paused);
   const genericDebts = debts.filter((debt) => debt.type !== "installment");
   const activeCards = cards.filter((card) => card.active);
   const cashLikeAccounts = accounts.filter((account) => account.active && isCashLikeType(account.type as AccountType));
@@ -138,7 +157,7 @@ export default async function DebtsCardsPage() {
   );
 
   const totalDebtRemaining = activeDebts.reduce((total, debt) => total + toNumber(debt.remaining_balance), 0);
-  const plannedDebtThisCycle = activeDebts.reduce((total, debt) => {
+  const plannedDebtThisCycle = scheduledDebts.reduce((total, debt) => {
     const paidThisCycle = debtPayments
       .filter((payment) => payment.debt_id === debt.id && payment.paid_date >= cycleStartDate && payment.paid_date <= cycleEndDate)
       .reduce((sum, payment) => sum + toNumber(payment.amount), 0);
@@ -202,12 +221,12 @@ export default async function DebtsCardsPage() {
             const estimatedMonths = estimatedMonthlyPower > 0 ? Math.ceil(remaining / estimatedMonthlyPower) : null;
             const history = debtPayments.filter((payment) => payment.debt_id === debt.id).slice(0, 5);
             const paidThisCycle = debtPayments.filter((payment) => payment.debt_id === debt.id && payment.paid_date >= cycleStartDate && payment.paid_date <= cycleEndDate).reduce((total, payment) => total + toNumber(payment.amount), 0);
-            const plannedLeft = Math.max(0, monthly - paidThisCycle);
+            const plannedLeft = debt.paused ? 0 : Math.max(0, monthly - paidThisCycle);
             return (
               <article key={debt.id} className="rounded-panel border border-line bg-surface p-4 shadow-card">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-black text-ink">{debt.name}</h3><StatusPill active={debt.active} locale={locale} /><span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{t.debtTypes[debt.type]}</span></div>
+                    <div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-black text-ink">{debt.name}</h3><StatusPill active={debt.active} paused={debt.paused} locale={locale} /><span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-black text-primary">{t.debtTypes[debt.type]}</span></div>
                     <div className="mt-4 grid gap-3">
                       <ProgressBar percent={progress} color="bg-emerald-500" />
                       <div className="grid gap-2 text-sm font-bold text-muted sm:grid-cols-3">
@@ -221,7 +240,10 @@ export default async function DebtsCardsPage() {
                       <div className="grid gap-2">{history.map((payment) => <p key={payment.id} className="flex items-center justify-between gap-3 text-sm font-bold text-ink"><span>{payment.paid_date}</span><span>{formatMoney(payment.amount)}</span></p>)}</div>
                     </div>
                   </div>
-                  <ToggleActiveForm id={debt.id} active={debt.active} kind="debt" locale={locale} />
+                  <div className="grid justify-items-start gap-2 sm:justify-items-end">
+                    <ToggleActiveForm id={debt.id} active={debt.active} paused={debt.paused} kind="debt" locale={locale} />
+                    {debt.paused ? <p className="max-w-xs text-xs font-semibold text-warning sm:text-right">{t.debtPauseHint}</p> : null}
+                  </div>
                 </div>
                 <LazyDetails className="mt-4" summaryClassName="cursor-pointer text-sm font-black text-primary" summary={t.editDebt}><div className="mt-3"><DebtForm debt={debt} compact locale={locale} /></div></LazyDetails>
               </article>
@@ -284,12 +306,13 @@ export default async function DebtsCardsPage() {
                     <div className="grid gap-2">
                       {cardInstallments.map((installment) => (
                         <div key={installment.id} className="rounded-2xl bg-surface p-3 text-sm font-bold text-ink">
-                          <div className="flex flex-wrap items-center justify-between gap-2"><span>{installment.name}</span><StatusPill active={installment.active} locale={locale} /></div>
+                          <div className="flex flex-wrap items-center justify-between gap-2"><span>{installment.name}</span><StatusPill active={installment.active} paused={installment.paused} locale={locale} /></div>
                           <p className="mt-2 text-muted">{t.installmentMonthly} {formatMoney(installment.monthly_payment)} · {t.installmentRemaining} {formatMoney(installment.remaining_balance)}</p>
                           <div className="mt-2 flex flex-wrap gap-2">
-                            <ToggleActiveForm id={installment.id} active={installment.active} kind="debt" locale={locale} />
+                            <ToggleActiveForm id={installment.id} active={installment.active} paused={installment.paused} kind="debt" locale={locale} />
                             <DeleteDebtForm id={installment.id} locale={locale} />
                           </div>
+                          {installment.paused ? <p className="mt-2 text-xs font-semibold text-warning">{t.debtPauseHint}</p> : null}
                         </div>
                       ))}
                     </div>

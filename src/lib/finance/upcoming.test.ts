@@ -227,6 +227,34 @@ describe("buildUpcomingItems", () => {
     expect(summary.items[0].amount).toBe(12000);
   });
 
+  it("does not create debt reminders while paused and resumes with only the current cycle amount", () => {
+    const paused = buildUpcomingItems({
+      rows: rows({
+        debts: [{ id: "d1", name: "Main debt", remaining_balance: "469000", monthly_payment: "9000", active: true, paused: true }]
+      }),
+      cycleStart,
+      cycleEnd,
+      today
+    });
+    expect(paused.items.find((item) => item.id === "debt-d1")).toBeUndefined();
+
+    // Resume in a later cycle. Payments (or lack of payments) from cycles that
+    // elapsed while paused are intentionally irrelevant: only one current-cycle
+    // installment becomes due immediately.
+    const laterCycleStart = new Date(2026, 9, 25, 12);
+    const laterCycleEnd = new Date(2026, 10, 24, 12);
+    const resumed = buildUpcomingItems({
+      rows: rows({
+        debts: [{ id: "d1", name: "Main debt", remaining_balance: "469000", monthly_payment: "9000", active: true, paused: false }]
+      }),
+      cycleStart: laterCycleStart,
+      cycleEnd: laterCycleEnd,
+      today: new Date(2026, 9, 25, 12)
+    });
+
+    expect(resumed.items.find((item) => item.id === "debt-d1")?.amount).toBe(9000);
+  });
+
   it("lists a debt whose monthly payment is not yet recorded and clears once paid", () => {
     const debtRows = rows({
       debts: [{ id: "d1", name: "Main debt", remaining_balance: "500000", monthly_payment: "9000", active: true }]

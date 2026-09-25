@@ -478,7 +478,7 @@ export async function processDueInstallmentCharges(): Promise<InstallmentChargeR
   const [installmentsResult, cardsResult, transactionsResult] = await Promise.all([
     supabase
       .from("debts")
-      .select("id,type,card_id,category_id,monthly_payment,remaining_balance,active")
+      .select("id,type,card_id,category_id,monthly_payment,remaining_balance,active,paused")
       .eq("user_id", userId)
       .eq("type", "installment")
       .eq("active", true)
