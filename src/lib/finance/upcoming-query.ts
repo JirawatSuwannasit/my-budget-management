@@ -19,7 +19,7 @@ export const loadUpcomingSummaryForRequest = cache(async (userId: string, asOfDa
       supabase.from("transactions").select("id,account_id,category_id,type,amount,transaction_date,cycle_start_date,related_entity_id").eq("user_id", userId).eq("cycle_start_date", start),
       supabase.from("subscriptions").select("id,name,frequency,price,billing_day,active,source_card_id").eq("user_id", userId).eq("active", true),
       supabase.from("annual_expenses").select("id,name,annual_amount,monthly_reserve,due_date,active").eq("user_id", userId).eq("active", true),
-      supabase.from("debts").select("id,name,type,card_id,remaining_balance,monthly_payment,active").eq("user_id", userId).eq("active", true),
+      supabase.from("debts").select("id,name,type,card_id,remaining_balance,monthly_payment,active,paused").eq("user_id", userId).eq("active", true),
       supabase.from("debt_payments").select("id,debt_id,amount,paid_date").eq("user_id", userId).gte("paid_date", start).lte("paid_date", end),
       supabase.from("credit_cards").select("id,name,billing_cut_day,payment_due_day,active").eq("user_id", userId).eq("active", true),
       supabase.from("card_payments").select("id,card_id,amount").eq("user_id", userId),
