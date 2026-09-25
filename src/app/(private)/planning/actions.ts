@@ -474,7 +474,7 @@ export async function processDueInstallmentCharges(): Promise<InstallmentChargeR
   const cycle = getFinancialCycle(todayAtNoon(), startDay);
   const cycleStartKey = toDateInput(cycle.start);
 
-  const [installmentsResult, transactionsResult] = await Promise.all([
+  const [installmentsResult, cardsResult, transactionsResult] = await Promise.all([
     supabase
       .from("debts")
       .select("id,type,card_id,category_id,monthly_payment,remaining_balance,active")
@@ -483,14 +483,26 @@ export async function processDueInstallmentCharges(): Promise<InstallmentChargeR
       .eq("active", true)
       .not("card_id", "is", null)
       .gt("remaining_balance", 0),
-    supabase.from("transactions").select("related_entity_id,cycle_start_date").eq("user_id", userId).eq("cycle_start_date", cycleStartKey)
+    supabase.from("credit_cards").select("id,billing_cut_day").eq("user_id", userId),
+    supabase
+      .from("transactions")
+      .select("related_entity_id,transaction_date")
+      .eq("user_id", userId)
+      .eq("type", "credit_card_expense")
+      .not("related_entity_id", "is", null)
   ]);
-  if (installmentsResult.error || transactionsResult.error) return { charged: 0, skipped: 0 };
+  if (installmentsResult.error || cardsResult.error || transactionsResult.error) return { charged: 0, skipped: 1 };
+
+  const cutDayByCardId = new Map((cardsResult.data ?? []).map((card) => [card.id, Number(card.billing_cut_day)]));
+  const installments = (installmentsResult.data ?? []).map((installment) => ({
+    ...installment,
+    billing_cut_day: cutDayByCardId.get(installment.card_id ?? "") ?? 0
+  })) as ChargeableInstallment[];
 
   const dueCharges = selectDueInstallmentCharges({
-    installments: (installmentsResult.data ?? []) as ChargeableInstallment[],
-    cycleTransactions: (transactionsResult.data ?? []) as CycleTransactionLink[],
-    cycleStart: cycle.start
+    installments,
+    chargeTransactions: transactionsResult.data ?? [],
+    today: todayAtNoon()
   });
   if (dueCharges.length === 0) return { charged: 0, skipped: 0 };
 
@@ -504,11 +516,12 @@ export async function processDueInstallmentCharges(): Promise<InstallmentChargeR
         p_transaction_date: toDateInput(todayAtNoon())
       });
       const result = data as AutomatedChargeRpcResult | null;
-      if (error || result?.status !== "created") {
+      if (error) {
         skipped += 1;
         continue;
       }
-      charged += 1;
+      if (result?.status === "created") charged += 1;
+      // already_processed is an expected idempotent no-op, not a warning.
     } catch {
       skipped += 1;
     }
