@@ -510,6 +510,19 @@ describe("Supabase dashboard row mapping", () => {
     expect(snapshot.remainingCreditCardPayable).toBe(7000);
   });
 
+  it("keeps paused debt principal in debt remaining but removes its current-cycle payment plan", () => {
+    const input = mapDashboardRowsToInput(
+      rows({
+        debts: [{ id: "debt", name: "Main debt", remaining_balance: "469000", monthly_payment: "9000", active: true, paused: true }]
+      }),
+      cycleStart,
+      cycleEnd
+    );
+
+    expect(input.debtRemaining).toBe(469000);
+    expect(input.plannedDebtPayments).toEqual([]);
+  });
+
   it("reduces planned debt payment only by payments inside the current cycle", () => {
     const input = mapDashboardRowsToInput(
       rows({
