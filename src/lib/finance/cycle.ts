@@ -49,6 +49,24 @@ export function getLastBillingCutDate(today: Date, cutDay: number): Date {
   return new Date(year, month - 1, clampDayToMonth(year, month - 1, cutDay), 12);
 }
 
+// Start date of the credit-card statement period that contains `date`.
+// A transaction dated on the cut day still belongs to the statement ending
+// that day, so the next period begins on the following calendar day.
+export function getCardBillingPeriodStart(date: Date, cutDay: number): Date {
+  const localDate = atLocalNoon(date);
+  const year = localDate.getFullYear();
+  const month = localDate.getMonth();
+  const day = localDate.getDate();
+  const thisMonthCutDay = clampDayToMonth(year, month, cutDay);
+
+  const previousCut =
+    day <= thisMonthCutDay
+      ? new Date(year, month - 1, clampDayToMonth(year, month - 1, cutDay), 12)
+      : new Date(year, month, thisMonthCutDay, 12);
+
+  return new Date(previousCut.getFullYear(), previousCut.getMonth(), previousCut.getDate() + 1, 12);
+}
+
 export function getFinancialCycle(inputDate: Date, startDay: number = DEFAULT_CYCLE_START_DAY): FinancialCycle {
   const cycleStartDay = clampStartDay(startDay);
   const date = atLocalNoon(inputDate);

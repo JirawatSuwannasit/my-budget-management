@@ -254,7 +254,11 @@ export default async function DebtsCardsPage() {
               cardTransactions: cardTransactions.filter((transaction) => transaction.card_id === card.id),
               cardPayments: cardPayments.filter((payment) => payment.card_id === card.id)
             });
-            const cardInstallments = debts.filter((debt) => debt.type === "installment" && debt.card_id === card.id);
+            // Completed installments stay in the database for audit/history but
+            // disappear from the active card list once no scheduled amount remains.
+            const cardInstallments = debts.filter(
+              (debt) => debt.type === "installment" && debt.card_id === card.id && toNumber(debt.remaining_balance) > 0
+            );
             const recentCardTransactions = cardTransactions.filter((transaction) => transaction.card_id === card.id).slice(0, 5);
             const recentPayments = cardPayments.filter((payment) => payment.card_id === card.id).slice(0, 5);
             return (

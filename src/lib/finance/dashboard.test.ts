@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCycleStartForSalaryPayment, getFinancialCycle, getLastBillingCutDate, getSalaryPaymentForCycle } from "./cycle";
+import { getCardBillingPeriodStart, getCycleStartForSalaryPayment, getFinancialCycle, getLastBillingCutDate, getSalaryPaymentForCycle } from "./cycle";
 import { calculateDashboardSnapshot } from "./dashboard";
 import { getAccountBalanceDeltas } from "./transaction-effects";
 import { computeCardObligation, hasRealDashboardRows, mapDashboardRowsToInput, type DashboardRows } from "./dashboard-data";
@@ -201,6 +201,21 @@ describe("financial cycle rules", () => {
     const cycleStart = getCycleStartForSalaryPayment(new Date(2026, 6, 31, 9), 1);
 
     expect(cycleStart).toEqual(new Date(2026, 7, 1, 12));
+  });
+});
+
+describe("getCardBillingPeriodStart", () => {
+  it("keeps dates before and on the cut day in the statement period that started after the previous cut", () => {
+    expect(getCardBillingPeriodStart(new Date(2026, 8, 25, 12), 30)).toEqual(new Date(2026, 7, 31, 12));
+    expect(getCardBillingPeriodStart(new Date(2026, 8, 30, 12), 30)).toEqual(new Date(2026, 7, 31, 12));
+  });
+
+  it("starts a new statement period on the day after the cut", () => {
+    expect(getCardBillingPeriodStart(new Date(2026, 9, 1, 12), 30)).toEqual(new Date(2026, 9, 1, 12));
+  });
+
+  it("clamps a 31st cut day in short months", () => {
+    expect(getCardBillingPeriodStart(new Date(2026, 2, 1, 12), 31)).toEqual(new Date(2026, 2, 1, 12));
   });
 });
 

@@ -1,4 +1,4 @@
-import type { CycleTransactionLink } from "./subscription-charges";
+import { getCardBillingPeriodStart } from "./cycle";
 
 // Lazy materialization (no scheduler in this stack): on app open we compute which
 // active, card-linked installments still have a remaining balance and haven't
@@ -15,6 +15,12 @@ export type ChargeableInstallment = {
   monthly_payment: number | string;
   remaining_balance: number | string;
   active: boolean | null;
+  billing_cut_day: number;
+};
+
+export type InstallmentChargeTransaction = {
+  related_entity_id: string | null;
+  transaction_date: string;
 };
 
 export type DueInstallmentCharge = {
@@ -26,8 +32,8 @@ export type DueInstallmentCharge = {
 
 type SelectDueParams = {
   installments: ChargeableInstallment[];
-  cycleTransactions: CycleTransactionLink[];
-  cycleStart: Date;
+  chargeTransactions: InstallmentChargeTransaction[];
+  today: Date;
 };
 
 function toNumber(value: number | string | null | undefined) {
@@ -43,35 +49,37 @@ function toDateInput(date: Date) {
   return year + "-" + month + "-" + day;
 }
 
-// Pure selection logic, deliberately separate from any Supabase I/O so it can be
-// unit tested directly. Correctness invariants: chargeAmount = min(monthly_payment,
-// remaining_balance), so the last cycle takes whatever remains and the sum of all
-// charges equals the original amount exactly, never overshooting; a debt with
-// remaining_balance <= 0 is never selected (the stop condition); and idempotency —
-// an installment already linked to a transaction this cycle (related_entity_id ===
-// debt.id) is excluded, so re-running mid-cycle after a successful charge selects
-// nothing further for it.
-export function selectDueInstallmentCharges({ installments, cycleTransactions, cycleStart }: SelectDueParams): DueInstallmentCharge[] {
-  const cycleStartKey = toDateInput(cycleStart);
-  const linkedIds = new Set(
-    cycleTransactions
-      .filter((transaction) => transaction.cycle_start_date === cycleStartKey)
-      .map((transaction) => transaction.related_entity_id)
-      .filter((id): id is string => Boolean(id))
-  );
-
+// Pure selection logic, deliberately separate from Supabase I/O. Installments
+// advance once per CREDIT-CARD statement period, not once per personal budget
+// cycle. Those boundaries can differ (for example budget cycle 25th, card cut
+// 30th); using the budget cycle can accidentally post two installments into one
+// statement. The DB RPC repeats the same period guard for concurrency safety.
+export function selectDueInstallmentCharges({ installments, chargeTransactions, today }: SelectDueParams): DueInstallmentCharge[] {
+  const todayKey = toDateInput(today);
   const due: DueInstallmentCharge[] = [];
+
   for (const installment of installments) {
     if (installment.active === false) continue;
     if (installment.type !== "installment") continue;
     if (!installment.card_id) continue;
+    if (!Number.isInteger(installment.billing_cut_day) || installment.billing_cut_day < 1 || installment.billing_cut_day > 31) continue;
+
     const remaining = toNumber(installment.remaining_balance);
     if (remaining <= 0) continue;
-    if (linkedIds.has(installment.id)) continue;
+
+    const periodStartKey = toDateInput(getCardBillingPeriodStart(today, installment.billing_cut_day));
+    const alreadyChargedThisStatement = chargeTransactions.some(
+      (transaction) =>
+        transaction.related_entity_id === installment.id &&
+        transaction.transaction_date >= periodStartKey &&
+        transaction.transaction_date <= todayKey
+    );
+    if (alreadyChargedThisStatement) continue;
 
     const amount = Math.min(toNumber(installment.monthly_payment), remaining);
     if (amount <= 0) continue;
     due.push({ debtId: installment.id, cardId: installment.card_id, categoryId: installment.category_id, amount });
   }
+
   return due;
 }
