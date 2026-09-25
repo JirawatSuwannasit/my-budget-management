@@ -445,8 +445,9 @@ export async function processDueSubscriptionCharges(): Promise<SubscriptionCharg
         p_transaction_date: toDateInput(todayAtNoon())
       });
       const result = data as AutomatedChargeRpcResult | null;
-      if (!error && result?.status === "created") charged += 1;
-      else skipped += 1; // already_processed is an expected, silent no-op.
+      if (error) skipped += 1;
+      else if (result?.status === "created") charged += 1;
+      // already_processed is an expected idempotent no-op, not a warning.
     } catch {
       skipped += 1;
     }
