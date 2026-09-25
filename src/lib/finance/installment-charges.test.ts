@@ -85,6 +85,22 @@ describe("selectDueInstallmentCharges", () => {
     expect(due[0].amount).toBe(0.01);
   });
 
+  it("skips a paused installment until it is resumed", () => {
+    const paused = selectDueInstallmentCharges({
+      installments: [installment({ paused: true })],
+      chargeTransactions: [],
+      today: sep1
+    });
+    expect(paused).toHaveLength(0);
+
+    const resumed = selectDueInstallmentCharges({
+      installments: [installment({ paused: false })],
+      chargeTransactions: [],
+      today: sep1
+    });
+    expect(resumed).toHaveLength(1);
+  });
+
   it("skips a cleared installment", () => {
     const due = selectDueInstallmentCharges({ installments: [installment({ remaining_balance: 0 })], chargeTransactions: [], today: sep1 });
     expect(due).toHaveLength(0);
