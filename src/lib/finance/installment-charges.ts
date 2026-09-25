@@ -15,6 +15,7 @@ export type ChargeableInstallment = {
   monthly_payment: number | string;
   remaining_balance: number | string;
   active: boolean | null;
+  paused?: boolean | null;
   billing_cut_day: number;
 };
 
@@ -60,6 +61,7 @@ export function selectDueInstallmentCharges({ installments, chargeTransactions, 
 
   for (const installment of installments) {
     if (installment.active === false) continue;
+    if (installment.paused === true) continue;
     if (installment.type !== "installment") continue;
     if (!installment.card_id) continue;
     if (!Number.isInteger(installment.billing_cut_day) || installment.billing_cut_day < 1 || installment.billing_cut_day > 31) continue;
