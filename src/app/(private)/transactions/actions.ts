@@ -57,6 +57,7 @@ function revalidateFinanceViews() {
   revalidatePath("/accounts");
   revalidatePath("/debts-cards");
   revalidatePath("/planning");
+  revalidatePath("/upcoming");
   revalidatePath("/categories");
 }
 function buildPayload(formData: FormData, userId: string, messages: TransactionMessages, startDay: number) {
