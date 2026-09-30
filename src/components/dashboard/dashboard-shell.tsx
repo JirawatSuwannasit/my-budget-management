@@ -25,11 +25,14 @@ type DashboardShellProps = {
 const SAFE_BUFFER_DAYS = 3;
 
 function formatMoney(value: number) {
+  const rounded = Math.round(value * 100) / 100;
+  const hasSatang = Math.abs(rounded - Math.trunc(rounded)) > 0;
   return new Intl.NumberFormat("th-TH", {
     style: "currency",
     currency: "THB",
-    maximumFractionDigits: 0
-  }).format(value);
+    minimumFractionDigits: hasSatang ? 2 : 0,
+    maximumFractionDigits: hasSatang ? 2 : 0
+  }).format(rounded);
 }
 
 function ProgressRow({ label, used, total, detail, color = "bg-primary" }: { label: string; used: number; total: number; detail?: string; color?: string }) {
