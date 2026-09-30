@@ -164,7 +164,9 @@ export function computeCardObligation({ billingCutDay, cardTransactions, cardPay
   const billedSpend = cardTransactions.filter((transaction) => transaction.transaction_date <= lastCutKey).reduce((total, transaction) => total + toNumber(transaction.amount), 0);
   const currentCycleSpending = cardTransactions.filter((transaction) => transaction.transaction_date > lastCutKey).reduce((total, transaction) => total + toNumber(transaction.amount), 0);
   const totalPaid = cardPayments.reduce((total, payment) => total + toNumber(payment.amount), 0);
-  const billedOutstanding = Math.max(0, billedSpend - totalPaid);
+  // All persisted money values are cent-precision. Round derived card balances
+  // back to cents so binary floating-point noise never creates phantom alerts.
+  const billedOutstanding = Math.max(0, Math.round((billedSpend - totalPaid) * 100) / 100);
 
   return { lastCut, billedSpend, currentCycleSpending, totalPaid, billedOutstanding };
 }
