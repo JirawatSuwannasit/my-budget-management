@@ -263,6 +263,35 @@ describe("computeCardObligation", () => {
     expect(obligation.billedOutstanding).toBe(6200);
   });
 
+  it("keeps real satang outstanding instead of rounding it away", () => {
+    const obligation = computeCardObligation(
+      {
+        billingCutDay,
+        cardTransactions: [{ amount: "950.23", transaction_date: "2026-07-20" }],
+        cardPayments: [{ amount: "950.00" }]
+      },
+      today
+    );
+
+    expect(obligation.billedOutstanding).toBe(0.23);
+  });
+
+  it("rounds binary floating-point residue back to zero at cent precision", () => {
+    const obligation = computeCardObligation(
+      {
+        billingCutDay,
+        cardTransactions: [
+          { amount: "0.10", transaction_date: "2026-07-20" },
+          { amount: "0.20", transaction_date: "2026-07-20" }
+        ],
+        cardPayments: [{ amount: "0.30" }]
+      },
+      today
+    );
+
+    expect(obligation.billedOutstanding).toBe(0);
+  });
+
   it("pays down the billed balance first and never goes negative", () => {
     const obligation = computeCardObligation(
       {
