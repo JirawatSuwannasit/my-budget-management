@@ -43,7 +43,14 @@ function toNumber(value: number | string | null | undefined) {
 }
 
 function formatMoney(value: number | string | null | undefined) {
-  return new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(toNumber(value));
+  const rounded = Math.round(toNumber(value) * 100) / 100;
+  const hasSatang = Math.abs(rounded - Math.trunc(rounded)) > 0;
+  return new Intl.NumberFormat("th-TH", {
+    style: "currency",
+    currency: "THB",
+    minimumFractionDigits: hasSatang ? 2 : 0,
+    maximumFractionDigits: hasSatang ? 2 : 0
+  }).format(rounded);
 }
 
 function toDateInput(date: Date) {
