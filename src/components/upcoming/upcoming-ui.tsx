@@ -4,7 +4,14 @@ import type { UpcomingItem, UpcomingSummary, UpcomingUrgency } from "@/lib/finan
 import { dictionaries, type Locale } from "@/lib/i18n/dictionaries";
 
 function formatMoney(value: number) {
-  return new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 0 }).format(value);
+  const rounded = Math.round(value * 100) / 100;
+  const hasSatang = Math.abs(rounded - Math.trunc(rounded)) > 0;
+  return new Intl.NumberFormat("th-TH", {
+    style: "currency",
+    currency: "THB",
+    minimumFractionDigits: hasSatang ? 2 : 0,
+    maximumFractionDigits: hasSatang ? 2 : 0
+  }).format(rounded);
 }
 
 function formatDate(dateKey: string) {
